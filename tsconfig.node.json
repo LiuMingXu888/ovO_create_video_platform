@@ -7,8 +7,10 @@
     "strict": true,
     "skipLibCheck": true,
     "target": "ES2022",
+    "rootDir": "electron",
     "outDir": "dist-electron",
+    "tsBuildInfoFile": "dist-electron/tsconfig.node.tsbuildinfo",
     "types": ["node"]
   },
-  "include": ["electron", "vite.config.ts"]
+  "include": ["electron"]
 }
