@@ -1,2 +1,21 @@
 .worktrees/
 .worktrees
+node_modules/
+dist/
+dist-electron/
+.vite/
+.DS_Store
+
+# Local app data and private API/session material
+storage/
+local-storage/
+api-captures/
+*.har
+*.log
+
+# Generated media
+outputs/
+*.mp4
+*.mov
+*.mp3
+*.wav
