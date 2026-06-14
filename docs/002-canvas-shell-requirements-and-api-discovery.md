@@ -188,6 +188,7 @@ Observed external avatar/resource host:
   - 音频
   - 视频
 - Each section has a header and a drawer-style collapse/expand control on the right.
+- All sections are expanded by default.
 - Collapsed sections hide their grid content.
 - Expanded sections show resource cards.
 
@@ -196,6 +197,9 @@ Observed external avatar/resource host:
 - Every video card uses a `9:16` visual ratio.
 - Use a six-column grid on desktop.
 - Images, videos, audio, scenes, characters, and props use the same interaction model, but their visual card presentation may differ by media type.
+- All image resources load into 人物 by default.
+- Users can drag image resource cards from 人物 into 场景 or 道具 to change their local category.
+- Dragging between 人物, 场景, and 道具 changes only the local shell category unless later API testing proves there is a safe server-side category field.
 - If a section has no data, show at least one upload placeholder card with a plus sign.
 - Clicking a placeholder opens local file selection.
 - Upload can select multiple files.
@@ -210,7 +214,7 @@ Each resource card has three actions:
 2. Download.
 3. Add to prompt.
 
-Clicking the plus action appends a reference token or asset mention into the fixed prompt area.
+Clicking the plus action inserts the resource name into the fixed prompt area, using the resource's current display name.
 
 ### Prompt Area
 
@@ -258,15 +262,10 @@ Behavior:
 - Use saved login state.
 - Load canvas snapshot and asset list.
 - Normalize resources into:
-  - character image assets
-  - scene image assets
-  - prop image assets
+  - image assets, loaded into 人物 by default
   - audio assets
   - video assets
-
-Current uncertainty:
-
-- The existing canvas appears to store characters, scenes, and props as image nodes without a strict server-side category. The app may need a local classification layer.
+- Support local drag-and-drop category changes from 人物 to 场景 or 道具.
 
 ### 2. Upload Assets
 
@@ -336,8 +335,8 @@ Need to verify:
 ## Implementation Guardrails
 
 - Do not read or commit browser cookies, localStorage dumps, tokens, or private API payloads.
-- Do not upload files without explicit user confirmation.
-- Do not trigger generation or subtitle-removal without explicit user confirmation.
+- Upload, generation, and subtitle-removal API tests are allowed after the user explicitly confirmed they can consume account credits.
+- Still avoid destructive operations and avoid committing any private payloads or generated account data to GitHub.
 - Do not push captured private project data to GitHub.
 - Commit and push every small verified feature to GitHub.
 - Before each feature, write or update a document and wait for user confirmation.
@@ -350,16 +349,20 @@ Build only the local UI shell first:
 - Static layout matching this document.
 - `ovO` logo.
 - Collapsible sections for 人物, 场景, 道具, 音频, 视频.
+- All sections expanded by default.
 - Six-column `9:16` resource card grid on desktop.
 - Empty-state plus placeholders.
+- Local drag-and-drop image categorization between 人物, 场景, and 道具.
+- Plus action inserts the resource display name into the prompt.
 - Fixed prompt box with compact and expanded focus states.
 - Reference-material strip with local validation logic, but no server upload yet.
 
 This slice has no company API side effects and can be reviewed visually before connecting real APIs.
 
-## Questions To Confirm
+## Confirmed Decisions
 
-1. For version 1, should characters, scenes, and props be separated by a local manual classification if the company API only returns image assets?
-2. For the first UI implementation, should every section be expanded by default, or should only 视频 be expanded like the reference sketch?
-3. Should the generation reference strip be the only source sent to `generate-video`, or should clicking plus on a resource also insert a textual marker into the prompt?
-4. Are generation and subtitle-removal allowed to be tested on the company account after you explicitly approve, even if they consume credits?
+1. All images load into 人物 by default.
+2. Images can be dragged from 人物 into 场景 or 道具 to change the local label/category.
+3. All sections are expanded by default.
+4. Clicking a card plus action inserts the resource name into the prompt area.
+5. Upload, video generation, and subtitle-removal tests may consume credits after explicit user approval for that test pass.
