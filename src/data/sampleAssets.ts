@@ -46,7 +46,7 @@ export const sampleAssets: CanvasAsset[] = [
     name: "紧张背景音乐",
     kind: "audio",
     category: "audio",
-    url: "",
+    url: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
     durationSeconds: 12,
     sizeBytes: 2_400_000
   },
