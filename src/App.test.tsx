@@ -173,41 +173,6 @@ describe("App shell", () => {
     expect(sceneSection).not.toHaveTextContent("scene-image");
   });
 
-  it("downloads remote assets by converting them to a local blob first", async () => {
-    const blob = new Blob(["asset"], { type: "image/png" });
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: () => Promise.resolve(blob)
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const { createObjectURL, revokeObjectURL } = mockObjectUrl("blob:downloaded-asset");
-
-    render(<App />);
-
-    const anchor = document.createElement("a");
-    const click = vi.fn();
-    vi.spyOn(anchor, "click").mockImplementation(click);
-    vi.spyOn(document, "createElement").mockImplementation(((tagName: string, options?: ElementCreationOptions) => {
-      if (tagName === "a") {
-        return anchor;
-      }
-
-      return Document.prototype.createElement.call(document, tagName, options);
-    }) as typeof document.createElement);
-
-    fireEvent.click(screen.getAllByTitle("下载")[1]);
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=600&q=80"
-    ));
-    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
-    expect(createObjectURL).toHaveBeenCalledWith(blob);
-    expect(anchor.href).toBe("blob:downloaded-asset");
-    expect(anchor.download).toBe("小区楼道");
-    expect(anchor.rel).toBe("noopener noreferrer");
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:downloaded-asset");
-  });
-
   it("checks auth state from the company API facade", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",

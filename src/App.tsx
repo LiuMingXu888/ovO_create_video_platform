@@ -5,6 +5,7 @@ import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
+import { downloadAsset } from "./lib/downloadAsset";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
 import type { AssetAction, AssetCategory, AssetKind, AuthState, CanvasAsset, CanvasProject, ReferenceItem } from "./types";
@@ -68,59 +69,6 @@ function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): As
   }
 
   return category;
-}
-
-function extractUrlExtension(url: string) {
-  try {
-    const pathname = new URL(url, window.location.href).pathname;
-    return pathname.match(/\.[A-Za-z0-9]{2,5}$/)?.[0] ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function getDownloadFileName(asset: CanvasAsset) {
-  const displayName = asset.name.trim() || "asset";
-
-  if (/\.[A-Za-z0-9]{2,5}$/.test(displayName)) {
-    return displayName;
-  }
-
-  return `${displayName}${extractUrlExtension(asset.url)}`;
-}
-
-function triggerDownload(url: string, fileName: string) {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.rel = "noopener noreferrer";
-  anchor.style.display = "none";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-}
-
-async function downloadAsset(asset: CanvasAsset) {
-  const fileName = getDownloadFileName(asset);
-
-  if (asset.url.startsWith("blob:")) {
-    triggerDownload(asset.url, fileName);
-    return;
-  }
-
-  try {
-    const response = await fetch(asset.url);
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    triggerDownload(objectUrl, fileName);
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    triggerDownload(asset.url, fileName);
-  }
 }
 
 function revokeObjectUrl(url: string | undefined) {
