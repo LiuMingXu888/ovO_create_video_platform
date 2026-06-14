@@ -460,6 +460,11 @@ button {
   background: #c93d46;
 }
 
+.generate-status {
+  color: #68705f;
+  font-size: 12px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

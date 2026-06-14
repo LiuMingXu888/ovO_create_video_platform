@@ -1,6 +1,12 @@
 import { CaptionsOff, Sparkles } from "lucide-react";
 
-export function GeneratePanel() {
+interface GeneratePanelProps {
+  onGenerate: () => void;
+  disabled?: boolean;
+  statusMessage?: string;
+}
+
+export function GeneratePanel({ onGenerate, disabled = false, statusMessage }: GeneratePanelProps) {
   return (
     <aside className="generate-panel" aria-label="生成设置">
       <div>
@@ -12,10 +18,11 @@ export function GeneratePanel() {
         <CaptionsOff size={16} />
         <span>去除字幕</span>
       </label>
-      <button type="button" className="generate-button">
+      <button type="button" className="generate-button" onClick={onGenerate} disabled={disabled}>
         <Sparkles size={18} />
         <span>生成视频</span>
       </button>
+      {statusMessage && <div className="generate-status">{statusMessage}</div>}
     </aside>
   );
 }

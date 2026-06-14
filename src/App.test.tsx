@@ -216,6 +216,16 @@ describe("App shell", () => {
     expect(await screen.findByText("接口图片")).toBeInTheDocument();
     expect(screen.getByText("接口项目")).toBeInTheDocument();
   });
+
+  it("builds a local generation payload preview without submitting the company API", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    expect(await screen.findByText("已生成请求预览，未提交公司接口")).toBeInTheDocument();
+    expect(screen.getByText(/Seedance 2.0/)).toBeInTheDocument();
+  });
 });
 
 describe("PromptDock", () => {
@@ -235,6 +245,7 @@ describe("PromptDock", () => {
         onPromptChange={() => undefined}
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
+        onGenerate={() => undefined}
       />
     );
 

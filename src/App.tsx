@@ -4,6 +4,7 @@ import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
+import { buildGenerateVideoPayload } from "./api/generationClient";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
 import { downloadAsset } from "./lib/downloadAsset";
 import { validateReferenceItems } from "./lib/referenceValidation";
@@ -126,6 +127,7 @@ export function App() {
   const [project, setProject] = useState<CanvasProject | null>(null);
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
+  const [generateStatus, setGenerateStatus] = useState<string | undefined>();
   const assetObjectUrls = useRef<Set<string>>(new Set());
   const referenceObjectUrls = useRef<Map<string, string>>(new Map());
   const mounted = useRef(true);
@@ -320,6 +322,22 @@ export function App() {
     setReferenceIssues((current) => current.filter((item) => item.id !== id));
   }
 
+  function handleGeneratePreview() {
+    const validation = validateReferenceItems(references);
+    if (!prompt.trim()) {
+      setGenerateStatus("请输入提示词");
+      return;
+    }
+
+    if (!validation.valid) {
+      setGenerateStatus(validation.errors.join(" / "));
+      return;
+    }
+
+    buildGenerateVideoPayload({ prompt, references });
+    setGenerateStatus("已生成请求预览，未提交公司接口");
+  }
+
   return (
     <main className="app-shell">
       <AppHeader authState={authState} project={project} />
@@ -357,6 +375,8 @@ export function App() {
         onPromptChange={setPrompt}
         onRemoveReference={removeReference}
         onLocalFilesSelected={handleReferenceFilesSelected}
+        onGenerate={handleGeneratePreview}
+        generateStatus={generateStatus}
       />
 
       <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />

@@ -10,6 +10,9 @@ interface PromptDockProps {
   onPromptChange: (value: string) => void;
   onRemoveReference: (id: string) => void;
   onLocalFilesSelected: (files: FileList) => void;
+  onGenerate: () => void;
+  generateDisabled?: boolean;
+  generateStatus?: string;
 }
 
 function getKindLabel(kind: ReferenceItem["kind"]) {
@@ -30,7 +33,10 @@ export function PromptDock({
   validationErrors = [],
   onPromptChange,
   onRemoveReference,
-  onLocalFilesSelected
+  onLocalFilesSelected,
+  onGenerate,
+  generateDisabled,
+  generateStatus
 }: PromptDockProps) {
   const validation = validateReferenceItems(references);
   const errors = [...validation.errors, ...validationErrors];
@@ -71,7 +77,7 @@ export function PromptDock({
           onChange={(event) => onPromptChange(event.currentTarget.value)}
           placeholder="输入视频提示词，点击资源 + 会插入资源名"
         />
-        <GeneratePanel />
+        <GeneratePanel onGenerate={onGenerate} disabled={generateDisabled} statusMessage={generateStatus} />
       </div>
     </div>
   );
