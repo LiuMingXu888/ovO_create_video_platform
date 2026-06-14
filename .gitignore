@@ -5,6 +5,9 @@ dist/
 dist-electron/
 .vite/
 .DS_Store
+.env
+.env.*
+!.env.example
 
 # Local app data and private API/session material
 storage/

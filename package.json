@@ -8,7 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "dev:electron": "concurrently -k \"npm run dev\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && vite build",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -30,7 +30,7 @@
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
-    "vitest": "^2.1.8",
+    "vitest": "^3.2.4",
     "wait-on": "^8.0.1"
   }
 }
