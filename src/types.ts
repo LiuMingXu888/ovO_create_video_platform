@@ -21,6 +21,8 @@ export interface ReferenceItem {
   kind: AssetKind;
   sizeBytes: number;
   durationSeconds?: number;
+  mimeType?: string;
+  fileName?: string;
   source: "asset" | "local-file";
 }
 

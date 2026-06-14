@@ -72,6 +72,10 @@ function validateVideos(items: ReferenceItem[], errors: string[]) {
     if (item.sizeBytes >= LIMITS.videoSize) {
       errors.push(`视频「${item.name}」必须小于 50MB`);
     }
+
+    if (shouldValidateLocalFormat(item) && !hasSupportedFileType(item, ["video/mp4", "video/quicktime"], [".mp4", ".mov"])) {
+      errors.push(`视频「${item.name}」仅支持 MP4、MOV 格式`);
+    }
   }
 }
 
@@ -88,9 +92,31 @@ function validateAudios(items: ReferenceItem[], errors: string[]) {
     if (item.sizeBytes >= LIMITS.audioSize) {
       errors.push(`音频「${item.name}」必须小于 15MB`);
     }
+
+    if (
+      shouldValidateLocalFormat(item) &&
+      !hasSupportedFileType(item, ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav"], [".mp3", ".wav"])
+    ) {
+      errors.push(`音频「${item.name}」仅支持 MP3、WAV 格式`);
+    }
   }
 }
 
 function sumDuration(items: ReferenceItem[]) {
   return items.reduce((sum, item) => sum + (item.durationSeconds ?? 0), 0);
+}
+
+function shouldValidateLocalFormat(item: ReferenceItem) {
+  return item.source === "local-file";
+}
+
+function hasSupportedFileType(item: ReferenceItem, mimeTypes: string[], extensions: string[]) {
+  const mimeType = item.mimeType?.toLowerCase();
+
+  if (mimeType) {
+    return mimeTypes.includes(mimeType);
+  }
+
+  const fileName = (item.fileName ?? item.name).toLowerCase();
+  return extensions.some((extension) => fileName.endsWith(extension));
 }

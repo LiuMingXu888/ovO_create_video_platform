@@ -11,6 +11,8 @@ function ref(overrides: Partial<ReferenceItem>): ReferenceItem {
     kind: overrides.kind ?? "image",
     sizeBytes: overrides.sizeBytes ?? mb,
     durationSeconds: overrides.durationSeconds,
+    mimeType: overrides.mimeType,
+    fileName: overrides.fileName,
     source: overrides.source ?? "asset"
   };
 }
@@ -73,5 +75,56 @@ describe("validateReferenceItems", () => {
     expect(result.errors).toContain("音频最多 3 个");
     expect(result.errors).toContain("音频「a4」必须小于 15MB");
     expect(result.errors).toContain("所有音频总时长不能超过 15 秒");
+  });
+
+  it("rejects unsupported local video and audio formats", () => {
+    const result = validateReferenceItems([
+      ref({
+        id: "webm-video",
+        kind: "video",
+        name: "webm-video",
+        durationSeconds: 4,
+        mimeType: "video/webm",
+        fileName: "webm-video.webm",
+        source: "local-file"
+      }),
+      ref({
+        id: "ogg-audio",
+        kind: "audio",
+        name: "ogg-audio",
+        durationSeconds: 4,
+        mimeType: "audio/ogg",
+        fileName: "ogg-audio.ogg",
+        source: "local-file"
+      })
+    ]);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("视频「webm-video」仅支持 MP4、MOV 格式");
+    expect(result.errors).toContain("音频「ogg-audio」仅支持 MP3、WAV 格式");
+  });
+
+  it("accepts local media when the MIME type is empty but the extension is supported", () => {
+    const result = validateReferenceItems([
+      ref({
+        kind: "video",
+        name: "empty-mime-video",
+        durationSeconds: 4,
+        mimeType: "",
+        fileName: "empty-mime-video.mov",
+        source: "local-file"
+      }),
+      ref({
+        kind: "audio",
+        name: "empty-mime-audio",
+        durationSeconds: 4,
+        mimeType: "",
+        fileName: "empty-mime-audio.wav",
+        source: "local-file"
+      })
+    ]);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 });

@@ -77,7 +77,19 @@ describe("App shell", () => {
     expect(screen.getByRole("button", { name: /图片 小区楼道/ })).toBeInTheDocument();
   });
 
-  it("uses local audio duration for reference validation and revokes the reference URL on removal", async () => {
+  it("does not add asset references beyond the hard reference limits", () => {
+    render(<App />);
+
+    const addButtons = screen.getAllByTitle("加入提示词");
+    for (let index = 0; index < 10; index += 1) {
+      fireEvent.click(addButtons[0]);
+    }
+
+    expect(screen.getByText("图片最多 9 张")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /图片 小区楼道/ })).toHaveLength(9);
+  });
+
+  it("uses local audio duration for reference validation and rejects overlong audio", async () => {
     const { revokeObjectURL } = mockObjectUrl("blob:local-audio");
     mockMediaDuration("audio", 16);
     const file = new File(["audio"], "long-audio.mp3", { type: "audio/mpeg" });
@@ -88,13 +100,78 @@ describe("App shell", () => {
     fireEvent.change(referenceInput as HTMLInputElement, { target: { files: [file] } });
 
     expect(await screen.findByText("所有音频总时长不能超过 15 秒")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /音频 long-audio/ }));
-
-    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:local-audio"));
+    expect(screen.queryByRole("button", { name: /音频 long-audio/ })).not.toBeInTheDocument();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:local-audio");
   });
 
-  it("downloads assets through a browser anchor click", () => {
+  it("revokes a valid local reference URL on removal", async () => {
+    const { revokeObjectURL } = mockObjectUrl("blob:valid-audio");
+    mockMediaDuration("audio", 5);
+    const file = new File(["audio"], "short-audio.mp3", { type: "audio/mpeg" });
+
+    render(<App />);
+
+    const referenceInput = screen.getByTitle("添加参考素材").querySelector("input");
+    fireEvent.change(referenceInput as HTMLInputElement, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByRole("button", { name: /音频 short-audio/ }));
+
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:valid-audio"));
+  });
+
+  it("rejects an invalid reference batch instead of adding over-limit items", async () => {
+    const { revokeObjectURL } = mockObjectUrl("blob:local-image");
+    const files = Array.from({ length: 10 }, (_, index) => new File(["image"], `image-${index}.png`, { type: "image/png" }));
+
+    render(<App />);
+
+    const referenceInput = screen.getByTitle("添加参考素材").querySelector("input");
+    fireEvent.change(referenceInput as HTMLInputElement, { target: { files } });
+
+    expect(await screen.findByText("图片最多 9 张")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /图片 image-0/ })).not.toBeInTheDocument();
+    expect(revokeObjectURL).toHaveBeenCalledTimes(10);
+  });
+
+  it("rejects unsupported local reference media formats", async () => {
+    const { revokeObjectURL } = mockObjectUrl("blob:local-webm");
+    mockMediaDuration("video", 4);
+    const file = new File(["video"], "clip.webm", { type: "video/webm" });
+
+    render(<App />);
+
+    const referenceInput = screen.getByTitle("添加参考素材").querySelector("input");
+    fireEvent.change(referenceInput as HTMLInputElement, { target: { files: [file] } });
+
+    expect(await screen.findByText("视频「clip」仅支持 MP4、MOV 格式")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /视频 clip/ })).not.toBeInTheDocument();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:local-webm");
+  });
+
+  it("uploads image assets into characters by default even from empty image sections", async () => {
+    mockObjectUrl("blob:scene-upload");
+    const file = new File(["image"], "scene-image.png", { type: "image/png" });
+
+    render(<App />);
+
+    const sceneSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    const sceneInput = sceneSection.querySelector("input") as HTMLInputElement;
+    fireEvent.change(sceneInput, { target: { files: [file] } });
+
+    expect(await screen.findByText("scene-image")).toBeInTheDocument();
+    expect(sceneSection.querySelector(".upload-placeholder")).toBeInTheDocument();
+    expect(sceneSection).not.toHaveTextContent("scene-image");
+  });
+
+  it("downloads remote assets by converting them to a local blob first", async () => {
+    const blob = new Blob(["asset"], { type: "image/png" });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(blob)
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { createObjectURL, revokeObjectURL } = mockObjectUrl("blob:downloaded-asset");
+
     render(<App />);
 
     const anchor = document.createElement("a");
@@ -110,12 +187,15 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getAllByTitle("下载")[1]);
 
-    expect(anchor.href).toBe(
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=600&q=80"
-    );
+    ));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(anchor.href).toBe("blob:downloaded-asset");
     expect(anchor.download).toBe("小区楼道");
     expect(anchor.rel).toBe("noopener noreferrer");
-    expect(click).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:downloaded-asset");
   });
 });
 

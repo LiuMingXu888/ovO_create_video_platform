@@ -4,6 +4,7 @@ import { AssetSection } from "./components/AssetSection";
 import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
+import { validateReferenceItems } from "./lib/referenceValidation";
 import type { AssetAction, AssetCategory, AssetKind, CanvasAsset, ReferenceItem } from "./types";
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
@@ -59,6 +60,14 @@ function getReferenceSize(asset: CanvasAsset) {
   return asset.sizeBytes ?? mb;
 }
 
+function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): AssetCategory {
+  if (kind === "image") {
+    return "characters";
+  }
+
+  return category;
+}
+
 function extractUrlExtension(url: string) {
   try {
     const pathname = new URL(url, window.location.href).pathname;
@@ -78,15 +87,38 @@ function getDownloadFileName(asset: CanvasAsset) {
   return `${displayName}${extractUrlExtension(asset.url)}`;
 }
 
-function downloadAsset(asset: CanvasAsset) {
+function triggerDownload(url: string, fileName: string) {
   const anchor = document.createElement("a");
-  anchor.href = asset.url;
-  anchor.download = getDownloadFileName(asset);
+  anchor.href = url;
+  anchor.download = fileName;
   anchor.rel = "noopener noreferrer";
   anchor.style.display = "none";
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
+}
+
+async function downloadAsset(asset: CanvasAsset) {
+  const fileName = getDownloadFileName(asset);
+
+  if (asset.url.startsWith("blob:")) {
+    triggerDownload(asset.url, fileName);
+    return;
+  }
+
+  try {
+    const response = await fetch(asset.url);
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    triggerDownload(objectUrl, fileName);
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    triggerDownload(asset.url, fileName);
+  }
 }
 
 function revokeObjectUrl(url: string | undefined) {
@@ -173,22 +205,31 @@ export function App() {
 
   function insertAsset(asset: CanvasAsset) {
     const token = asset.name.trim();
+    const reference: ReferenceItem = {
+      id: createId(`ref-${asset.id}`),
+      name: asset.name,
+      kind: asset.kind,
+      sizeBytes: getReferenceSize(asset),
+      durationSeconds: asset.durationSeconds,
+      source: "asset"
+    };
 
     setPrompt((current) => {
       const normalized = current.trim();
       return normalized ? `${normalized} ${token}` : token;
     });
-    setReferences((current) => [
-      ...current,
-      {
-        id: createId(`ref-${asset.id}`),
-        name: asset.name,
-        kind: asset.kind,
-        sizeBytes: getReferenceSize(asset),
-        durationSeconds: asset.durationSeconds,
-        source: "asset"
+    setReferences((current) => {
+      const candidateReferences = [...current, reference];
+      const validation = validateReferenceItems(candidateReferences);
+
+      if (validation.valid) {
+        setReferenceIssues([]);
+        return candidateReferences;
       }
-    ]);
+
+      setReferenceIssues(validation.errors.map((message) => ({ id: createId("reference-error"), message })));
+      return current;
+    });
   }
 
   function handleAssetAction(asset: CanvasAsset, action: AssetAction) {
@@ -225,7 +266,7 @@ export function App() {
         id: createId("local-asset"),
         name: getDisplayName(file),
         kind,
-        category,
+        category: getAssetCategoryForUpload(category, kind),
         url,
         sizeBytes: file.size
       };
@@ -258,6 +299,8 @@ export function App() {
             kind,
             sizeBytes: file.size,
             durationSeconds,
+            mimeType: file.type,
+            fileName: file.name,
             source: "local-file" as const
           },
           issue
@@ -269,11 +312,29 @@ export function App() {
       return;
     }
 
-    setReferences((current) => [...current, ...createdReferences.map(({ item }) => item)]);
-    setReferenceIssues((current) => [
-      ...current,
-      ...createdReferences.flatMap(({ issue }) => (issue ? [issue] : []))
-    ]);
+    const newItems = createdReferences.map(({ item }) => item);
+    const issues = createdReferences.flatMap(({ issue }) => (issue ? [issue] : []));
+
+    setReferences((current) => {
+      const candidateReferences = [...current, ...newItems];
+      const validation = validateReferenceItems(candidateReferences);
+
+      if (validation.valid && issues.length === 0) {
+        setReferenceIssues((currentIssues) => currentIssues.filter((issue) => !newItems.some((item) => item.id === issue.id)));
+        return candidateReferences;
+      }
+
+      newItems.forEach((item) => {
+        revokeObjectUrl(referenceObjectUrls.current.get(item.id));
+        referenceObjectUrls.current.delete(item.id);
+      });
+      setReferenceIssues((currentIssues) => [
+        ...currentIssues,
+        ...issues,
+        ...validation.errors.map((message) => ({ id: createId("reference-error"), message }))
+      ]);
+      return current;
+    });
   }
 
   function removeReference(id: string) {
