@@ -6,6 +6,7 @@ import { GeneratePanel } from "./GeneratePanel";
 interface PromptDockProps {
   prompt: string;
   references: ReferenceItem[];
+  validationErrors?: string[];
   onPromptChange: (value: string) => void;
   onRemoveReference: (id: string) => void;
   onLocalFilesSelected: (files: FileList) => void;
@@ -26,11 +27,13 @@ function getKindLabel(kind: ReferenceItem["kind"]) {
 export function PromptDock({
   prompt,
   references,
+  validationErrors = [],
   onPromptChange,
   onRemoveReference,
   onLocalFilesSelected
 }: PromptDockProps) {
   const validation = validateReferenceItems(references);
+  const errors = [...validation.errors, ...validationErrors];
 
   return (
     <div className="prompt-dock">
@@ -60,7 +63,7 @@ export function PromptDock({
         ))}
       </div>
 
-      {!validation.valid && <div className="validation-errors">{validation.errors.join(" / ")}</div>}
+      {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
 
       <div className="prompt-row">
         <textarea

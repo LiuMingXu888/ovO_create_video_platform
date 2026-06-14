@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { AssetSection } from "./components/AssetSection";
 import { PreviewModal } from "./components/PreviewModal";
@@ -8,6 +8,11 @@ import type { AssetAction, AssetCategory, AssetKind, CanvasAsset, ReferenceItem 
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
 const mb = 1024 * 1024;
+
+interface ReferenceIssue {
+  id: string;
+  message: string;
+}
 
 function createId(prefix: string) {
   const randomPart =
@@ -54,6 +59,76 @@ function getReferenceSize(asset: CanvasAsset) {
   return asset.sizeBytes ?? mb;
 }
 
+function extractUrlExtension(url: string) {
+  try {
+    const pathname = new URL(url, window.location.href).pathname;
+    return pathname.match(/\.[A-Za-z0-9]{2,5}$/)?.[0] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function getDownloadFileName(asset: CanvasAsset) {
+  const displayName = asset.name.trim() || "asset";
+
+  if (/\.[A-Za-z0-9]{2,5}$/.test(displayName)) {
+    return displayName;
+  }
+
+  return `${displayName}${extractUrlExtension(asset.url)}`;
+}
+
+function downloadAsset(asset: CanvasAsset) {
+  const anchor = document.createElement("a");
+  anchor.href = asset.url;
+  anchor.download = getDownloadFileName(asset);
+  anchor.rel = "noopener noreferrer";
+  anchor.style.display = "none";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+function revokeObjectUrl(url: string | undefined) {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function readMediaDuration(kind: AssetKind, objectUrl: string): Promise<number | undefined> {
+  if (kind === "image") {
+    return Promise.resolve(undefined);
+  }
+
+  return new Promise((resolve) => {
+    const media = document.createElement(kind === "audio" ? "audio" : "video");
+    let settled = false;
+    const timeoutId = window.setTimeout(() => settle(undefined), 5000);
+
+    function settle(duration: number | undefined) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      window.clearTimeout(timeoutId);
+      media.onloadedmetadata = null;
+      media.onerror = null;
+      media.removeAttribute("src");
+      resolve(duration);
+    }
+
+    media.preload = "metadata";
+    media.onloadedmetadata = () => {
+      settle(Number.isFinite(media.duration) ? media.duration : undefined);
+    };
+    media.onerror = () => {
+      settle(undefined);
+    };
+    media.src = objectUrl;
+  });
+}
+
 export function App() {
   const [assets, setAssets] = useState<CanvasAsset[]>(sampleAssets);
   const [expandedSections, setExpandedSections] = useState<AssetCategory[]>(
@@ -62,7 +137,23 @@ export function App() {
   const [draggedAsset, setDraggedAsset] = useState<CanvasAsset | null>(null);
   const [prompt, setPrompt] = useState("");
   const [references, setReferences] = useState<ReferenceItem[]>([]);
+  const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
+  const assetObjectUrls = useRef<Set<string>>(new Set());
+  const referenceObjectUrls = useRef<Map<string, string>>(new Map());
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+
+    return () => {
+      mounted.current = false;
+      assetObjectUrls.current.forEach(revokeObjectUrl);
+      referenceObjectUrls.current.forEach(revokeObjectUrl);
+      assetObjectUrls.current.clear();
+      referenceObjectUrls.current.clear();
+    };
+  }, []);
 
   const assetsByCategory = useMemo(() => {
     return sectionDefinitions.reduce<Record<AssetCategory, CanvasAsset[]>>(
@@ -107,7 +198,7 @@ export function App() {
     }
 
     if (action === "download") {
-      window.open(asset.url, "_blank", "noopener,noreferrer");
+      downloadAsset(asset);
       return;
     }
 
@@ -127,13 +218,15 @@ export function App() {
     const fallbackKind = kindFromCategory(category);
     const createdAssets: CanvasAsset[] = Array.from(files).map((file) => {
       const kind = kindFromFile(file, fallbackKind);
+      const url = URL.createObjectURL(file);
+      assetObjectUrls.current.add(url);
 
       return {
         id: createId("local-asset"),
         name: getDisplayName(file),
         kind,
         category,
-        url: URL.createObjectURL(file),
+        url,
         sizeBytes: file.size
       };
     });
@@ -141,16 +234,53 @@ export function App() {
     setAssets((current) => [...current, ...createdAssets]);
   }
 
-  function handleReferenceFilesSelected(files: FileList) {
-    const createdReferences: ReferenceItem[] = Array.from(files).map((file) => ({
-      id: createId("local-ref"),
-      name: getDisplayName(file),
-      kind: kindFromFile(file, "image"),
-      sizeBytes: file.size,
-      source: "local-file"
-    }));
+  async function handleReferenceFilesSelected(files: FileList) {
+    const createdReferences = await Promise.all(
+      Array.from(files).map(async (file) => {
+        const id = createId("local-ref");
+        const name = getDisplayName(file);
+        const kind = kindFromFile(file, "image");
+        const objectUrl = URL.createObjectURL(file);
+        referenceObjectUrls.current.set(id, objectUrl);
+        const durationSeconds = await readMediaDuration(kind, objectUrl);
+        const issue =
+          kind !== "image" && durationSeconds === undefined
+            ? {
+                id,
+                message: `无法读取「${name}」的媒体时长`
+              }
+            : undefined;
 
-    setReferences((current) => [...current, ...createdReferences]);
+        return {
+          item: {
+            id,
+            name,
+            kind,
+            sizeBytes: file.size,
+            durationSeconds,
+            source: "local-file" as const
+          },
+          issue
+        };
+      })
+    );
+
+    if (!mounted.current) {
+      return;
+    }
+
+    setReferences((current) => [...current, ...createdReferences.map(({ item }) => item)]);
+    setReferenceIssues((current) => [
+      ...current,
+      ...createdReferences.flatMap(({ issue }) => (issue ? [issue] : []))
+    ]);
+  }
+
+  function removeReference(id: string) {
+    revokeObjectUrl(referenceObjectUrls.current.get(id));
+    referenceObjectUrls.current.delete(id);
+    setReferences((current) => current.filter((item) => item.id !== id));
+    setReferenceIssues((current) => current.filter((item) => item.id !== id));
   }
 
   return (
@@ -176,8 +306,9 @@ export function App() {
       <PromptDock
         prompt={prompt}
         references={references}
+        validationErrors={referenceIssues.map((issue) => issue.message)}
         onPromptChange={setPrompt}
-        onRemoveReference={(id) => setReferences((current) => current.filter((item) => item.id !== id))}
+        onRemoveReference={removeReference}
         onLocalFilesSelected={handleReferenceFilesSelected}
       />
 
