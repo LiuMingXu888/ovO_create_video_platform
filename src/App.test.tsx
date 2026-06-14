@@ -58,6 +58,7 @@ describe("App shell", () => {
 
     expect(screen.getByLabelText("ovO")).toBeInTheDocument();
     expect(screen.getByText("未命名项目")).toBeInTheDocument();
+    expect(screen.getByText("未登录")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "人物" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "场景" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "道具" })).toBeInTheDocument();
