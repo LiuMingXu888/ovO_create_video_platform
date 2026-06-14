@@ -1,0 +1,38 @@
+import { loadProjectSnapshot } from "../api/canvasClient";
+import type { ApiTransport } from "../api/transport";
+import { normalizeSnapshotAssets } from "../lib/assetNormalizer";
+import { parseCanvasUrl } from "../lib/canvasUrl";
+import type { CanvasProject } from "../types";
+
+export interface LoadedCanvasResources {
+  project: CanvasProject;
+  assets: ReturnType<typeof normalizeSnapshotAssets>;
+}
+
+export async function loadCanvasResources(transport: ApiTransport, canvasUrl: string): Promise<LoadedCanvasResources> {
+  const parsed = parseCanvasUrl(canvasUrl);
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+
+  const snapshot = await loadProjectSnapshot(transport, parsed.projectId);
+  const title = getSnapshotTitle(snapshot);
+
+  return {
+    project: {
+      projectId: parsed.projectId,
+      canvasUrl: parsed.normalizedUrl,
+      title,
+      loadedAt: new Date().toISOString()
+    },
+    assets: normalizeSnapshotAssets(snapshot)
+  };
+}
+
+function getSnapshotTitle(snapshot: unknown) {
+  if (typeof snapshot === "object" && snapshot !== null && "title" in snapshot && typeof snapshot.title === "string") {
+    return snapshot.title;
+  }
+
+  return undefined;
+}
