@@ -1,8 +1,17 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./services/companyApiFacade", () => ({
+  companyApiFacade: {
+    checkAuth: vi.fn(),
+    loadCanvasResources: vi.fn()
+  }
+}));
+
 import { App } from "./App";
 import { PromptDock } from "./components/PromptDock";
+import { companyApiFacade } from "./services/companyApiFacade";
 import type { ReferenceItem } from "./types";
 
 afterEach(() => {
@@ -197,6 +206,50 @@ describe("App shell", () => {
     expect(anchor.download).toBe("小区楼道");
     expect(anchor.rel).toBe("noopener noreferrer");
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:downloaded-asset");
+  });
+
+  it("checks auth state from the company API facade", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176" }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "检查登录态" }));
+
+    expect(await screen.findByText("已登录：23176")).toBeInTheDocument();
+    expect(screen.getByText("23176")).toBeInTheDocument();
+  });
+
+  it("loads canvas resources into the existing grid", async () => {
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      assets: [
+        {
+          id: "api-image",
+          name: "接口图片",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByPlaceholderText("粘贴画布地址，例如 http://qijing.kjjhz.cn/canvas/..."), {
+      target: { value: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+
+    expect(await screen.findByText("接口图片")).toBeInTheDocument();
+    expect(screen.getByText("接口项目")).toBeInTheDocument();
   });
 });
 

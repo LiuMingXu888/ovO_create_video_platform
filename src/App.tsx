@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { AssetSection } from "./components/AssetSection";
+import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
 import { validateReferenceItems } from "./lib/referenceValidation";
-import type { AssetAction, AssetCategory, AssetKind, CanvasAsset, ReferenceItem } from "./types";
+import { companyApiFacade } from "./services/companyApiFacade";
+import type { AssetAction, AssetCategory, AssetKind, AuthState, CanvasAsset, CanvasProject, ReferenceItem } from "./types";
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
 const mb = 1024 * 1024;
@@ -171,6 +173,11 @@ export function App() {
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
+  const [canvasUrl, setCanvasUrl] = useState("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x");
+  const [authState, setAuthState] = useState<AuthState>({ status: "unknown" });
+  const [project, setProject] = useState<CanvasProject | null>(null);
+  const [canvasLoading, setCanvasLoading] = useState(false);
+  const [canvasError, setCanvasError] = useState<string | undefined>();
   const assetObjectUrls = useRef<Set<string>>(new Set());
   const referenceObjectUrls = useRef<Map<string, string>>(new Map());
   const mounted = useRef(true);
@@ -244,6 +251,27 @@ export function App() {
     }
 
     insertAsset(asset);
+  }
+
+  async function handleCheckAuth() {
+    setAuthState({ status: "checking" });
+    const nextState = await companyApiFacade.checkAuth();
+    setAuthState(nextState);
+  }
+
+  async function handleLoadCanvas() {
+    setCanvasLoading(true);
+    setCanvasError(undefined);
+
+    try {
+      const result = await companyApiFacade.loadCanvasResources(canvasUrl);
+      setProject(result.project);
+      setAssets(result.assets);
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
+    } finally {
+      setCanvasLoading(false);
+    }
   }
 
   function handleDropAsset(category: AssetCategory) {
@@ -346,7 +374,17 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <AppHeader />
+      <AppHeader authState={authState} project={project} />
+
+      <CanvasControls
+        canvasUrl={canvasUrl}
+        authState={authState}
+        loading={canvasLoading}
+        errorMessage={canvasError}
+        onCanvasUrlChange={setCanvasUrl}
+        onCheckAuth={handleCheckAuth}
+        onLoadCanvas={handleLoadCanvas}
+      />
 
       <div className="asset-workspace">
         {sectionDefinitions.map((section) => (

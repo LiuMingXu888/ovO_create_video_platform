@@ -131,6 +131,80 @@ button {
   margin: 18px auto 0;
 }
 
+.canvas-controls {
+  display: grid;
+  max-width: 1260px;
+  gap: 10px;
+  margin: 18px auto 0;
+  padding: 0 18px;
+}
+
+.canvas-url-field {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d7d4cc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.canvas-url-field input {
+  min-width: 0;
+  border: 0;
+  outline: none;
+  color: #202734;
+}
+
+.canvas-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 1px solid #d94c54;
+  background: #d94c54;
+  color: #ffffff;
+}
+
+.secondary-button {
+  border: 1px solid #d7d4cc;
+  background: #ffffff;
+  color: #2c3442;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.canvas-status-line,
+.canvas-error-line {
+  font-size: 12px;
+}
+
+.canvas-status-line {
+  color: #68705f;
+}
+
+.canvas-error-line {
+  color: #b4232d;
+}
+
 .asset-section {
   margin-bottom: 10px;
   overflow: hidden;
