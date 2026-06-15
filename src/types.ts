@@ -2,7 +2,15 @@ export type AssetKind = "image" | "audio" | "video";
 
 export type AssetCategory = "characters" | "scenes" | "props" | "audio" | "video";
 
-export type AssetAction = "preview" | "download" | "insert" | "rename" | "remove-subtitles" | "toggle-play" | "delete";
+export type AssetAction =
+  | "preview"
+  | "download"
+  | "insert"
+  | "rename"
+  | "remove-subtitles"
+  | "toggle-play"
+  | "delete"
+  | "reuse-generation";
 
 export type SortMode = "default" | "asc" | "desc";
 
@@ -21,6 +29,8 @@ export interface CanvasAsset {
   thumbnailUrl?: string;
   durationSeconds?: number;
   sizeBytes?: number;
+  generationPrompt?: string;
+  generationReferences?: ReferenceItem[];
 }
 
 export interface ReferenceItem {
@@ -31,6 +41,7 @@ export interface ReferenceItem {
   durationSeconds?: number;
   mimeType?: string;
   fileName?: string;
+  previewUrl?: string;
   source: "asset" | "local-file";
 }
 

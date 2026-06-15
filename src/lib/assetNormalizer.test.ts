@@ -12,7 +12,9 @@ describe("normalizeSnapshotAssets", () => {
         category: "characters",
         url: "https://example.com/man.png",
         thumbnailUrl: "https://example.com/man-thumb.png",
-        sizeBytes: 1024
+        sizeBytes: 1024,
+        generationPrompt: undefined,
+        generationReferences: undefined
       },
       {
         id: "audio-1",
@@ -21,7 +23,9 @@ describe("normalizeSnapshotAssets", () => {
         category: "audio",
         url: "https://example.com/bgm.mp3",
         durationSeconds: 12,
-        sizeBytes: 2048
+        sizeBytes: 2048,
+        generationPrompt: undefined,
+        generationReferences: undefined
       },
       {
         id: "video-1",
@@ -31,7 +35,9 @@ describe("normalizeSnapshotAssets", () => {
         url: "https://example.com/opening.mp4",
         thumbnailUrl: "https://example.com/opening.jpg",
         durationSeconds: 5,
-        sizeBytes: 4096
+        sizeBytes: 4096,
+        generationPrompt: undefined,
+        generationReferences: undefined
       }
     ]);
   });
@@ -74,7 +80,9 @@ describe("normalizeSnapshotAssets", () => {
         url: "https://example.com/hallway.webp",
         thumbnailUrl: undefined,
         durationSeconds: undefined,
-        sizeBytes: undefined
+        sizeBytes: undefined,
+        generationPrompt: undefined,
+        generationReferences: undefined
       },
       {
         id: "video-node",
@@ -84,7 +92,9 @@ describe("normalizeSnapshotAssets", () => {
         url: "https://example.com/video.mp4",
         thumbnailUrl: undefined,
         durationSeconds: 5,
-        sizeBytes: undefined
+        sizeBytes: undefined,
+        generationPrompt: undefined,
+        generationReferences: undefined
       }
     ]);
   });
@@ -116,7 +126,9 @@ describe("normalizeSnapshotAssets", () => {
         url: "https://example.com/nested.png",
         thumbnailUrl: undefined,
         durationSeconds: undefined,
-        sizeBytes: undefined
+        sizeBytes: undefined,
+        generationPrompt: undefined,
+        generationReferences: undefined
       }
     ]);
   });
@@ -148,7 +160,76 @@ describe("normalizeSnapshotAssets", () => {
         url: "https://example.com/wrapped.webp",
         thumbnailUrl: undefined,
         durationSeconds: undefined,
-        sizeBytes: undefined
+        sizeBytes: undefined,
+        generationPrompt: undefined,
+        generationReferences: undefined
+      }
+    ]);
+  });
+
+  it("normalizes reusable generation prompt and references on video assets", () => {
+    expect(
+      normalizeSnapshotAssets({
+        assets: [
+          {
+            id: "generated-video",
+            name: "生成视频",
+            type: "video",
+            url: "https://example.com/generated.mp4",
+            generationPrompt: "镜头缓慢推进，人物回头",
+            generationReferences: [
+              {
+                id: "ref-image",
+                name: "小区楼道",
+                kind: "image",
+                url: "https://example.com/hallway.png",
+                sizeBytes: 2048
+              },
+              {
+                id: "ref-audio",
+                name: "紧张音乐",
+                kind: "audio",
+                durationSeconds: 5
+              }
+            ]
+          }
+        ]
+      })
+    ).toEqual([
+      {
+        id: "generated-video",
+        name: "生成视频",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4",
+        thumbnailUrl: undefined,
+        durationSeconds: undefined,
+        sizeBytes: undefined,
+        generationPrompt: "镜头缓慢推进，人物回头",
+        generationReferences: [
+          {
+            id: "ref-image",
+            name: "小区楼道",
+            kind: "image",
+            sizeBytes: 2048,
+            durationSeconds: undefined,
+            mimeType: undefined,
+            fileName: undefined,
+            source: "asset",
+            previewUrl: "https://example.com/hallway.png"
+          },
+          {
+            id: "ref-audio",
+            name: "紧张音乐",
+            kind: "audio",
+            sizeBytes: 1048576,
+            durationSeconds: 5,
+            mimeType: undefined,
+            fileName: undefined,
+            source: "asset",
+            previewUrl: undefined
+          }
+        ]
       }
     ]);
   });

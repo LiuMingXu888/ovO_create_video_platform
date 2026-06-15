@@ -1,4 +1,4 @@
-import { CaptionsOff, Check, Download, Film, Maximize2, Package, Pause, Pencil, Play, Plus, Trash2, UserRound, X } from "lucide-react";
+import { CaptionsOff, Check, Download, Film, Maximize2, Package, Pause, Pencil, Play, Plus, RefreshCcw, Trash2, UserRound, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { AssetAction, AssetCategory, CanvasAsset } from "../types";
 
@@ -151,6 +151,17 @@ export function AssetCard({
             onClick={() => onAction(asset, "toggle-play")}
           >
             {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+          </button>
+        )}
+        {asset.kind === "video" && (
+          <button
+            type="button"
+            title={asset.generationPrompt && asset.generationReferences?.length ? "复用生成" : "暂无可复用的生成提示词和引用"}
+            aria-label={`复用生成 ${asset.name}`}
+            disabled={!asset.generationPrompt || !asset.generationReferences?.length}
+            onClick={() => onAction(asset, "reuse-generation")}
+          >
+            <RefreshCcw size={15} />
           </button>
         )}
         <button type="button" title="加入提示词" aria-label={`加入提示词 ${asset.name}`} onClick={() => onAction(asset, "insert")}>

@@ -1,4 +1,4 @@
-import type { AssetCategory, AssetKind, CanvasAsset } from "../types";
+import type { AssetCategory, AssetKind, CanvasAsset, ReferenceItem } from "../types";
 
 interface RawAssetRecord {
   id?: string;
@@ -23,6 +23,13 @@ interface RawAssetRecord {
   duration?: number;
   sizeBytes?: number;
   size?: number;
+  prompt?: string;
+  generationPrompt?: string;
+  references?: unknown;
+  generationReferences?: unknown;
+  referenceImages?: unknown;
+  referenceVideos?: unknown;
+  referenceAudios?: unknown;
   assetId?: string;
   category?: string;
   data?: unknown;
@@ -72,7 +79,9 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
     url,
     thumbnailUrl: record.thumbnailUrl ?? record.coverUrl ?? record.posterUrl,
     durationSeconds: record.durationSeconds ?? record.duration,
-    sizeBytes: record.sizeBytes ?? record.size
+    sizeBytes: record.sizeBytes ?? record.size,
+    generationPrompt: getGenerationPrompt(record),
+    generationReferences: getGenerationReferences(record)
   };
 }
 
@@ -210,10 +219,120 @@ function pickMediaFields(record: Record<string, unknown>): Partial<RawAssetRecor
     assetUri: stringValue(record.assetUri),
     thumbnailUrl: stringValue(record.thumbnailUrl),
     coverUrl: stringValue(record.coverUrl),
-    posterUrl: stringValue(record.posterUrl)
+    posterUrl: stringValue(record.posterUrl),
+    prompt: stringValue(record.prompt),
+    generationPrompt: stringValue(record.generationPrompt),
+    references: record.references,
+    generationReferences: record.generationReferences,
+    referenceImages: record.referenceImages,
+    referenceVideos: record.referenceVideos,
+    referenceAudios: record.referenceAudios
   };
 }
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function getGenerationPrompt(record: RawAssetRecord) {
+  return record.generationPrompt ?? record.prompt;
+}
+
+function getGenerationReferences(record: RawAssetRecord): ReferenceItem[] | undefined {
+  const directReferences = parseReferenceList(record.generationReferences ?? record.references);
+  const groupedReferences = [
+    ...parseNamedReferences(record.referenceImages, "image"),
+    ...parseNamedReferences(record.referenceAudios, "audio"),
+    ...parseNamedReferences(record.referenceVideos, "video")
+  ];
+  const references = [...directReferences, ...groupedReferences];
+
+  return references.length > 0 ? references : undefined;
+}
+
+function parseReferenceList(value: unknown): ReferenceItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item, index) => {
+    if (typeof item === "string") {
+      return [createReferenceItem(item, "image", index)];
+    }
+
+    if (!isRecord(item)) {
+      return [];
+    }
+
+    const url = stringValue(item.url) ?? stringValue(item.imageUrl) ?? stringValue(item.audioUrl) ?? stringValue(item.videoUrl);
+    const kind =
+      normalizeKind(item.kind) ??
+      normalizeKind(item.type) ??
+      normalizeKind(url) ??
+      normalizeKind(stringValue(item.fileName)) ??
+      "image";
+    const name = stringValue(item.name) ?? stringValue(item.title) ?? stringValue(item.label) ?? (url ? fallbackName(url) : `${kind}-${index + 1}`);
+
+    return [
+      {
+        id: stringValue(item.id) ?? `source-ref-${index + 1}`,
+        name,
+        kind,
+        sizeBytes: numberValue(item.sizeBytes) ?? numberValue(item.size) ?? 1024 * 1024,
+        durationSeconds: numberValue(item.durationSeconds) ?? numberValue(item.duration),
+        mimeType: stringValue(item.mimeType),
+        fileName: stringValue(item.fileName),
+        source: "asset" as const,
+        previewUrl: kind === "image" ? url : undefined
+      }
+    ];
+  });
+}
+
+function parseNamedReferences(value: unknown, kind: AssetKind): ReferenceItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item, index) => {
+    if (typeof item === "string") {
+      return [createReferenceItem(item, kind, index)];
+    }
+
+    if (!isRecord(item)) {
+      return [];
+    }
+
+    const url = stringValue(item.url) ?? stringValue(item.imageUrl) ?? stringValue(item.audioUrl) ?? stringValue(item.videoUrl);
+    const name = stringValue(item.name) ?? stringValue(item.title) ?? stringValue(item.label) ?? (url ? fallbackName(url) : `${kind}-${index + 1}`);
+    return [
+      {
+        id: stringValue(item.id) ?? `source-${kind}-${index + 1}`,
+        name,
+        kind,
+        sizeBytes: numberValue(item.sizeBytes) ?? numberValue(item.size) ?? 1024 * 1024,
+        durationSeconds: numberValue(item.durationSeconds) ?? numberValue(item.duration),
+        mimeType: stringValue(item.mimeType),
+        fileName: stringValue(item.fileName),
+        source: "asset" as const,
+        previewUrl: kind === "image" ? url : undefined
+      }
+    ];
+  });
+}
+
+function createReferenceItem(nameOrUrl: string, kind: AssetKind, index: number): ReferenceItem {
+  const looksLikeUrl = /^https?:\/\//.test(nameOrUrl);
+  return {
+    id: `source-${kind}-${index + 1}`,
+    name: looksLikeUrl ? fallbackName(nameOrUrl) : nameOrUrl,
+    kind,
+    sizeBytes: 1024 * 1024,
+    source: "asset",
+    previewUrl: kind === "image" && looksLikeUrl ? nameOrUrl : undefined
+  };
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
