@@ -6,6 +6,7 @@ interface CanvasControlsProps {
   authState: AuthState;
   loading: boolean;
   errorMessage?: string;
+  notice?: string;
   onCanvasUrlChange: (value: string) => void;
   onOpenLogin: () => void;
   onCheckAuth: () => void;
@@ -17,6 +18,7 @@ export function CanvasControls({
   authState,
   loading,
   errorMessage,
+  notice,
   onCanvasUrlChange,
   onOpenLogin,
   onCheckAuth,
@@ -58,6 +60,7 @@ export function CanvasControls({
       </div>
 
       <div className="canvas-status-line">{loading ? "正在连接公司接口" : authLabel}</div>
+      {notice && <div className="canvas-status-line">{notice}</div>}
       {errorMessage && <div className="canvas-error-line">{errorMessage}</div>}
     </section>
   );

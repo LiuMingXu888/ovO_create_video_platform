@@ -127,6 +127,7 @@ export function App() {
   const [project, setProject] = useState<CanvasProject | null>(null);
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
+  const [canvasNotice, setCanvasNotice] = useState<string | undefined>();
   const [generateStatus, setGenerateStatus] = useState<string | undefined>();
   const assetObjectUrls = useRef<Set<string>>(new Set());
   const referenceObjectUrls = useRef<Map<string, string>>(new Map());
@@ -218,11 +219,13 @@ export function App() {
   async function handleLoadCanvas() {
     setCanvasLoading(true);
     setCanvasError(undefined);
+    setCanvasNotice(undefined);
 
     try {
       const result = await companyApiFacade.loadCanvasResources(canvasUrl);
       setProject(result.project);
       setAssets(result.assets);
+      setCanvasNotice(`已加载 ${result.assets.length} 个资源`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
     } finally {
@@ -353,6 +356,7 @@ export function App() {
         authState={authState}
         loading={canvasLoading}
         errorMessage={canvasError}
+        notice={canvasNotice}
         onCanvasUrlChange={setCanvasUrl}
         onOpenLogin={handleOpenLogin}
         onCheckAuth={handleCheckAuth}

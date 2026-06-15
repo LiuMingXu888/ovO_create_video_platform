@@ -230,6 +230,7 @@ describe("App shell", () => {
 
     expect(await screen.findByText("接口图片")).toBeInTheDocument();
     expect(screen.getByText("接口项目")).toBeInTheDocument();
+    expect(screen.getByText("已加载 1 个资源")).toBeInTheDocument();
   });
 
   it("builds a local generation payload preview without submitting the company API", async () => {
