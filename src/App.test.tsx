@@ -238,8 +238,77 @@ describe("App shell", () => {
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
 
-    expect(await screen.findByText("已生成请求预览，未提交公司接口")).toBeInTheDocument();
+    expect(await screen.findByText("已生成 9:16 · 5s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
     expect(screen.getByText(/Seedance 2.0/)).toBeInTheDocument();
+  });
+
+  it("renames image and video assets locally", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名 小区楼道" }));
+    fireEvent.change(screen.getByDisplayValue("小区楼道"), { target: { value: "小区楼道改名" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
+
+    expect(await screen.findByText("小区楼道改名")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重命名 开场参考视频" }));
+    fireEvent.change(screen.getByDisplayValue("开场参考视频"), { target: { value: "视频改名" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
+
+    expect(await screen.findByText("视频改名")).toBeInTheDocument();
+  });
+
+  it("sorts assets inside one section by name without moving other sections", async () => {
+    render(<App />);
+
+    const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
+    const beforeSortNames = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
+
+    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序" }));
+
+    const afterSortNames = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
+
+    expect(beforeSortNames).not.toEqual(afterSortNames);
+    expect(afterSortNames).toEqual(["高铁站", "绿色行李箱", "男主秦扬人脸参考", "小区楼道"]);
+    expect(screen.getByText("紧张背景音乐")).toBeInTheDocument();
+  });
+
+  it("reorders images inside the same section by drag and drop", async () => {
+    render(<App />);
+
+    const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
+    const firstCard = screen.getByText("小区楼道").closest("article") as HTMLElement;
+    const targetCard = screen.getByText("男主秦扬人脸参考").closest("article") as HTMLElement;
+
+    fireEvent.dragStart(firstCard);
+    fireEvent.dragOver(targetCard);
+    fireEvent.drop(targetCard);
+
+    const names = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
+
+    expect(names).toEqual(["高铁站", "男主秦扬人脸参考", "小区楼道", "绿色行李箱"]);
+  });
+
+  it("moves subtitle removal from generate settings onto video cards", () => {
+    render(<App />);
+
+    expect(screen.queryByLabelText("去除字幕")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "去除字幕 开场参考视频" })).toBeInTheDocument();
+  });
+
+  it("shows generation controls for ratio, duration, and omnireference mode", async () => {
+    render(<App />);
+
+    expect(screen.getByLabelText("比例")).toHaveValue("9:16");
+    expect(screen.getByLabelText("时长")).toHaveValue("5");
+    expect(screen.getByLabelText("全能参考模式")).toBeChecked();
+
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByLabelText("比例"), { target: { value: "16:9" } });
+    fireEvent.change(screen.getByLabelText("时长"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    expect(await screen.findByText("已生成 16:9 · 10s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
   });
 });
 
@@ -261,6 +330,8 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
+        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true }}
+        onGenerationSettingsChange={() => undefined}
       />
     );
 

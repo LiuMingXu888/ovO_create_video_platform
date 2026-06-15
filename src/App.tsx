@@ -9,7 +9,16 @@ import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
 import { downloadAsset } from "./lib/downloadAsset";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
-import type { AssetAction, AssetCategory, AssetKind, AuthState, CanvasAsset, CanvasProject, ReferenceItem } from "./types";
+import type {
+  AssetAction,
+  AssetCategory,
+  AssetKind,
+  AuthState,
+  CanvasAsset,
+  CanvasProject,
+  GenerationSettings,
+  ReferenceItem
+} from "./types";
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
 const mb = 1024 * 1024;
@@ -119,6 +128,11 @@ export function App() {
   );
   const [draggedAsset, setDraggedAsset] = useState<CanvasAsset | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
+    aspectRatio: "9:16",
+    durationSeconds: 5,
+    omnireference: true
+  });
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
@@ -200,6 +214,11 @@ export function App() {
       return;
     }
 
+    if (action === "remove-subtitles") {
+      setGenerateStatus(`已为「${asset.name}」创建去字幕请求预览，未提交公司接口`);
+      return;
+    }
+
     insertAsset(asset);
   }
 
@@ -236,6 +255,66 @@ export function App() {
     }
 
     setAssets((current) => current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category } : asset)));
+    setDraggedAsset(null);
+  }
+
+  function renameAsset(assetId: string, name: string) {
+    setAssets((current) => current.map((asset) => (asset.id === assetId ? { ...asset, name } : asset)));
+    setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name } : item)));
+  }
+
+  function sortAssetsByName(category: AssetCategory) {
+    setAssets((current) => {
+      const collator = new Intl.Collator("zh-Hans-CN");
+      const sortedIds = current
+        .filter((asset) => asset.category === category)
+        .slice()
+        .sort((left, right) => collator.compare(left.name, right.name))
+        .map((asset) => asset.id);
+      let index = 0;
+
+      return current.map((asset) => {
+        if (asset.category !== category) {
+          return asset;
+        }
+
+        const nextAsset = current.find((candidate) => candidate.id === sortedIds[index]);
+        index += 1;
+        return nextAsset ?? asset;
+      });
+    });
+  }
+
+  function dropOnAsset(targetAsset: CanvasAsset) {
+    if (!draggedAsset || draggedAsset.id === targetAsset.id) {
+      return;
+    }
+
+    if (draggedAsset.kind === "image" && draggedAsset.category !== targetAsset.category && imageCategories.includes(targetAsset.category)) {
+      setAssets((current) => current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category: targetAsset.category } : asset)));
+      setDraggedAsset(null);
+      return;
+    }
+
+    if (draggedAsset.category !== targetAsset.category) {
+      setDraggedAsset(null);
+      return;
+    }
+
+    setAssets((current) => {
+      const withoutDragged = current.filter((asset) => asset.id !== draggedAsset.id);
+      const targetIndex = withoutDragged.findIndex((asset) => asset.id === targetAsset.id);
+
+      if (targetIndex < 0) {
+        return current;
+      }
+
+      return [
+        ...withoutDragged.slice(0, targetIndex + 1),
+        draggedAsset,
+        ...withoutDragged.slice(targetIndex + 1)
+      ];
+    });
     setDraggedAsset(null);
   }
 
@@ -340,8 +419,12 @@ export function App() {
       return;
     }
 
-    buildGenerateVideoPayload({ prompt, references });
-    setGenerateStatus("已生成请求预览，未提交公司接口");
+    buildGenerateVideoPayload({ prompt, references, settings: generationSettings });
+    setGenerateStatus(
+      `已生成 ${generationSettings.aspectRatio} · ${generationSettings.durationSeconds}s · ${
+        generationSettings.omnireference ? "全能参考" : "标准参考"
+      } 请求预览，未提交公司接口`
+    );
   }
 
   return (
@@ -368,9 +451,12 @@ export function App() {
             expanded={expandedSections.includes(section.id)}
             onToggle={toggleSection}
             onAction={handleAssetAction}
+            onRename={renameAsset}
+            onSortByName={sortAssetsByName}
             onFilesSelected={handleFilesSelected}
             onDragStart={setDraggedAsset}
             onDropAsset={handleDropAsset}
+            onDropOnAsset={dropOnAsset}
           />
         ))}
       </div>
@@ -384,6 +470,8 @@ export function App() {
         onLocalFilesSelected={handleReferenceFilesSelected}
         onGenerate={handleGeneratePreview}
         generateStatus={generateStatus}
+        generationSettings={generationSettings}
+        onGenerationSettingsChange={setGenerationSettings}
       />
 
       <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />

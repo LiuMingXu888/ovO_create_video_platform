@@ -2,7 +2,13 @@ export type AssetKind = "image" | "audio" | "video";
 
 export type AssetCategory = "characters" | "scenes" | "props" | "audio" | "video";
 
-export type AssetAction = "preview" | "download" | "insert";
+export type AssetAction = "preview" | "download" | "insert" | "rename" | "remove-subtitles";
+
+export interface GenerationSettings {
+  aspectRatio: "9:16" | "16:9" | "1:1";
+  durationSeconds: 5 | 10 | 16;
+  omnireference: boolean;
+}
 
 export interface CanvasAsset {
   id: string;

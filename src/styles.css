@@ -19,7 +19,8 @@ body {
 
 button,
 textarea,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -93,6 +94,7 @@ button {
 .icon-button,
 .account-button,
 .asset-card-overlay button,
+.asset-name-editor button,
 .modal-close,
 .generate-button {
   display: inline-flex;
@@ -224,13 +226,36 @@ button {
   border: 0;
   background: #ffffff;
   color: #d94c54;
-  cursor: pointer;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 0;
 }
 
 .section-header:hover {
+  background: #fff8f7;
+}
+
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-action-button {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f0c3c6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #d94c54;
+  cursor: pointer;
+}
+
+.section-action-button:hover {
+  border-color: #d94c54;
   background: #fff8f7;
 }
 
@@ -288,6 +313,8 @@ button {
   position: absolute;
   inset: 8px 8px auto auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 5px;
 }
 
@@ -312,6 +339,35 @@ button {
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.asset-name-editor {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  gap: 4px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 5px;
+}
+
+.asset-name-editor input {
+  min-width: 0;
+  border: 1px solid #d7d4cc;
+  border-radius: 6px;
+  padding: 0 6px;
+  color: #202734;
+  font-size: 12px;
+  outline: none;
+}
+
+.asset-name-editor button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
 }
 
 .upload-placeholder {
@@ -340,7 +396,7 @@ button {
 
 .reference-strip {
   display: flex;
-  width: min(900px, calc(100vw - 48px));
+  width: min(1120px, calc(100vw - 48px));
   min-height: 45px;
   align-items: center;
   gap: 8px;
@@ -386,14 +442,14 @@ button {
 }
 
 .validation-errors {
-  width: min(900px, calc(100vw - 48px));
+  width: min(1120px, calc(100vw - 48px));
   color: #b4232d;
   font-size: 12px;
 }
 
 .prompt-row {
   display: grid;
-  grid-template-columns: minmax(480px, 650px) 210px;
+  grid-template-columns: minmax(640px, 860px) 240px;
   align-items: stretch;
   gap: 10px;
 }
@@ -421,11 +477,28 @@ button {
 
 .generate-panel {
   display: grid;
-  gap: 10px;
+  height: 118px;
+  grid-template-rows: auto auto 1fr;
+  gap: 6px;
   border: 1px solid #d7d4cc;
   border-radius: 8px;
   background: #ffffff;
-  padding: 12px;
+  padding: 10px;
+  transition:
+    height 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.prompt-row:focus-within .generate-panel {
+  height: 178px;
+  box-shadow: 0 10px 28px rgba(217, 76, 84, 0.1);
+}
+
+.generate-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .generate-panel strong,
@@ -446,8 +519,27 @@ button {
   font-size: 13px;
 }
 
+.field-line {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: #2f3847;
+  font-size: 12px;
+}
+
+.field-line select {
+  min-width: 0;
+  height: 28px;
+  border: 1px solid #d7d4cc;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #202734;
+  padding: 0 8px;
+}
+
 .generate-button {
-  height: 42px;
+  height: 36px;
   gap: 8px;
   border-color: #d94c54;
   border-radius: 8px;
@@ -461,8 +553,12 @@ button {
 }
 
 .generate-status {
+  align-self: end;
+  overflow: hidden;
   color: #68705f;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-backdrop {
