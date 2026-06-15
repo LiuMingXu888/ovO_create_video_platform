@@ -1,17 +1,26 @@
-import type { ReferenceItem } from "../types";
+import type { GenerationSettings, ReferenceItem } from "../types";
 import type { ApiTransport } from "./transport";
 
 interface BuildGenerateVideoPayloadInput {
   prompt: string;
   references: ReferenceItem[];
+  settings?: GenerationSettings;
 }
 
 export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
+  const settings: GenerationSettings = input.settings ?? {
+    aspectRatio: "9:16",
+    durationSeconds: 5,
+    omnireference: true
+  };
+
   return {
     prompt: input.prompt,
     model: "Seedance 2.0",
-    aspectRatio: "9:16",
+    aspectRatio: settings.aspectRatio,
     resolution: "720p",
+    duration: settings.durationSeconds,
+    referenceMode: settings.omnireference ? "omnireference" : "standard",
     referenceImages: input.references.filter((item) => item.kind === "image").map((item) => item.name),
     referenceVideos: input.references.filter((item) => item.kind === "video").map((item) => item.name),
     referenceAudios: input.references.filter((item) => item.kind === "audio").map((item) => item.name)

@@ -1,6 +1,6 @@
 import { ImagePlus, X } from "lucide-react";
 import { validateReferenceItems } from "../lib/referenceValidation";
-import type { ReferenceItem } from "../types";
+import type { GenerationSettings, ReferenceItem } from "../types";
 import { GeneratePanel } from "./GeneratePanel";
 
 interface PromptDockProps {
@@ -11,6 +11,8 @@ interface PromptDockProps {
   onRemoveReference: (id: string) => void;
   onLocalFilesSelected: (files: FileList) => void;
   onGenerate: () => void;
+  generationSettings: GenerationSettings;
+  onGenerationSettingsChange: (settings: GenerationSettings) => void;
   generateDisabled?: boolean;
   generateStatus?: string;
 }
@@ -35,6 +37,8 @@ export function PromptDock({
   onRemoveReference,
   onLocalFilesSelected,
   onGenerate,
+  generationSettings,
+  onGenerationSettingsChange,
   generateDisabled,
   generateStatus
 }: PromptDockProps) {
@@ -77,7 +81,13 @@ export function PromptDock({
           onChange={(event) => onPromptChange(event.currentTarget.value)}
           placeholder="输入视频提示词，点击资源 + 会插入资源名"
         />
-        <GeneratePanel onGenerate={onGenerate} disabled={generateDisabled} statusMessage={generateStatus} />
+        <GeneratePanel
+          settings={generationSettings}
+          onSettingsChange={onGenerationSettingsChange}
+          onGenerate={onGenerate}
+          disabled={generateDisabled}
+          statusMessage={generateStatus}
+        />
       </div>
     </div>
   );

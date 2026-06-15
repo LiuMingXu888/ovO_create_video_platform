@@ -60,7 +60,17 @@ describe("validateReferenceItems", () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("视频最多 3 个");
     expect(result.errors).toContain("视频「v4」必须小于 50MB");
-    expect(result.errors).toContain("所有视频总时长必须控制在 2-15 秒");
+    expect(result.errors).toContain("所有视频总时长必须控制在 2-16 秒");
+  });
+
+  it("accepts video references up to 16 seconds total", () => {
+    const result = validateReferenceItems([
+      ref({ id: "v1", kind: "video", name: "v1", durationSeconds: 8, sizeBytes: 10 * mb }),
+      ref({ id: "v2", kind: "video", name: "v2", durationSeconds: 8, sizeBytes: 10 * mb })
+    ]);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it("rejects audio count, size, and duration violations", () => {
