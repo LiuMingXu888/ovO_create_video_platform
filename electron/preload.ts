@@ -1,9 +1,13 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("ovoDesktop", {
   version: "0.1.0",
   auth: {
-    openLoginWindow: async () => ({ ok: false, message: "登录窗口将在下一阶段接入" }),
-    clearSession: async () => ({ ok: true })
+    openLoginWindow: () => ipcRenderer.invoke("ovo:auth:open-login-window"),
+    checkSession: () => ipcRenderer.invoke("ovo:auth:check-session"),
+    clearSession: () => ipcRenderer.invoke("ovo:auth:clear-session")
+  },
+  discovery: {
+    inspectCanvas: (canvasUrl: string) => ipcRenderer.invoke("ovo:discovery:inspect-canvas", canvasUrl)
   }
 });
