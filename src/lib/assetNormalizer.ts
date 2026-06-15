@@ -38,6 +38,10 @@ function collectRawAssets(value: unknown): RawAssetRecord[] {
     return [];
   }
 
+  if (isRecord(value.snapshot)) {
+    return collectRawAssets(value.snapshot);
+  }
+
   const directAssets = value.assets;
   if (Array.isArray(directAssets)) {
     return directAssets.filter(isRecord) as RawAssetRecord[];
@@ -53,7 +57,7 @@ function collectRawAssets(value: unknown): RawAssetRecord[] {
 
 function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
   const url = getRecordUrl(record);
-  const kind = normalizeKind(record.kind ?? record.type ?? url);
+  const kind = normalizeKind(record.kind) ?? normalizeKind(record.type) ?? normalizeKind(url);
 
   if (!url || !kind) {
     return null;
@@ -73,9 +77,11 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
 
 function flattenNodeRecord(record: Record<string, unknown>): RawAssetRecord {
   const data = isRecord(record.data) ? record.data : {};
+  const nestedMedia = findNestedMediaRecord(record);
   return {
     ...record,
     ...data,
+    ...nestedMedia,
     id: stringValue(data.assetId) ?? stringValue(record.id),
     type: stringValue(data.type) ?? stringValue(record.type),
     kind: stringValue(data.kind) ?? stringValue(record.kind)
@@ -135,6 +141,63 @@ function fallbackName(url: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function findNestedMediaRecord(value: unknown): Partial<RawAssetRecord> {
+  const found = findFirstMediaRecord(value, new Set());
+  return found ? pickMediaFields(found) : {};
+}
+
+function findFirstMediaRecord(value: unknown, seen: Set<unknown>): Record<string, unknown> | undefined {
+  if (!isRecord(value) || seen.has(value)) {
+    return undefined;
+  }
+
+  seen.add(value);
+
+  if (hasMediaUrl(value)) {
+    return value;
+  }
+
+  for (const child of Object.values(value)) {
+    const found = findFirstMediaRecord(child, seen);
+    if (found) {
+      return found;
+    }
+  }
+
+  return undefined;
+}
+
+function hasMediaUrl(record: Record<string, unknown>) {
+  return [
+    record.url,
+    record.publicUrl,
+    record.src,
+    record.imageUrl,
+    record.audioUrl,
+    record.videoUrl,
+    record.providerVideoUrl,
+    record.seedanceProviderUrl,
+    record.assetUri
+  ].some((value) => typeof value === "string" && value.trim());
+}
+
+function pickMediaFields(record: Record<string, unknown>): Partial<RawAssetRecord> {
+  return {
+    url: stringValue(record.url),
+    publicUrl: stringValue(record.publicUrl),
+    src: stringValue(record.src),
+    imageUrl: stringValue(record.imageUrl),
+    audioUrl: stringValue(record.audioUrl),
+    videoUrl: stringValue(record.videoUrl),
+    providerVideoUrl: stringValue(record.providerVideoUrl),
+    seedanceProviderUrl: stringValue(record.seedanceProviderUrl),
+    assetUri: stringValue(record.assetUri),
+    thumbnailUrl: stringValue(record.thumbnailUrl),
+    coverUrl: stringValue(record.coverUrl),
+    posterUrl: stringValue(record.posterUrl)
+  };
 }
 
 function stringValue(value: unknown) {

@@ -88,4 +88,68 @@ describe("normalizeSnapshotAssets", () => {
       }
     ]);
   });
+
+  it("finds media URLs nested inside canvas node payloads", () => {
+    expect(
+      normalizeSnapshotAssets({
+        nodes: [
+          {
+            id: "nested-image-node",
+            type: "custom-node",
+            data: {
+              label: "嵌套图片节点",
+              payload: {
+                media: {
+                  imageUrl: "https://example.com/nested.png"
+                }
+              }
+            }
+          }
+        ]
+      })
+    ).toEqual([
+      {
+        id: "nested-image-node",
+        name: "嵌套图片节点",
+        kind: "image",
+        category: "characters",
+        url: "https://example.com/nested.png",
+        thumbnailUrl: undefined,
+        durationSeconds: undefined,
+        sizeBytes: undefined
+      }
+    ]);
+  });
+
+  it("loads nodes from the real snapshot response wrapper", () => {
+    expect(
+      normalizeSnapshotAssets({
+        snapshot: {
+          nodes: [
+            {
+              id: "wrapped-image-node",
+              type: "image",
+              data: {
+                name: "包裹图片",
+                imageUrl: "https://example.com/wrapped.webp"
+              }
+            }
+          ]
+        },
+        hash: "hash-1",
+        source: "server"
+      })
+    ).toEqual([
+      {
+        id: "wrapped-image-node",
+        name: "包裹图片",
+        kind: "image",
+        category: "characters",
+        url: "https://example.com/wrapped.webp",
+        thumbnailUrl: undefined,
+        durationSeconds: undefined,
+        sizeBytes: undefined
+      }
+    ]);
+  });
 });
