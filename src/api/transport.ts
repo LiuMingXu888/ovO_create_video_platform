@@ -14,7 +14,7 @@ export interface ApiRequestOptions {
 export class FetchApiTransport implements ApiTransport {
   constructor(
     private readonly origin = COMPANY_API_ORIGIN,
-    private readonly fetcher: typeof fetch = fetch
+    private readonly fetcher: typeof fetch = globalThis.fetch.bind(globalThis)
   ) {}
 
   async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
