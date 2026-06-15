@@ -1,4 +1,4 @@
-import { CaptionsOff, Check, Download, Maximize2, Pencil, Plus, Shapes, UserRound, X } from "lucide-react";
+import { CaptionsOff, Check, Download, Maximize2, Pencil, Plus, RefreshCcw, Shapes, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import type { AssetAction, AssetCategory, CanvasAsset } from "../types";
 
@@ -81,7 +81,10 @@ export function AssetCard({
         <button type="button" title="重命名" aria-label={`重命名 ${asset.name}`} onClick={() => setEditingName(true)}>
           <Pencil size={15} />
         </button>
-        {asset.kind === "video" && (
+      </div>
+
+      {asset.kind === "video" && (
+        <div className="asset-video-actions">
           <button
             type="button"
             title="去除字幕"
@@ -90,8 +93,17 @@ export function AssetCard({
           >
             <CaptionsOff size={15} />
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            title={asset.generationPrompt && asset.generationReferences?.length ? "复用生成" : "暂无可复用的生成提示词和引用"}
+            aria-label={`复用生成 ${asset.name}`}
+            disabled={!asset.generationPrompt || !asset.generationReferences?.length}
+            onClick={() => onAction(asset, "reuse-generation")}
+          >
+            <RefreshCcw size={15} />
+          </button>
+        </div>
+      )}
 
       {asset.kind === "image" && (
         <div className="asset-category-overlay">

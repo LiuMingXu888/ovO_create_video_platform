@@ -81,6 +81,25 @@ function getReferenceSize(asset: CanvasAsset) {
   return asset.sizeBytes ?? mb;
 }
 
+function createReferenceFromAsset(asset: CanvasAsset): ReferenceItem {
+  return {
+    id: createId(`ref-${asset.id}`),
+    name: asset.name,
+    kind: asset.kind,
+    sizeBytes: getReferenceSize(asset),
+    durationSeconds: asset.durationSeconds,
+    source: "asset",
+    previewUrl: asset.kind === "image" ? asset.thumbnailUrl ?? asset.url : undefined
+  };
+}
+
+function cloneReferenceForReuse(item: ReferenceItem): ReferenceItem {
+  return {
+    ...item,
+    id: createId(`reuse-${item.id}`)
+  };
+}
+
 function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): AssetCategory {
   if (kind === "image") {
     return "characters";
@@ -199,20 +218,8 @@ export function App() {
   }
 
   function insertAsset(asset: CanvasAsset) {
-    const token = asset.name.trim();
-    const reference: ReferenceItem = {
-      id: createId(`ref-${asset.id}`),
-      name: asset.name,
-      kind: asset.kind,
-      sizeBytes: getReferenceSize(asset),
-      durationSeconds: asset.durationSeconds,
-      source: "asset"
-    };
+    const reference = createReferenceFromAsset(asset);
 
-    setPrompt((current) => {
-      const normalized = current.trim();
-      return normalized ? `${normalized} ${token}` : token;
-    });
     setReferences((current) => {
       const candidateReferences = [...current, reference];
       const validation = validateReferenceItems(candidateReferences);
@@ -225,6 +232,28 @@ export function App() {
       setReferenceIssues(validation.errors.map((message) => ({ id: createId("reference-error"), message })));
       return current;
     });
+  }
+
+  function reuseGeneration(asset: CanvasAsset) {
+    if (!asset.generationPrompt || !asset.generationReferences?.length) {
+      setGenerateStatus(`「${asset.name}」暂无可复用的生成提示词和引用`);
+      return;
+    }
+
+    const nextReferences = asset.generationReferences.map(cloneReferenceForReuse);
+    const validation = validateReferenceItems(nextReferences);
+    setPrompt(asset.generationPrompt);
+
+    if (validation.valid) {
+      setReferenceIssues([]);
+      setReferences(nextReferences);
+      setGenerateStatus(`已复用「${asset.name}」的提示词和引用`);
+      return;
+    }
+
+    setReferences([]);
+    setReferenceIssues(validation.errors.map((message) => ({ id: createId("reference-error"), message })));
+    setGenerateStatus(validation.errors.join(" / "));
   }
 
   function handleAssetAction(asset: CanvasAsset, action: AssetAction) {
@@ -240,6 +269,11 @@ export function App() {
 
     if (action === "remove-subtitles") {
       setGenerateStatus(`已为「${asset.name}」创建去字幕请求预览，未提交公司接口`);
+      return;
+    }
+
+    if (action === "reuse-generation") {
+      reuseGeneration(asset);
       return;
     }
 
@@ -459,7 +493,8 @@ export function App() {
             durationSeconds,
             mimeType: file.type,
             fileName: file.name,
-            source: "local-file" as const
+            source: "local-file" as const,
+            previewUrl: kind === "image" ? objectUrl : undefined
           },
           issue
         };
@@ -515,6 +550,23 @@ export function App() {
     }
 
     buildGenerateVideoPayload({ prompt, references, settings: generationSettings });
+    const generatedAsset: CanvasAsset = {
+      id: createId("generated-video"),
+      name: `生成视频 ${assets.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`,
+      kind: "video",
+      category: "video",
+      url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+      thumbnailUrl: "https://images.unsplash.com/photo-1496062031456-07b8f162a322?auto=format&fit=crop&w=300&q=80",
+      durationSeconds: generationSettings.durationSeconds,
+      sizeBytes: 6_000_000,
+      generationPrompt: prompt,
+      generationReferences: references.map(cloneReferenceForReuse)
+    };
+    setAssets((current) => [...current, generatedAsset]);
+    setDefaultAssetOrder((current) => ({
+      ...current,
+      video: [...current.video, generatedAsset.id]
+    }));
     setGenerateStatus(
       `已生成 ${generationSettings.aspectRatio} · ${generationSettings.durationSeconds}s · ${
         generationSettings.omnireference ? "全能参考" : "标准参考"

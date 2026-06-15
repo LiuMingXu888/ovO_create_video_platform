@@ -17,16 +17,23 @@ interface PromptDockProps {
   generateStatus?: string;
 }
 
-function getKindLabel(kind: ReferenceItem["kind"]) {
-  if (kind === "image") {
-    return "图片";
+function getReferenceLabel(item: ReferenceItem, references: ReferenceItem[]) {
+  const sameKindIndex = references.filter((reference) => reference.kind === item.kind).findIndex((reference) => reference.id === item.id) + 1;
+
+  if (item.kind === "image") {
+    return `图${numberToChinese(sameKindIndex)}`;
   }
 
-  if (kind === "video") {
-    return "视频";
+  if (item.kind === "video") {
+    return `视频${numberToChinese(sameKindIndex)}`;
   }
 
-  return "音频";
+  return `音频${numberToChinese(sameKindIndex)}`;
+}
+
+function numberToChinese(value: number) {
+  const labels = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
+  return labels[value] ?? String(value);
 }
 
 export function PromptDock({
@@ -65,9 +72,19 @@ export function PromptDock({
         </label>
 
         {references.map((item) => (
-          <button key={item.id} type="button" className="reference-chip" onClick={() => onRemoveReference(item.id)}>
-            <span>{getKindLabel(item.kind)}</span>
+          <button
+            key={item.id}
+            type="button"
+            className={`reference-chip reference-chip-${item.kind}`}
+            onClick={() => onRemoveReference(item.id)}
+          >
+            <span className="reference-kind">{getReferenceLabel(item, references)}</span>
             <strong>{item.name}</strong>
+            {item.kind === "image" && item.previewUrl && (
+              <span className="reference-preview" aria-hidden="true">
+                <img src={item.previewUrl} alt="" />
+              </span>
+            )}
             <X size={14} />
           </button>
         ))}
@@ -79,7 +96,7 @@ export function PromptDock({
         <textarea
           value={prompt}
           onChange={(event) => onPromptChange(event.currentTarget.value)}
-          placeholder="输入视频提示词，点击资源 + 会插入资源名"
+          placeholder="输入视频提示词，点击资源 + 会加入引用"
         />
         <GeneratePanel
           settings={generationSettings}

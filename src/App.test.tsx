@@ -84,15 +84,39 @@ describe("App shell", () => {
     expect(screen.getAllByTitle("本地选择文件")).toHaveLength(2);
   });
 
-  it("inserts an asset name into the prompt and reference strip", () => {
+  it("adds an asset to the reference strip without inserting its name into the prompt", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
 
-    expect(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源名")).toHaveValue("小区楼道");
+    expect(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会加入引用")).toHaveValue("");
     expect(referenceChips()).toHaveLength(1);
-    expect(referenceChips()[0]).toHaveTextContent("图片");
+    expect(referenceChips()[0]).toHaveTextContent("图一");
     expect(referenceChips()[0]).toHaveTextContent("小区楼道");
+  });
+
+  it("labels references by kind and only gives image references hover previews", () => {
+    render(<App />);
+
+    const addButtons = screen.getAllByTitle("加入提示词");
+    fireEvent.click(addButtons[0]);
+    fireEvent.click(addButtons[4]);
+    fireEvent.click(addButtons[5]);
+    fireEvent.click(addButtons[1]);
+
+    expect(referenceChips().map((chip) => chip.querySelector(".reference-kind")?.textContent)).toEqual([
+      "图一",
+      "音频一",
+      "视频一",
+      "图二"
+    ]);
+    expect(document.querySelectorAll(".reference-preview")).toHaveLength(2);
+    expect(referenceChips()[0].querySelector(".reference-preview img")).toHaveAttribute(
+      "src",
+      expect.stringContaining("images.unsplash.com")
+    );
+    expect(referenceChips()[1].querySelector(".reference-preview")).toBeNull();
+    expect(referenceChips()[2].querySelector(".reference-preview")).toBeNull();
   });
 
   it("does not add asset references beyond the hard reference limits", () => {
@@ -132,7 +156,7 @@ describe("App shell", () => {
     const referenceInput = screen.getByTitle("添加参考素材").querySelector("input");
     fireEvent.change(referenceInput as HTMLInputElement, { target: { files: [file] } });
 
-    fireEvent.click(await screen.findByRole("button", { name: /音频 short-audio/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /音频一 short-audio/ }));
 
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:valid-audio"));
   });
@@ -249,6 +273,9 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会加入引用"), {
+      target: { value: "镜头缓慢推进，人物回头" }
+    });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
 
     expect(await screen.findByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
@@ -403,6 +430,32 @@ describe("App shell", () => {
 
     expect(screen.queryByLabelText("去除字幕")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "去除字幕 开场参考视频" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "复用生成 开场参考视频" })).toBeDisabled();
+  });
+
+  it("reuses a generated video's prompt and source references when metadata exists", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会加入引用"), {
+      target: { value: "镜头缓慢推进，人物回头" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
+
+    fireEvent.click(referenceChips()[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会加入引用"), {
+      target: { value: "" }
+    });
+    expect(referenceChips()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "复用生成 生成视频 1" }));
+
+    expect(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会加入引用")).toHaveValue("镜头缓慢推进，人物回头");
+    expect(referenceChips()).toHaveLength(1);
+    expect(referenceChips()[0]).toHaveTextContent("图一");
+    expect(referenceChips()[0]).toHaveTextContent("小区楼道");
   });
 
   it("shows generation controls for ratio, duration, and omnireference mode", async () => {
@@ -414,6 +467,9 @@ describe("App shell", () => {
     expect(screen.getByText("全能参考")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会加入引用"), {
+      target: { value: "夜路回头，镜头推进" }
+    });
     fireEvent.change(screen.getByLabelText("比例"), { target: { value: "16:9" } });
     fireEvent.change(screen.getByLabelText("时长"), { target: { value: "12" } });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
