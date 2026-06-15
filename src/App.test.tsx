@@ -187,19 +187,28 @@ describe("App shell", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:local-webm");
   });
 
-  it("uploads image assets into the selected image section", async () => {
+  it("categorizes uploaded image assets by Chinese name prefixes", async () => {
     mockObjectUrl("blob:scene-upload");
-    const file = new File(["image"], "scene-image.png", { type: "image/png" });
+    const files = [
+      new File(["image"], "场景-百家老宅.png", { type: "image/png" }),
+      new File(["image"], "道具-桂花糕.png", { type: "image/png" }),
+      new File(["image"], "女主林夏.png", { type: "image/png" })
+    ];
 
     render(<App />);
 
-    const sceneSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
-    const sceneInput = sceneSection.querySelector("input") as HTMLInputElement;
-    fireEvent.change(sceneInput, { target: { files: [file] } });
+    const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
+    const scenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    const propsSection = screen.getByRole("button", { name: "道具" }).closest("section") as HTMLElement;
+    const scenesInput = scenesSection.querySelector("input") as HTMLInputElement;
+    fireEvent.change(scenesInput, { target: { files } });
 
-    expect(await screen.findByText("scene-image")).toBeInTheDocument();
-    expect(sceneSection.querySelector(".upload-placeholder")).toBeInTheDocument();
-    expect(sceneSection).toHaveTextContent("scene-image");
+    expect(await screen.findByText("场景-百家老宅")).toBeInTheDocument();
+    expect(scenesSection).toHaveTextContent("场景-百家老宅");
+    expect(propsSection).toHaveTextContent("道具-桂花糕");
+    expect(charactersSection).toHaveTextContent("女主林夏");
+    expect(charactersSection).not.toHaveTextContent("场景-百家老宅");
+    expect(charactersSection).not.toHaveTextContent("道具-桂花糕");
   });
 
   it("uploads local files through the company canvas node flow when a real project is loaded", async () => {

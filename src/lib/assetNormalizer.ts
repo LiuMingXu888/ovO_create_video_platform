@@ -1,4 +1,5 @@
 import type { AssetCategory, AssetKind, CanvasAsset } from "../types";
+import { getCategoryForAssetName } from "./assetCategory";
 
 interface RawAssetRecord {
   id?: string;
@@ -68,7 +69,7 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
     id: record.assetId ?? record.id ?? `${kind}-${url}`,
     name: record.name ?? record.title ?? record.label ?? fallbackName(url),
     kind,
-    category: categoryForRecord(record, kind),
+    category: getCategoryForAssetName(kind, record.name ?? record.title ?? record.label ?? fallbackName(url), normalizeCategory(record.category) ?? "characters"),
     url,
     thumbnailUrl: record.thumbnailUrl ?? record.coverUrl ?? record.posterUrl,
     durationSeconds: record.durationSeconds ?? record.duration,
@@ -120,19 +121,6 @@ function normalizeKind(value: unknown): AssetKind | null {
   }
 
   return null;
-}
-
-function categoryForKind(kind: AssetKind): AssetCategory {
-  if (kind === "image") {
-    return "characters";
-  }
-
-  return kind;
-}
-
-function categoryForRecord(record: RawAssetRecord, kind: AssetKind): AssetCategory {
-  const category = normalizeCategory(record.category);
-  return category ?? categoryForKind(kind);
 }
 
 function normalizeCategory(value: unknown): AssetCategory | null {

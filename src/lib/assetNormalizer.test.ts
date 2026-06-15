@@ -36,6 +36,64 @@ describe("normalizeSnapshotAssets", () => {
     ]);
   });
 
+  it("categorizes image assets by Chinese name prefixes", () => {
+    expect(
+      normalizeSnapshotAssets({
+        assets: [
+          {
+            id: "scene-image",
+            name: "场景-百家老宅",
+            type: "image",
+            imageUrl: "https://example.com/house.png"
+          },
+          {
+            id: "prop-image",
+            title: "道具-桂花糕",
+            type: "image",
+            imageUrl: "https://example.com/cake.png"
+          },
+          {
+            id: "character-image",
+            label: "女主林夏",
+            type: "image",
+            imageUrl: "https://example.com/person.png"
+          }
+        ]
+      }).map((asset) => ({ name: asset.name, category: asset.category }))
+    ).toEqual([
+      { name: "场景-百家老宅", category: "scenes" },
+      { name: "道具-桂花糕", category: "props" },
+      { name: "女主林夏", category: "characters" }
+    ]);
+  });
+
+  it("keeps an explicit server category when it is already provided", () => {
+    expect(
+      normalizeSnapshotAssets({
+        assets: [
+          {
+            id: "server-image",
+            name: "普通图片",
+            type: "image",
+            category: "scenes",
+            imageUrl: "https://example.com/server.png"
+          }
+        ]
+      })
+    ).toEqual([
+      {
+        id: "server-image",
+        name: "普通图片",
+        kind: "image",
+        category: "scenes",
+        url: "https://example.com/server.png",
+        thumbnailUrl: undefined,
+        durationSeconds: undefined,
+        sizeBytes: undefined
+      }
+    ]);
+  });
+
   it("ignores records without a usable URL", () => {
     expect(normalizeSnapshotAssets({ assets: [{ id: "bad", name: "bad", type: "image" }] })).toEqual([]);
   });

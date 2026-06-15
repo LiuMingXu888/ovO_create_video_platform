@@ -8,6 +8,7 @@ import { buildGenerateVideoPayload } from "./api/generationClient";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
 import { downloadAsset, downloadAssets } from "./lib/downloadAsset";
 import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
+import { getCategoryForAssetName } from "./lib/assetCategory";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
 import type {
@@ -84,7 +85,7 @@ function getReferenceSize(asset: CanvasAsset) {
 
 function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): AssetCategory {
   if (kind === "image") {
-    return imageCategories.includes(category) ? category : "characters";
+    return category;
   }
 
   return category;
@@ -578,13 +579,14 @@ export function App() {
         let nextSnapshot: unknown = canvasSnapshot;
 
         for (const input of uploadInputs) {
+          const assetCategory = input.kind === "image" ? getCategoryForAssetName(input.kind, input.name, category) : category;
           const result = await companyApiFacade.uploadCanvasAsset({
             projectId: project.projectId,
             snapshot: nextSnapshot,
             file: input.file,
             name: input.name,
             kind: input.kind,
-            category: getAssetCategoryForUpload(category, input.kind)
+            category: getAssetCategoryForUpload(assetCategory, input.kind)
           });
 
           nextSnapshot = result.snapshot;
@@ -612,6 +614,7 @@ export function App() {
     }
 
     const createdAssets: CanvasAsset[] = uploadInputs.map(({ file, kind, name }) => {
+      const assetCategory = kind === "image" ? getCategoryForAssetName(kind, name) : category;
       const url = URL.createObjectURL(file);
       assetObjectUrls.current.add(url);
 
@@ -619,7 +622,7 @@ export function App() {
         id: createId("local-asset"),
         name,
         kind,
-        category: getAssetCategoryForUpload(category, kind),
+        category: getAssetCategoryForUpload(assetCategory, kind),
         url,
         sizeBytes: file.size
       };
