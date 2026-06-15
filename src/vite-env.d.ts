@@ -19,5 +19,20 @@ interface Window {
         sanitizedMapPath?: string;
       }>;
     };
+    api: {
+      request: (
+        path: string,
+        options?: {
+          method?: "GET" | "POST" | "PUT" | "DELETE";
+          body?: unknown;
+          headers?: Record<string, string>;
+        }
+      ) => Promise<{
+        ok: boolean;
+        status: number;
+        data?: unknown;
+        message?: string;
+      }>;
+    };
   };
 }

@@ -16,6 +16,17 @@ export type CompanySessionFetch = (
   }
 ) => Promise<Response>;
 
+export function validateCompanyApiPath(pathname: string) {
+  if (!pathname.startsWith("/api/")) {
+    return {
+      ok: false,
+      message: "仅允许请求公司 /api/ 接口"
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function checkCompanySession(fetcher: CompanySessionFetch): Promise<CompanySessionResult> {
   try {
     const response = await fetcher(COMPANY_AUTH_ME_URL, {

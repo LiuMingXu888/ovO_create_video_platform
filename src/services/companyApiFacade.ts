@@ -1,9 +1,11 @@
 import { checkAuth } from "../api/authClient";
+import { DesktopApiTransport } from "../api/desktopTransport";
 import { FetchApiTransport } from "../api/transport";
 import { loadCanvasResources } from "./canvasLoader";
 import type { AuthState, AuthUser } from "../types";
 
 const transport = new FetchApiTransport();
+const desktopTransport = new DesktopApiTransport();
 
 function authStateFromDesktopResult(result: { ok: boolean; message?: string; user?: unknown }): AuthState {
   if (result.ok) {
@@ -28,5 +30,5 @@ export const companyApiFacade = {
 
     return checkAuth(transport);
   },
-  loadCanvasResources: (canvasUrl: string) => loadCanvasResources(transport, canvasUrl)
+  loadCanvasResources: (canvasUrl: string) => loadCanvasResources(window.ovoDesktop ? desktopTransport : transport, canvasUrl)
 };

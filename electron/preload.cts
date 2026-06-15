@@ -9,5 +9,15 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
   },
   discovery: {
     inspectCanvas: (canvasUrl: string) => ipcRenderer.invoke("ovo:discovery:inspect-canvas", canvasUrl)
+  },
+  api: {
+    request: (
+      path: string,
+      options?: {
+        method?: "GET" | "POST" | "PUT" | "DELETE";
+        body?: unknown;
+        headers?: Record<string, string>;
+      }
+    ) => ipcRenderer.invoke("ovo:company-api:request", path, options)
   }
 });

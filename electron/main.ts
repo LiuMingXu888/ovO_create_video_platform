@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkSession, clearSession, inspectCanvas, openLoginWindow } from "./companySession.js";
+import { checkSession, clearSession, inspectCanvas, openLoginWindow, requestCompanyApi } from "./companySession.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +37,7 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:auth:check-session", () => checkSession());
   ipcMain.handle("ovo:auth:clear-session", () => clearSession());
   ipcMain.handle("ovo:discovery:inspect-canvas", (_event, canvasUrl: string) => inspectCanvas(canvasUrl));
+  ipcMain.handle("ovo:company-api:request", (_event, pathname: string, options) => requestCompanyApi(pathname, options));
 
   createMainWindow();
 

@@ -7,6 +7,7 @@ import {
   COMPANY_ORIGIN,
   COMPANY_SESSION_PARTITION,
   TARGET_CANVAS_URL,
+  validateCompanyApiPath,
   type CompanySessionResult
 } from "./companySessionClient.js";
 import { createStoragePaths } from "./storagePaths.js";
@@ -19,6 +20,19 @@ export interface InspectCanvasResult {
   message?: string;
   summaries?: SanitizedApiSummary[];
   sanitizedMapPath?: string;
+}
+
+export interface CompanyApiRequestOptions {
+  method?: "GET" | "POST" | "PUT" | "DELETE";
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
+export interface CompanyApiRequestResult {
+  ok: boolean;
+  status: number;
+  data?: unknown;
+  message?: string;
 }
 
 export function getStoragePaths() {
@@ -112,6 +126,49 @@ export async function clearSession(): Promise<CompanySessionResult> {
   return { ok: true };
 }
 
+export async function requestCompanyApi(pathname: string, options: CompanyApiRequestOptions = {}): Promise<CompanyApiRequestResult> {
+  const validation = validateCompanyApiPath(pathname);
+  if (!validation.ok) {
+    return {
+      ok: false,
+      status: 400,
+      message: validation.message
+    };
+  }
+
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    ...options.headers
+  };
+  const requestInit: RequestInit = {
+    method: options.method ?? "GET",
+    headers
+  };
+
+  if (options.body !== undefined) {
+    headers["content-type"] = headers["content-type"] ?? "application/json";
+    requestInit.body = JSON.stringify(options.body);
+  }
+
+  try {
+    const response = await fetchWithCompanySession(`${COMPANY_ORIGIN}${pathname}`, requestInit);
+    const data = await safeJson(response);
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+      message: response.ok ? undefined : getResponseMessage(data, response.status)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      message: error instanceof Error ? error.message : "公司接口请求失败"
+    };
+  }
+}
+
 export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
   const paths = getStoragePaths();
   await fs.mkdir(paths.capturesDir, { recursive: true });
@@ -145,4 +202,24 @@ function projectIdFromCanvasUrl(canvasUrl: string) {
     throw new Error("画布地址无效");
   }
   return projectId;
+}
+
+async function safeJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function getResponseMessage(data: unknown, status: number) {
+  if (typeof data === "object" && data !== null) {
+    const record = data as Record<string, unknown>;
+    const message = record.error ?? record.message ?? record.errorDetail;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return `请求失败 (${status})`;
 }
