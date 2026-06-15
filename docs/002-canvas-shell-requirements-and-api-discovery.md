@@ -47,6 +47,21 @@ Observed page asset inventory:
 
 The current Chrome execution environment allowed reading page structure, page assets, and front-end bundles. It did not allow direct `fetch` or `XMLHttpRequest` from the read-only page scope, so full response-body probing still needs a later implementation/debug pass using Playwright or app-side request code.
 
+## Electron Login State Fix Plan
+
+Current issue: the Electron login window can open the company site, but the app checks `/api/auth/me` with Node's global `fetch`. That fetch does not share cookies with the Chromium login window, so a successful login inside Electron is still reported as invalid by the app.
+
+Root cause: the login window and auth-check request are using different session stores.
+
+Implementation plan:
+
+1. Create one named persistent Electron partition for company auth, for example `persist:ovo-company-session`.
+2. Open the company login window with that partition.
+3. Run `/api/auth/me` checks through the same Electron session instead of Node global `fetch`.
+4. Poll briefly after opening the login window, so the app can return logged-in status as soon as the company login completes.
+5. Clear cookies, storage data, cache, and local auth files when the user clears the session.
+6. Add an explicit renderer action for opening the company login window, while keeping the existing check-login action as a manual refresh.
+
 ## Confirmed API Endpoints From Page And Bundles
 
 ### User And Session
