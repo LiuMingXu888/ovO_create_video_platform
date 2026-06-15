@@ -8,15 +8,21 @@ interface AssetSectionProps {
   assets: CanvasAsset[];
   expanded: boolean;
   sortMode: SortMode;
+  playingAssetId?: string | null;
   onToggle: (category: AssetCategory) => void;
   onAction: (asset: CanvasAsset, action: AssetAction) => void;
   onRename: (assetId: string, name: string) => void;
   onChangeCategory: (assetId: string, category: AssetCategory) => void;
+  onMediaElement: (assetId: string, element: HTMLMediaElement | null) => void;
+  onMediaEnded: (assetId: string) => void;
   onCycleSort: (category: AssetCategory) => void;
   onFilesSelected: (category: AssetCategory, files: FileList) => void;
   onDragStart: (asset: CanvasAsset) => void;
   onDropAsset: (category: AssetCategory) => void;
   onDropOnAsset: (targetAsset: CanvasAsset) => void;
+  selectionMode?: boolean;
+  selectedAssetIds?: Set<string>;
+  onSelectionChange?: (assetId: string, selected: boolean) => void;
 }
 
 const uploadAcceptByCategory: Record<AssetCategory, string> = {
@@ -34,15 +40,21 @@ export function AssetSection({
   assets,
   expanded,
   sortMode,
+  playingAssetId,
   onToggle,
   onAction,
   onRename,
   onChangeCategory,
+  onMediaElement,
+  onMediaEnded,
   onCycleSort,
   onFilesSelected,
   onDragStart,
   onDropAsset,
-  onDropOnAsset
+  onDropOnAsset,
+  selectionMode = false,
+  selectedAssetIds = new Set(),
+  onSelectionChange
 }: AssetSectionProps) {
   const acceptsDraggedImages = imageCategories.includes(section.id);
   const sortLabel = sortMode === "asc" ? "升序" : sortMode === "desc" ? "降序" : "默认";
@@ -93,20 +105,24 @@ export function AssetSection({
               key={asset.id}
               asset={asset}
               draggable={asset.kind === "image"}
+              playingAssetId={playingAssetId}
               onAction={onAction}
               onRename={onRename}
               onChangeCategory={onChangeCategory}
+              onMediaElement={onMediaElement}
+              onMediaEnded={onMediaEnded}
               onDragStart={onDragStart}
               onDropOnAsset={onDropOnAsset}
+              selectionMode={selectionMode}
+              selected={selectedAssetIds.has(asset.id)}
+              onSelectionChange={onSelectionChange}
             />
           ))}
-          {assets.length === 0 && (
-            <UploadPlaceholder
-              accept={uploadAcceptByCategory[section.id]}
-              category={section.id}
-              onFilesSelected={onFilesSelected}
-            />
-          )}
+          <UploadPlaceholder
+            accept={uploadAcceptByCategory[section.id]}
+            category={section.id}
+            onFilesSelected={onFilesSelected}
+          />
         </div>
       )}
     </section>

@@ -1,7 +1,16 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkSession, clearSession, inspectCanvas, openLoginWindow, requestCompanyApi, saveAssetToDownloads } from "./companySession.js";
+import {
+  checkSession,
+  clearSession,
+  inspectCanvas,
+  openLoginWindow,
+  requestCompanyApi,
+  saveAssetToDownloads,
+  saveAssetsToDownloads,
+  uploadCompanyFile
+} from "./companySession.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,7 +35,6 @@ function createMainWindow() {
 
   if (devServerUrl) {
     void window.loadURL(devServerUrl);
-    window.webContents.openDevTools({ mode: "detach" });
   } else {
     void window.loadFile(path.join(__dirname, "../dist/index.html"));
   }
@@ -38,7 +46,11 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:auth:clear-session", () => clearSession());
   ipcMain.handle("ovo:discovery:inspect-canvas", (_event, canvasUrl: string) => inspectCanvas(canvasUrl));
   ipcMain.handle("ovo:company-api:request", (_event, pathname: string, options) => requestCompanyApi(pathname, options));
+  ipcMain.handle("ovo:company-api:upload-file", (_event, pathname: string, input) => uploadCompanyFile(pathname, input));
   ipcMain.handle("ovo:file:save-asset", (_event, input: { url: string; fileName: string }) => saveAssetToDownloads(input));
+  ipcMain.handle("ovo:file:save-assets", (_event, input: { assets: Array<{ url: string; fileName: string }> }) =>
+    saveAssetsToDownloads(input)
+  );
 
   createMainWindow();
 

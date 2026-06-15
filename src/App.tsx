@@ -6,7 +6,8 @@ import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
 import { buildGenerateVideoPayload } from "./api/generationClient";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
-import { downloadAsset } from "./lib/downloadAsset";
+import { downloadAsset, downloadAssets } from "./lib/downloadAsset";
+import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
 import type {
@@ -83,7 +84,7 @@ function getReferenceSize(asset: CanvasAsset) {
 
 function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): AssetCategory {
   if (kind === "image") {
-    return "characters";
+    return imageCategories.includes(category) ? category : "characters";
   }
 
   return category;
@@ -166,8 +167,12 @@ export function App() {
   const [canvasError, setCanvasError] = useState<string | undefined>();
   const [canvasNotice, setCanvasNotice] = useState<string | undefined>();
   const [generateStatus, setGenerateStatus] = useState<string | undefined>();
+  const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
   const assetObjectUrls = useRef<Set<string>>(new Set());
   const referenceObjectUrls = useRef<Map<string, string>>(new Map());
+  const mediaElements = useRef<Map<string, HTMLMediaElement>>(new Map());
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -177,8 +182,10 @@ export function App() {
       mounted.current = false;
       assetObjectUrls.current.forEach(revokeObjectUrl);
       referenceObjectUrls.current.forEach(revokeObjectUrl);
+      mediaElements.current.forEach((element) => element.pause());
       assetObjectUrls.current.clear();
       referenceObjectUrls.current.clear();
+      mediaElements.current.clear();
     };
   }, []);
 
@@ -199,7 +206,6 @@ export function App() {
   }
 
   function insertAsset(asset: CanvasAsset) {
-    const token = asset.name.trim();
     const reference: ReferenceItem = {
       id: createId(`ref-${asset.id}`),
       name: asset.name,
@@ -209,10 +215,6 @@ export function App() {
       source: "asset"
     };
 
-    setPrompt((current) => {
-      const normalized = current.trim();
-      return normalized ? `${normalized} ${token}` : token;
-    });
     setReferences((current) => {
       const candidateReferences = [...current, reference];
       const validation = validateReferenceItems(candidateReferences);
@@ -233,6 +235,11 @@ export function App() {
       return;
     }
 
+    if (action === "toggle-play") {
+      void togglePlayback(asset);
+      return;
+    }
+
     if (action === "download") {
       downloadAsset(asset);
       return;
@@ -243,19 +250,167 @@ export function App() {
       return;
     }
 
+    if (action === "delete") {
+      void handleDeleteAsset(asset);
+      return;
+    }
+
     insertAsset(asset);
+  }
+
+  function toggleSelectionMode() {
+    setSelectionMode(true);
+  }
+
+  function cancelSelectionMode() {
+    setSelectionMode(false);
+    setSelectedAssetIds(new Set());
+  }
+
+  function changeAssetSelection(assetId: string, selected: boolean) {
+    setSelectedAssetIds((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(assetId);
+      } else {
+        next.delete(assetId);
+      }
+      return next;
+    });
+  }
+
+  async function handleDownloadSelected() {
+    const selectedAssets = assets.filter((asset) => selectedAssetIds.has(asset.id));
+    if (selectedAssets.length === 0) {
+      return;
+    }
+
+    try {
+      await downloadAssets(selectedAssets);
+      setCanvasNotice(`已下载 ${selectedAssets.length} 个资源`);
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "批量下载失败");
+    }
+  }
+
+  async function handleDeleteAsset(asset: CanvasAsset) {
+    const confirmed = window.confirm(`确定要删除「${asset.name}」吗？`);
+    if (!confirmed) {
+      return;
+    }
+
+    if (!project || !canvasSnapshot) {
+      setAssets((current) => current.filter((item) => item.id !== asset.id));
+      setDefaultAssetOrder((current) => {
+        const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
+          (order, section) => {
+            order[section.id] = current[section.id].filter((id) => id !== asset.id);
+            return order;
+          },
+          { characters: [], scenes: [], props: [], audio: [], video: [] }
+        );
+
+        return nextOrder;
+      });
+      return;
+    }
+
+    try {
+      const result = await companyApiFacade.deleteCanvasAsset({
+        projectId: project.projectId,
+        snapshot: canvasSnapshot,
+        assetId: asset.id
+      });
+      setCanvasSnapshot(result.snapshot);
+      setAssets((current) => current.filter((item) => item.id !== asset.id));
+      setDefaultAssetOrder((current) => {
+        const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
+          (order, section) => {
+            order[section.id] = current[section.id].filter((id) => id !== asset.id);
+            return order;
+          },
+          { characters: [], scenes: [], props: [], audio: [], video: [] }
+        );
+
+        return nextOrder;
+      });
+      setCanvasNotice(`已删除「${asset.name}」`);
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "删除同步失败");
+    }
+  }
+
+  async function togglePlayback(asset: CanvasAsset) {
+    if (asset.kind === "image") {
+      return;
+    }
+
+    const targetElement = mediaElements.current.get(asset.id);
+    if (!targetElement) {
+      return;
+    }
+
+    if (playingAssetId === asset.id) {
+      targetElement.pause();
+      setPlayingAssetId(null);
+      return;
+    }
+
+    targetElement.muted = false;
+    targetElement.volume = 1;
+
+    mediaElements.current.forEach((element, assetId) => {
+      if (assetId !== asset.id) {
+        element.pause();
+      }
+    });
+
+    setPlayingAssetId(asset.id);
+
+    try {
+      await targetElement.play();
+    } catch (error) {
+      setPlayingAssetId((current) => (current === asset.id ? null : current));
+      setCanvasError(error instanceof Error ? error.message : "媒体播放失败");
+    }
+  }
+
+  function registerMediaElement(assetId: string, element: HTMLMediaElement | null) {
+    if (!element) {
+      mediaElements.current.delete(assetId);
+      return;
+    }
+
+    mediaElements.current.set(assetId, element);
+  }
+
+  function handleMediaEnded(assetId: string) {
+    const element = mediaElements.current.get(assetId);
+    if (element) {
+      element.currentTime = 0;
+      element.pause();
+    }
+    setPlayingAssetId((current) => (current === assetId ? null : current));
   }
 
   async function handleCheckAuth() {
     setAuthState({ status: "checking" });
-    const nextState = await companyApiFacade.checkAuth();
-    setAuthState(nextState);
+    await refreshAuthState();
   }
 
   async function handleOpenLogin() {
     setAuthState({ status: "checking" });
     const nextState = await companyApiFacade.openLogin();
     setAuthState(nextState);
+    await refreshAuthState();
+  }
+
+  async function refreshAuthState() {
+    const nextState = await companyApiFacade.checkAuth();
+    if (mounted.current && nextState) {
+      setAuthState(nextState);
+    }
+    return nextState;
   }
 
   async function handleLoadCanvas() {
@@ -406,16 +561,63 @@ export function App() {
     setDraggedAsset(null);
   }
 
-  function handleFilesSelected(category: AssetCategory, files: FileList) {
+  async function handleFilesSelected(category: AssetCategory, files: FileList) {
     const fallbackKind = kindFromCategory(category);
-    const createdAssets: CanvasAsset[] = Array.from(files).map((file) => {
-      const kind = kindFromFile(file, fallbackKind);
+    const uploadInputs = Array.from(files).map((file) => ({
+      file,
+      kind: kindFromFile(file, fallbackKind),
+      name: getDisplayName(file)
+    }));
+
+    if (project && canvasSnapshot) {
+      setCanvasError(undefined);
+      setCanvasNotice(`正在上传 ${uploadInputs.length} 个资源`);
+
+      try {
+        const uploadedAssets: CanvasAsset[] = [];
+        let nextSnapshot: unknown = canvasSnapshot;
+
+        for (const input of uploadInputs) {
+          const result = await companyApiFacade.uploadCanvasAsset({
+            projectId: project.projectId,
+            snapshot: nextSnapshot,
+            file: input.file,
+            name: input.name,
+            kind: input.kind,
+            category: getAssetCategoryForUpload(category, input.kind)
+          });
+
+          nextSnapshot = result.snapshot;
+          uploadedAssets.push(result.asset);
+        }
+
+        if (!mounted.current) {
+          return;
+        }
+
+        const normalizedAssets = normalizeSnapshotAssets(nextSnapshot);
+        setCanvasSnapshot(nextSnapshot);
+        setAssets(normalizedAssets);
+        setDefaultAssetOrder(createAssetOrder(normalizedAssets));
+        setCanvasNotice(`已同步上传 ${uploadedAssets.length} 个资源`);
+      } catch (error) {
+        if (!mounted.current) {
+          return;
+        }
+
+        setCanvasError(error instanceof Error ? error.message : "资源上传同步失败");
+      }
+
+      return;
+    }
+
+    const createdAssets: CanvasAsset[] = uploadInputs.map(({ file, kind, name }) => {
       const url = URL.createObjectURL(file);
       assetObjectUrls.current.add(url);
 
       return {
         id: createId("local-asset"),
-        name: getDisplayName(file),
+        name,
         kind,
         category: getAssetCategoryForUpload(category, kind),
         url,
@@ -502,9 +704,11 @@ export function App() {
     setReferenceIssues((current) => current.filter((item) => item.id !== id));
   }
 
-  function handleGeneratePreview() {
+  async function handleGeneratePreview() {
+    await refreshAuthState();
     const validation = validateReferenceItems(references);
-    if (!prompt.trim()) {
+    const promptText = buildPromptText(prompt, references);
+    if (!promptText.trim()) {
       setGenerateStatus("请输入提示词");
       return;
     }
@@ -514,17 +718,26 @@ export function App() {
       return;
     }
 
-    buildGenerateVideoPayload({ prompt, references, settings: generationSettings });
+    buildGenerateVideoPayload({ prompt: promptText, references, settings: generationSettings });
     setGenerateStatus(
       `已生成 ${generationSettings.aspectRatio} · ${generationSettings.durationSeconds}s · ${
         generationSettings.omnireference ? "全能参考" : "标准参考"
       } 请求预览，未提交公司接口`
     );
+    await refreshAuthState();
   }
 
   return (
     <main className="app-shell">
-      <AppHeader authState={authState} project={project} />
+      <AppHeader
+        authState={authState}
+        project={project}
+        selectionMode={selectionMode}
+        selectedCount={selectedAssetIds.size}
+        onToggleSelectionMode={toggleSelectionMode}
+        onCancelSelectionMode={cancelSelectionMode}
+        onDownloadSelected={handleDownloadSelected}
+      />
 
       <CanvasControls
         canvasUrl={canvasUrl}
@@ -546,15 +759,21 @@ export function App() {
             assets={assetsByCategory[section.id]}
             expanded={expandedSections.includes(section.id)}
             sortMode={sortModes[section.id]}
+            playingAssetId={playingAssetId}
             onToggle={toggleSection}
             onAction={handleAssetAction}
             onRename={renameAsset}
             onChangeCategory={changeAssetCategory}
+            onMediaElement={registerMediaElement}
+            onMediaEnded={handleMediaEnded}
             onCycleSort={cycleSort}
             onFilesSelected={handleFilesSelected}
             onDragStart={setDraggedAsset}
             onDropAsset={handleDropAsset}
             onDropOnAsset={dropOnAsset}
+            selectionMode={selectionMode}
+            selectedAssetIds={selectedAssetIds}
+            onSelectionChange={changeAssetSelection}
           />
         ))}
       </div>
@@ -575,4 +794,8 @@ export function App() {
       <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
     </main>
   );
+}
+
+function buildPromptText(prompt: string, references: ReferenceItem[]) {
+  return [prompt.trim(), ...references.map((item) => item.name)].filter(Boolean).join(" ");
 }

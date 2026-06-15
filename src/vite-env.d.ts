@@ -33,11 +33,31 @@ interface Window {
         data?: unknown;
         message?: string;
       }>;
+      uploadFile: (
+        path: string,
+        input: {
+          fileName: string;
+          mimeType?: string;
+          bytes: ArrayBuffer;
+          prefix: string;
+          projectId?: string;
+        }
+      ) => Promise<{
+        ok: boolean;
+        status: number;
+        data?: unknown;
+        message?: string;
+      }>;
     };
     file: {
       saveAsset: (input: { url: string; fileName: string }) => Promise<{
         ok: boolean;
         path?: string;
+        message?: string;
+      }>;
+      saveAssets?: (input: { assets: Array<{ url: string; fileName: string }> }) => Promise<{
+        ok: boolean;
+        directoryPath?: string;
         message?: string;
       }>;
     };

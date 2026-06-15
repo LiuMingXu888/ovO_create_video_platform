@@ -31,6 +31,25 @@ export async function downloadAsset(asset: CanvasAsset) {
   }
 }
 
+export async function downloadAssets(assets: CanvasAsset[]) {
+  const inputs = assets.map((asset) => ({
+    url: asset.url,
+    fileName: getDownloadFileName(asset)
+  }));
+
+  if (window.ovoDesktop?.file.saveAssets) {
+    const result = await window.ovoDesktop.file.saveAssets({ assets: inputs });
+    if (!result.ok) {
+      throw new Error(result.message ?? "批量下载失败");
+    }
+    return;
+  }
+
+  for (const asset of assets) {
+    await downloadAsset(asset);
+  }
+}
+
 function getDownloadFileName(asset: CanvasAsset) {
   const displayName = asset.name.trim() || "asset";
 

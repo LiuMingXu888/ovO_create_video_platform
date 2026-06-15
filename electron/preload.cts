@@ -18,9 +18,14 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
         body?: unknown;
         headers?: Record<string, string>;
       }
-    ) => ipcRenderer.invoke("ovo:company-api:request", path, options)
+    ) => ipcRenderer.invoke("ovo:company-api:request", path, options),
+    uploadFile: async (
+      path: string,
+      input: { fileName: string; mimeType?: string; bytes: ArrayBuffer; prefix: string; projectId?: string }
+    ) => ipcRenderer.invoke("ovo:company-api:upload-file", path, input)
   },
   file: {
-    saveAsset: (input: { url: string; fileName: string }) => ipcRenderer.invoke("ovo:file:save-asset", input)
+    saveAsset: (input: { url: string; fileName: string }) => ipcRenderer.invoke("ovo:file:save-asset", input),
+    saveAssets: (input: { assets: Array<{ url: string; fileName: string }> }) => ipcRenderer.invoke("ovo:file:save-assets", input)
   }
 });

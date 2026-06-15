@@ -45,4 +45,38 @@ describe("DesktopApiTransport", () => {
       message: "Unauthorized"
     });
   });
+
+  it("serializes real FormData bodies before sending them through the desktop bridge", async () => {
+    const uploadFile = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: { publicUrl: "https://example.com/uploaded.png" }
+    });
+    vi.stubGlobal("window", {
+      ovoDesktop: {
+        api: {
+          request: vi.fn(),
+          uploadFile
+        }
+      }
+    });
+
+    const transport = new DesktopApiTransport();
+    const formData = new FormData();
+    formData.append("file", new File(["x"], "uploaded.png", { type: "image/png" }));
+
+    await expect(transport.request("/api/upload-file", { method: "POST", body: formData })).resolves.toEqual({
+      publicUrl: "https://example.com/uploaded.png"
+    });
+    expect(uploadFile).toHaveBeenCalledWith(
+      "/api/upload-file",
+      expect.objectContaining({
+        fileName: "uploaded.png",
+        mimeType: "image/png",
+        prefix: "",
+        bytes: expect.any(ArrayBuffer)
+      })
+    );
+    expect(uploadFile.mock.calls[0][1]).not.toBeInstanceOf(FormData);
+  });
 });

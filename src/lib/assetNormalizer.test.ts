@@ -152,4 +152,54 @@ describe("normalizeSnapshotAssets", () => {
       }
     ]);
   });
+
+  it("preserves stored image categories from snapshot node data", () => {
+    expect(
+      normalizeSnapshotAssets({
+        snapshot: {
+          nodes: [
+            {
+              id: "scene-node",
+              type: "image",
+              data: {
+                name: "场景图",
+                category: "scenes",
+                imageUrl: "https://example.com/scene.webp"
+              }
+            },
+            {
+              id: "prop-node",
+              type: "image",
+              data: {
+                name: "道具图",
+                category: "props",
+                imageUrl: "https://example.com/prop.webp"
+              }
+            }
+          ]
+        }
+      })
+    ).toEqual([
+      {
+        id: "scene-node",
+        name: "场景图",
+        kind: "image",
+        category: "scenes",
+        url: "https://example.com/scene.webp",
+        thumbnailUrl: undefined,
+        durationSeconds: undefined,
+        sizeBytes: undefined
+      },
+      {
+        id: "prop-node",
+        name: "道具图",
+        kind: "image",
+        category: "props",
+        url: "https://example.com/prop.webp",
+        thumbnailUrl: undefined,
+        durationSeconds: undefined,
+        sizeBytes: undefined
+      }
+    ]);
+  });
 });

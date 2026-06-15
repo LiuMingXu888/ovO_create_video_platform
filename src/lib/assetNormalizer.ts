@@ -24,6 +24,7 @@ interface RawAssetRecord {
   sizeBytes?: number;
   size?: number;
   assetId?: string;
+  category?: string;
   data?: unknown;
 }
 
@@ -67,7 +68,7 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
     id: record.assetId ?? record.id ?? `${kind}-${url}`,
     name: record.name ?? record.title ?? record.label ?? fallbackName(url),
     kind,
-    category: categoryForKind(kind),
+    category: categoryForRecord(record, kind),
     url,
     thumbnailUrl: record.thumbnailUrl ?? record.coverUrl ?? record.posterUrl,
     durationSeconds: record.durationSeconds ?? record.duration,
@@ -127,6 +128,19 @@ function categoryForKind(kind: AssetKind): AssetCategory {
   }
 
   return kind;
+}
+
+function categoryForRecord(record: RawAssetRecord, kind: AssetKind): AssetCategory {
+  const category = normalizeCategory(record.category);
+  return category ?? categoryForKind(kind);
+}
+
+function normalizeCategory(value: unknown): AssetCategory | null {
+  if (value === "characters" || value === "scenes" || value === "props" || value === "audio" || value === "video") {
+    return value;
+  }
+
+  return null;
 }
 
 function fallbackName(url: string) {

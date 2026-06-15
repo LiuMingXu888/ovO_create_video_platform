@@ -2,6 +2,7 @@ import { ImagePlus, X } from "lucide-react";
 import { validateReferenceItems } from "../lib/referenceValidation";
 import type { GenerationSettings, ReferenceItem } from "../types";
 import { GeneratePanel } from "./GeneratePanel";
+import { PromptTokenEditor } from "./PromptTokenEditor";
 
 interface PromptDockProps {
   prompt: string;
@@ -76,10 +77,11 @@ export function PromptDock({
       {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
 
       <div className="prompt-row">
-        <textarea
-          value={prompt}
-          onChange={(event) => onPromptChange(event.currentTarget.value)}
-          placeholder="输入视频提示词，点击资源 + 会插入资源名"
+        <PromptTokenEditor
+          prompt={prompt}
+          references={references}
+          onPromptChange={onPromptChange}
+          onRemoveReference={onRemoveReference}
         />
         <GeneratePanel
           settings={generationSettings}

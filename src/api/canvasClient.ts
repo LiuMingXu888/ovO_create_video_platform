@@ -12,6 +12,12 @@ export async function saveProjectSnapshot(transport: ApiTransport, projectId: st
   });
 }
 
+export function removeAssetFromSnapshot(snapshot: unknown, assetId: string): { snapshot: unknown; updated: boolean } {
+  const cloned = structuredClone(snapshot);
+  const updated = removeInValue(cloned, assetId, new Set());
+  return { snapshot: cloned, updated };
+}
+
 export function renameAssetInSnapshot(snapshot: unknown, assetId: string, name: string): { snapshot: unknown; updated: boolean } {
   const cloned = structuredClone(snapshot);
   const updated = renameInValue(cloned, assetId, name, new Set());
@@ -40,8 +46,41 @@ function renameInValue(value: unknown, assetId: string, name: string, seen: Set<
   return updated;
 }
 
+function removeInValue(value: unknown, assetId: string, seen: Set<unknown>): boolean {
+  if (!isRecord(value) || seen.has(value)) {
+    return false;
+  }
+
+  seen.add(value);
+
+  let updated = false;
+  if (Array.isArray(value.nodes)) {
+    const nextNodes = value.nodes.filter((node) => !matchesNodeAsset(node, assetId));
+    if (nextNodes.length !== value.nodes.length) {
+      value.nodes = nextNodes;
+      updated = true;
+    }
+  }
+
+  for (const child of Object.values(value)) {
+    if (removeInValue(child, assetId, seen)) {
+      updated = true;
+    }
+  }
+
+  return updated;
+}
+
 function matchesAsset(record: Record<string, unknown>, assetId: string) {
   return record.id === assetId || record.assetId === assetId;
+}
+
+function matchesNodeAsset(value: unknown, assetId: string) {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return matchesAsset(value, assetId) || (isRecord(value.data) && matchesAsset(value.data, assetId));
 }
 
 function setNameFields(record: Record<string, unknown>, name: string) {

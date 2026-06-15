@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadAsset } from "./downloadAsset";
+import { downloadAsset, downloadAssets } from "./downloadAsset";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -58,5 +58,28 @@ describe("downloadAsset", () => {
     expect(anchor.download).toBe("素材.png");
     expect(click).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:download");
+  });
+
+  it("uses the desktop bridge to save selected assets into one folder", async () => {
+    const saveAssets = vi.fn().mockResolvedValue({ ok: true, directoryPath: "/Users/mac/Downloads/2026-06-15-201500" });
+    vi.stubGlobal("window", {
+      ovoDesktop: {
+        file: { saveAssets }
+      }
+    });
+
+    await downloadAssets([
+      {
+        id: "asset-1",
+        name: "素材",
+        kind: "image",
+        category: "characters",
+        url: "https://example.com/image.png"
+      }
+    ]);
+
+    expect(saveAssets).toHaveBeenCalledWith({
+      assets: [{ url: "https://example.com/image.png", fileName: "素材.png" }]
+    });
   });
 });

@@ -2,7 +2,7 @@ export type AssetKind = "image" | "audio" | "video";
 
 export type AssetCategory = "characters" | "scenes" | "props" | "audio" | "video";
 
-export type AssetAction = "preview" | "download" | "insert" | "rename" | "remove-subtitles";
+export type AssetAction = "preview" | "download" | "insert" | "rename" | "remove-subtitles" | "toggle-play" | "delete";
 
 export type SortMode = "default" | "asc" | "desc";
 
@@ -64,6 +64,12 @@ export interface AuthUser {
   name?: string;
   account?: string;
   avatarUrl?: string;
+  creditBalance?: number;
+  credits?: number;
+  credit?: number;
+  points?: number;
+  balance?: number;
+  remainingCredits?: number;
 }
 
 export type AuthState =

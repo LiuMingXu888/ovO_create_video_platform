@@ -1,4 +1,4 @@
-import { loadProjectSnapshot, renameAssetInSnapshot, saveProjectSnapshot } from "../api/canvasClient";
+import { loadProjectSnapshot, removeAssetFromSnapshot, renameAssetInSnapshot, saveProjectSnapshot } from "../api/canvasClient";
 import type { ApiTransport } from "../api/transport";
 import { normalizeSnapshotAssets } from "../lib/assetNormalizer";
 import { parseCanvasUrl } from "../lib/canvasUrl";
@@ -44,6 +44,22 @@ export async function renameCanvasAsset(
   return {
     ok: true,
     snapshot: renamed.snapshot
+  };
+}
+
+export async function deleteCanvasAsset(
+  transport: ApiTransport,
+  input: { projectId: string; snapshot: unknown; assetId: string }
+) {
+  const removed = removeAssetFromSnapshot(input.snapshot, input.assetId);
+  if (!removed.updated) {
+    throw new Error("未找到可同步删除的画布资源节点");
+  }
+
+  await saveProjectSnapshot(transport, input.projectId, removed.snapshot);
+  return {
+    ok: true,
+    snapshot: removed.snapshot
   };
 }
 

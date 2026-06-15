@@ -60,6 +60,7 @@ export function CanvasControls({
       </div>
 
       <div className="canvas-status-line">{loading ? "正在连接公司接口" : authLabel}</div>
+      <div className="canvas-status-line">当前网址：{canvasUrl}</div>
       {notice && <div className="canvas-status-line">{notice}</div>}
       {errorMessage && <div className="canvas-error-line">{errorMessage}</div>}
     </section>

@@ -10,24 +10,63 @@ interface DesktopApiResponse<T> {
 
 export class DesktopApiTransport implements ApiTransport {
   async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+    if (options.body instanceof FormData) {
+      const result = (await window.ovoDesktop?.api.uploadFile(path, await serializeFormData(options.body))) as
+        | DesktopApiResponse<T>
+        | undefined;
+      return unwrapDesktopResult(result);
+    }
+
     const result = (await window.ovoDesktop?.api.request(path, {
       method: options.method ?? "GET",
       body: options.body,
       headers: options.headers
     })) as DesktopApiResponse<T> | undefined;
 
-    if (!result) {
-      throw { message: "Electron 桌面端接口不可用" } satisfies ApiError;
-    }
-
-    if (!result.ok) {
-      throw {
-        status: result.status,
-        message: result.message ?? `请求失败 (${result.status})`,
-        detail: result.data
-      } satisfies ApiError;
-    }
-
-    return result.data as T;
+    return unwrapDesktopResult(result);
   }
+}
+
+function unwrapDesktopResult<T>(result: DesktopApiResponse<T> | undefined) {
+  if (!result) {
+    throw { message: "Electron 桌面端接口不可用" } satisfies ApiError;
+  }
+
+  if (!result.ok) {
+    throw {
+      status: result.status,
+      message: result.message ?? `请求失败 (${result.status})`,
+      detail: result.data
+    } satisfies ApiError;
+  }
+
+  return result.data as T;
+}
+
+async function serializeFormData(formData: FormData) {
+  const file = formData.get("file");
+  if (file instanceof File) {
+    const bytes = await readBlobBytes(file);
+    return {
+      fileName: file.name,
+      mimeType: file.type,
+      bytes,
+      prefix: String(formData.get("prefix") ?? ""),
+      projectId: formData.get("projectId") ? String(formData.get("projectId")) : undefined
+    };
+  }
+
+  throw new Error("上传表单缺少文件");
+}
+
+async function readBlobBytes(blob: Blob) {
+  if (typeof blob.arrayBuffer === "function") {
+    return blob.arrayBuffer();
+  }
+
+  if (typeof blob.stream === "function") {
+    return new Response(blob.stream()).arrayBuffer();
+  }
+
+  return new Response(blob).arrayBuffer();
 }

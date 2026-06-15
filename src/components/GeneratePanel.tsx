@@ -10,6 +10,8 @@ interface GeneratePanelProps {
 }
 
 export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled = false, statusMessage }: GeneratePanelProps) {
+  const creditCost = settings.durationSeconds * 10;
+
   return (
     <aside className="generate-panel" aria-label="生成设置">
       <div className="generate-summary">
@@ -50,6 +52,7 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
           }
         />
       </label>
+      <div className="credit-cost">需 {creditCost} 积分</div>
       <button type="button" className="generate-button" onClick={onGenerate} disabled={disabled}>
         <Sparkles size={18} />
         <span>生成视频</span>
