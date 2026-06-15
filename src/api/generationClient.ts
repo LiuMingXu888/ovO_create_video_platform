@@ -10,7 +10,7 @@ interface BuildGenerateVideoPayloadInput {
 export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
   const settings: GenerationSettings = input.settings ?? {
     aspectRatio: "9:16",
-    durationSeconds: 5,
+    durationSeconds: 15,
     omnireference: true
   };
 

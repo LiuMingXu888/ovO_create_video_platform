@@ -6,7 +6,8 @@ vi.mock("./services/companyApiFacade", () => ({
   companyApiFacade: {
     openLogin: vi.fn(),
     checkAuth: vi.fn(),
-    loadCanvasResources: vi.fn()
+    loadCanvasResources: vi.fn(),
+    renameCanvasAsset: vi.fn()
   }
 }));
 
@@ -62,6 +63,10 @@ function mockMediaDuration(tagName: "audio" | "video", duration: number) {
   }) as typeof document.createElement);
 }
 
+function referenceChips() {
+  return Array.from(document.querySelectorAll(".reference-chip"));
+}
+
 describe("App shell", () => {
   it("renders the local desktop asset sections expanded by default", () => {
     render(<App />);
@@ -85,7 +90,9 @@ describe("App shell", () => {
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
 
     expect(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源名")).toHaveValue("小区楼道");
-    expect(screen.getByRole("button", { name: /图片 小区楼道/ })).toBeInTheDocument();
+    expect(referenceChips()).toHaveLength(1);
+    expect(referenceChips()[0]).toHaveTextContent("图片");
+    expect(referenceChips()[0]).toHaveTextContent("小区楼道");
   });
 
   it("does not add asset references beyond the hard reference limits", () => {
@@ -97,7 +104,7 @@ describe("App shell", () => {
     }
 
     expect(screen.getByText("图片最多 9 张")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /图片 小区楼道/ })).toHaveLength(9);
+    expect(referenceChips()).toHaveLength(9);
   });
 
   it("uses local audio duration for reference validation and rejects overlong audio", async () => {
@@ -210,6 +217,11 @@ describe("App shell", () => {
         title: "接口项目",
         loadedAt: "2026-06-15T00:00:00.000Z"
       },
+      snapshot: {
+        snapshot: {
+          nodes: []
+        }
+      },
       assets: [
         {
           id: "api-image",
@@ -239,7 +251,7 @@ describe("App shell", () => {
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
 
-    expect(await screen.findByText("已生成 9:16 · 5s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
+    expect(await screen.findByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
     expect(screen.getByText(/Seedance 2.0/)).toBeInTheDocument();
   });
 
@@ -259,18 +271,114 @@ describe("App shell", () => {
     expect(await screen.findByText("视频改名")).toBeInTheDocument();
   });
 
-  it("sorts assets inside one section by name without moving other sections", async () => {
+  it("syncs renamed real canvas assets through the company API facade", async () => {
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "node-image",
+              type: "image",
+              data: {
+                name: "接口图片",
+                imageUrl: "https://example.com/image.png"
+              }
+            }
+          ]
+        }
+      },
+      assets: [
+        {
+          id: "node-image",
+          name: "接口图片",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.renameCanvasAsset).mockResolvedValue({
+      ok: true,
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "node-image",
+              type: "image",
+              data: {
+                name: "接口图片改名",
+                imageUrl: "https://example.com/image.png"
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("接口图片");
+    fireEvent.click(screen.getByRole("button", { name: "重命名 接口图片" }));
+    fireEvent.change(screen.getByDisplayValue("接口图片"), { target: { value: "接口图片改名" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
+
+    expect(await screen.findByText("接口图片改名")).toBeInTheDocument();
+    expect(companyApiFacade.renameCanvasAsset).toHaveBeenCalledWith({
+      projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "node-image",
+              type: "image",
+              data: {
+                name: "接口图片",
+                imageUrl: "https://example.com/image.png"
+              }
+            }
+          ]
+        }
+      },
+      assetId: "node-image",
+      name: "接口图片改名"
+    });
+    expect(await screen.findByText("已同步名称：接口图片改名")).toBeInTheDocument();
+  });
+
+  it("cycles section sorting through default, ascending, descending, and default", async () => {
     render(<App />);
 
     const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
     const beforeSortNames = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
 
-    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序" }));
+    expect(screen.getAllByText("默认")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序：默认" }));
+    expect(screen.getByText("升序")).toBeInTheDocument();
+    expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual([
+      "高铁站",
+      "绿色行李箱",
+      "男主秦扬人脸参考",
+      "小区楼道"
+    ]);
 
-    const afterSortNames = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
+    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序：升序" }));
+    expect(screen.getByText("降序")).toBeInTheDocument();
+    expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual([
+      "小区楼道",
+      "男主秦扬人脸参考",
+      "绿色行李箱",
+      "高铁站"
+    ]);
 
-    expect(beforeSortNames).not.toEqual(afterSortNames);
-    expect(afterSortNames).toEqual(["高铁站", "绿色行李箱", "男主秦扬人脸参考", "小区楼道"]);
+    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序：降序" }));
+    expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual(beforeSortNames);
     expect(screen.getByText("紧张背景音乐")).toBeInTheDocument();
   });
 
@@ -301,15 +409,28 @@ describe("App shell", () => {
     render(<App />);
 
     expect(screen.getByLabelText("比例")).toHaveValue("9:16");
-    expect(screen.getByLabelText("时长")).toHaveValue("5");
-    expect(screen.getByLabelText("全能参考模式")).toBeChecked();
+    expect(screen.getByLabelText("时长")).toHaveValue("15");
+    expect(screen.queryByRole("checkbox", { name: "全能参考模式" })).not.toBeInTheDocument();
+    expect(screen.getByText("全能参考")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.change(screen.getByLabelText("比例"), { target: { value: "16:9" } });
-    fireEvent.change(screen.getByLabelText("时长"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("时长"), { target: { value: "12" } });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
 
-    expect(await screen.findByText("已生成 16:9 · 10s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
+    expect(await screen.findByText("已生成 16:9 · 12s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
+  });
+
+  it("offers image category conversion actions only on image assets", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "设为场景图片 小区楼道" }));
+
+    const sceneSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    expect(sceneSection).toHaveTextContent("小区楼道");
+    expect(screen.getByRole("button", { name: "设为人物图片 小区楼道" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "设为道具图片 小区楼道" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "设为场景图片 开场参考视频" })).not.toBeInTheDocument();
   });
 });
 

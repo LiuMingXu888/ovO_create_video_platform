@@ -17,11 +17,19 @@ import type {
   CanvasAsset,
   CanvasProject,
   GenerationSettings,
-  ReferenceItem
+  ReferenceItem,
+  SortMode
 } from "./types";
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
 const mb = 1024 * 1024;
+const defaultSortModes: Record<AssetCategory, SortMode> = {
+  characters: "default",
+  scenes: "default",
+  props: "default",
+  audio: "default",
+  video: "default"
+};
 
 interface ReferenceIssue {
   id: string;
@@ -87,6 +95,16 @@ function revokeObjectUrl(url: string | undefined) {
   }
 }
 
+function createAssetOrder(sourceAssets: CanvasAsset[]): Record<AssetCategory, string[]> {
+  return sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
+    (order, section) => {
+      order[section.id] = sourceAssets.filter((asset) => asset.category === section.id).map((asset) => asset.id);
+      return order;
+    },
+    { characters: [], scenes: [], props: [], audio: [], video: [] }
+  );
+}
+
 function readMediaDuration(kind: AssetKind, objectUrl: string): Promise<number | undefined> {
   if (kind === "image") {
     return Promise.resolve(undefined);
@@ -130,7 +148,7 @@ export function App() {
   const [prompt, setPrompt] = useState("");
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     aspectRatio: "9:16",
-    durationSeconds: 5,
+    durationSeconds: 15,
     omnireference: true
   });
   const [references, setReferences] = useState<ReferenceItem[]>([]);
@@ -139,6 +157,11 @@ export function App() {
   const [canvasUrl, setCanvasUrl] = useState("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x");
   const [authState, setAuthState] = useState<AuthState>({ status: "unknown" });
   const [project, setProject] = useState<CanvasProject | null>(null);
+  const [canvasSnapshot, setCanvasSnapshot] = useState<unknown>(null);
+  const [sortModes, setSortModes] = useState<Record<AssetCategory, SortMode>>(defaultSortModes);
+  const [defaultAssetOrder, setDefaultAssetOrder] = useState<Record<AssetCategory, string[]>>(() =>
+    createAssetOrder(sampleAssets)
+  );
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
   const [canvasNotice, setCanvasNotice] = useState<string | undefined>();
@@ -243,7 +266,10 @@ export function App() {
     try {
       const result = await companyApiFacade.loadCanvasResources(canvasUrl);
       setProject(result.project);
+      setCanvasSnapshot(result.snapshot);
       setAssets(result.assets);
+      setSortModes(defaultSortModes);
+      setDefaultAssetOrder(createAssetOrder(result.assets));
       setCanvasNotice(`已加载 ${result.assets.length} 个资源`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
@@ -261,18 +287,77 @@ export function App() {
     setDraggedAsset(null);
   }
 
-  function renameAsset(assetId: string, name: string) {
+  async function renameAsset(assetId: string, name: string) {
     setAssets((current) => current.map((asset) => (asset.id === assetId ? { ...asset, name } : asset)));
     setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name } : item)));
+
+    if (!project || !canvasSnapshot) {
+      setCanvasNotice(`已本地改名：${name}`);
+      return;
+    }
+
+    try {
+      const result = await companyApiFacade.renameCanvasAsset({
+        projectId: project.projectId,
+        snapshot: canvasSnapshot,
+        assetId,
+        name
+      });
+      setCanvasSnapshot(result.snapshot);
+      setCanvasNotice(`已同步名称：${name}`);
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "名称同步失败");
+    }
   }
 
-  function sortAssetsByName(category: AssetCategory) {
+  function changeAssetCategory(assetId: string, category: AssetCategory) {
+    setAssets((current) => current.map((asset) => (asset.id === assetId && asset.kind === "image" ? { ...asset, category } : asset)));
+    setDefaultAssetOrder((current) => {
+      const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
+        (order, section) => {
+          order[section.id] = current[section.id].filter((id) => id !== assetId);
+          return order;
+        },
+        { characters: [], scenes: [], props: [], audio: [], video: [] }
+      );
+
+      nextOrder[category] = [...nextOrder[category], assetId];
+      return nextOrder;
+    });
+  }
+
+  function cycleSort(category: AssetCategory) {
+    const currentMode = sortModes[category];
+    const nextMode: SortMode = currentMode === "default" ? "asc" : currentMode === "asc" ? "desc" : "default";
+    if (currentMode === "default" && nextMode === "asc") {
+      setDefaultAssetOrder((current) => ({
+        ...current,
+        [category]: assets.filter((asset) => asset.category === category).map((asset) => asset.id)
+      }));
+    }
+    setSortModes((current) => ({ ...current, [category]: nextMode }));
+
     setAssets((current) => {
+      if (nextMode === "default") {
+        const defaultOrder = defaultAssetOrder[category];
+        return current
+          .slice()
+          .sort((left, right) => {
+            if (left.category !== category || right.category !== category) {
+              return 0;
+            }
+
+            return defaultOrder.indexOf(left.id) - defaultOrder.indexOf(right.id);
+          });
+      }
+
       const collator = new Intl.Collator("zh-Hans-CN");
       const sortedIds = current
         .filter((asset) => asset.category === category)
         .slice()
-        .sort((left, right) => collator.compare(left.name, right.name))
+        .sort((left, right) =>
+          nextMode === "asc" ? collator.compare(left.name, right.name) : collator.compare(right.name, left.name)
+        )
         .map((asset) => asset.id);
       let index = 0;
 
@@ -339,6 +424,13 @@ export function App() {
     });
 
     setAssets((current) => [...current, ...createdAssets]);
+    setDefaultAssetOrder((current) => {
+      const nextOrder = { ...current };
+      for (const asset of createdAssets) {
+        nextOrder[asset.category] = [...nextOrder[asset.category], asset.id];
+      }
+      return nextOrder;
+    });
   }
 
   async function handleReferenceFilesSelected(files: FileList) {
@@ -453,10 +545,12 @@ export function App() {
             section={section}
             assets={assetsByCategory[section.id]}
             expanded={expandedSections.includes(section.id)}
+            sortMode={sortModes[section.id]}
             onToggle={toggleSection}
             onAction={handleAssetAction}
             onRename={renameAsset}
-            onSortByName={sortAssetsByName}
+            onChangeCategory={changeAssetCategory}
+            onCycleSort={cycleSort}
             onFilesSelected={handleFilesSelected}
             onDragStart={setDraggedAsset}
             onDropAsset={handleDropAsset}

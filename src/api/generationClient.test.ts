@@ -16,7 +16,7 @@ describe("buildGenerateVideoPayload", () => {
       model: "Seedance 2.0",
       aspectRatio: "9:16",
       resolution: "720p",
-      duration: 5,
+      duration: 15,
       referenceMode: "omnireference",
       referenceImages: ["图"],
       referenceVideos: ["视频"],

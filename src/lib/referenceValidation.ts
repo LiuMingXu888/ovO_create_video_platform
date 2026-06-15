@@ -9,7 +9,7 @@ const LIMITS = {
   videoCount: 3,
   videoSize: 50 * MB,
   minVideoDuration: 2,
-  maxVideoDuration: 16,
+  maxVideoDuration: 15,
   audioCount: 3,
   audioSize: 15 * MB,
   maxAudioDuration: 15
@@ -65,7 +65,7 @@ function validateVideos(items: ReferenceItem[], errors: string[]) {
 
   const totalDuration = sumDuration(items);
   if (items.length > 0 && (totalDuration < LIMITS.minVideoDuration || totalDuration > LIMITS.maxVideoDuration)) {
-    errors.push("所有视频总时长必须控制在 2-16 秒");
+    errors.push("所有视频总时长必须控制在 2-15 秒");
   }
 
   for (const item of items) {

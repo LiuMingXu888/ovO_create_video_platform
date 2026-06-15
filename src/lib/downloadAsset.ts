@@ -3,6 +3,14 @@ import type { CanvasAsset } from "../types";
 export async function downloadAsset(asset: CanvasAsset) {
   const fileName = getDownloadFileName(asset);
 
+  if (window.ovoDesktop?.file) {
+    const result = await window.ovoDesktop.file.saveAsset({ url: asset.url, fileName });
+    if (!result.ok) {
+      throw new Error(result.message ?? "下载失败");
+    }
+    return;
+  }
+
   if (asset.url.startsWith("blob:")) {
     triggerDownload(asset.url, fileName);
     return;
@@ -35,7 +43,7 @@ function getDownloadFileName(asset: CanvasAsset) {
 
 function extractUrlExtension(url: string) {
   try {
-    const pathname = new URL(url, window.location.href).pathname;
+    const pathname = new URL(url, document.baseURI).pathname;
     return pathname.match(/\.[A-Za-z0-9]{2,5}$/)?.[0] ?? "";
   } catch {
     return "";

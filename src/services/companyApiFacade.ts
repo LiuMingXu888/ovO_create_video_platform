@@ -1,7 +1,7 @@
 import { checkAuth } from "../api/authClient";
 import { DesktopApiTransport } from "../api/desktopTransport";
 import { FetchApiTransport } from "../api/transport";
-import { loadCanvasResources } from "./canvasLoader";
+import { loadCanvasResources, renameCanvasAsset } from "./canvasLoader";
 import type { AuthState, AuthUser } from "../types";
 
 const transport = new FetchApiTransport();
@@ -30,5 +30,7 @@ export const companyApiFacade = {
 
     return checkAuth(transport);
   },
-  loadCanvasResources: (canvasUrl: string) => loadCanvasResources(window.ovoDesktop ? desktopTransport : transport, canvasUrl)
+  loadCanvasResources: (canvasUrl: string) => loadCanvasResources(window.ovoDesktop ? desktopTransport : transport, canvasUrl),
+  renameCanvasAsset: (input: { projectId: string; snapshot: unknown; assetId: string; name: string }) =>
+    renameCanvasAsset(window.ovoDesktop ? desktopTransport : transport, input)
 };

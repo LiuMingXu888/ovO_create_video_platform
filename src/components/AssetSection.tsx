@@ -1,5 +1,5 @@
 import { ArrowDownAZ, ChevronDown, ChevronUp } from "lucide-react";
-import type { AssetAction, AssetCategory, CanvasAsset, SectionDefinition } from "../types";
+import type { AssetAction, AssetCategory, CanvasAsset, SectionDefinition, SortMode } from "../types";
 import { AssetCard } from "./AssetCard";
 import { UploadPlaceholder } from "./UploadPlaceholder";
 
@@ -7,10 +7,12 @@ interface AssetSectionProps {
   section: SectionDefinition;
   assets: CanvasAsset[];
   expanded: boolean;
+  sortMode: SortMode;
   onToggle: (category: AssetCategory) => void;
   onAction: (asset: CanvasAsset, action: AssetAction) => void;
   onRename: (assetId: string, name: string) => void;
-  onSortByName: (category: AssetCategory) => void;
+  onChangeCategory: (assetId: string, category: AssetCategory) => void;
+  onCycleSort: (category: AssetCategory) => void;
   onFilesSelected: (category: AssetCategory, files: FileList) => void;
   onDragStart: (asset: CanvasAsset) => void;
   onDropAsset: (category: AssetCategory) => void;
@@ -31,16 +33,19 @@ export function AssetSection({
   section,
   assets,
   expanded,
+  sortMode,
   onToggle,
   onAction,
   onRename,
-  onSortByName,
+  onChangeCategory,
+  onCycleSort,
   onFilesSelected,
   onDragStart,
   onDropAsset,
   onDropOnAsset
 }: AssetSectionProps) {
   const acceptsDraggedImages = imageCategories.includes(section.id);
+  const sortLabel = sortMode === "asc" ? "升序" : sortMode === "desc" ? "降序" : "默认";
 
   return (
     <section
@@ -60,12 +65,13 @@ export function AssetSection({
       <div className="section-header">
         <span>{section.title}</span>
         <div className="section-actions">
+          <span className="sort-mode-label">{sortLabel}</span>
           <button
             type="button"
             className="section-action-button"
             title="按名称排序"
-            aria-label={`${section.title} 按名称排序`}
-            onClick={() => onSortByName(section.id)}
+            aria-label={`${section.title} 按名称排序：${sortLabel}`}
+            onClick={() => onCycleSort(section.id)}
           >
             <ArrowDownAZ size={18} />
           </button>
@@ -89,6 +95,7 @@ export function AssetSection({
               draggable={asset.kind === "image"}
               onAction={onAction}
               onRename={onRename}
+              onChangeCategory={onChangeCategory}
               onDragStart={onDragStart}
               onDropOnAsset={onDropOnAsset}
             />

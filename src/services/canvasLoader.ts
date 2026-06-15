@@ -1,4 +1,4 @@
-import { loadProjectSnapshot } from "../api/canvasClient";
+import { loadProjectSnapshot, renameAssetInSnapshot, saveProjectSnapshot } from "../api/canvasClient";
 import type { ApiTransport } from "../api/transport";
 import { normalizeSnapshotAssets } from "../lib/assetNormalizer";
 import { parseCanvasUrl } from "../lib/canvasUrl";
@@ -7,6 +7,7 @@ import type { CanvasProject } from "../types";
 export interface LoadedCanvasResources {
   project: CanvasProject;
   assets: ReturnType<typeof normalizeSnapshotAssets>;
+  snapshot: unknown;
 }
 
 export async function loadCanvasResources(transport: ApiTransport, canvasUrl: string): Promise<LoadedCanvasResources> {
@@ -25,7 +26,24 @@ export async function loadCanvasResources(transport: ApiTransport, canvasUrl: st
       title,
       loadedAt: new Date().toISOString()
     },
-    assets: normalizeSnapshotAssets(snapshot)
+    assets: normalizeSnapshotAssets(snapshot),
+    snapshot
+  };
+}
+
+export async function renameCanvasAsset(
+  transport: ApiTransport,
+  input: { projectId: string; snapshot: unknown; assetId: string; name: string }
+) {
+  const renamed = renameAssetInSnapshot(input.snapshot, input.assetId, input.name);
+  if (!renamed.updated) {
+    throw new Error("未找到可同步的画布资源节点");
+  }
+
+  await saveProjectSnapshot(transport, input.projectId, renamed.snapshot);
+  return {
+    ok: true,
+    snapshot: renamed.snapshot
   };
 }
 

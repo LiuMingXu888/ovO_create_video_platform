@@ -34,5 +34,12 @@ interface Window {
         message?: string;
       }>;
     };
+    file: {
+      saveAsset: (input: { url: string; fileName: string }) => Promise<{
+        ok: boolean;
+        path?: string;
+        message?: string;
+      }>;
+    };
   };
 }

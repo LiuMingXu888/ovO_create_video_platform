@@ -19,5 +19,8 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
         headers?: Record<string, string>;
       }
     ) => ipcRenderer.invoke("ovo:company-api:request", path, options)
+  },
+  file: {
+    saveAsset: (input: { url: string; fileName: string }) => ipcRenderer.invoke("ovo:file:save-asset", input)
   }
 });

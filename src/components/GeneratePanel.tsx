@@ -14,7 +14,10 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
     <aside className="generate-panel" aria-label="生成设置">
       <div className="generate-summary">
         <strong>Seedance 2.0</strong>
-        <span>{settings.aspectRatio} · {settings.durationSeconds}s · 720p</span>
+        <span>
+          <b>全能参考</b>
+          <em>720p</em>
+        </span>
       </div>
       <label className="field-line">
         <span>比例</span>
@@ -31,30 +34,21 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
         </select>
       </label>
       <label className="field-line">
-        <span>时长</span>
-        <select
+        <span>{settings.durationSeconds}s</span>
+        <input
+          type="range"
           aria-label="时长"
-          value={String(settings.durationSeconds)}
+          min="4"
+          max="15"
+          step="1"
+          value={settings.durationSeconds}
           onChange={(event) =>
             onSettingsChange({
               ...settings,
-              durationSeconds: Number(event.currentTarget.value) as GenerationSettings["durationSeconds"]
+              durationSeconds: Number(event.currentTarget.value)
             })
           }
-        >
-          <option value="5">5s</option>
-          <option value="10">10s</option>
-          <option value="16">16s</option>
-        </select>
-      </label>
-      <label className="toggle-line">
-        <input
-          type="checkbox"
-          aria-label="全能参考模式"
-          checked={settings.omnireference}
-          onChange={(event) => onSettingsChange({ ...settings, omnireference: event.currentTarget.checked })}
         />
-        <span>全能参考模式</span>
       </label>
       <button type="button" className="generate-button" onClick={onGenerate} disabled={disabled}>
         <Sparkles size={18} />

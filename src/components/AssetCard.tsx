@@ -1,17 +1,32 @@
-import { CaptionsOff, Check, Download, Maximize2, Pencil, Plus, X } from "lucide-react";
+import { CaptionsOff, Check, Download, Maximize2, Pencil, Plus, Shapes, UserRound, X } from "lucide-react";
 import { useState } from "react";
-import type { AssetAction, CanvasAsset } from "../types";
+import type { AssetAction, AssetCategory, CanvasAsset } from "../types";
 
 interface AssetCardProps {
   asset: CanvasAsset;
   draggable?: boolean;
   onAction: (asset: CanvasAsset, action: AssetAction) => void;
   onRename: (assetId: string, name: string) => void;
+  onChangeCategory: (assetId: string, category: AssetCategory) => void;
   onDragStart?: (asset: CanvasAsset) => void;
   onDropOnAsset?: (targetAsset: CanvasAsset) => void;
 }
 
-export function AssetCard({ asset, draggable = false, onAction, onRename, onDragStart, onDropOnAsset }: AssetCardProps) {
+const categoryActions: Array<{ category: AssetCategory; label: string; icon: "user" | "shapes" }> = [
+  { category: "characters", label: "人物图片", icon: "user" },
+  { category: "scenes", label: "场景图片", icon: "shapes" },
+  { category: "props", label: "道具图片", icon: "shapes" }
+];
+
+export function AssetCard({
+  asset,
+  draggable = false,
+  onAction,
+  onRename,
+  onChangeCategory,
+  onDragStart,
+  onDropOnAsset
+}: AssetCardProps) {
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(asset.name);
 
@@ -77,6 +92,24 @@ export function AssetCard({ asset, draggable = false, onAction, onRename, onDrag
           </button>
         )}
       </div>
+
+      {asset.kind === "image" && (
+        <div className="asset-category-overlay">
+          {categoryActions
+            .filter((action) => action.category !== asset.category)
+            .map((action) => (
+              <button
+                key={action.category}
+                type="button"
+                title={`设为${action.label}`}
+                aria-label={`设为${action.label} ${asset.name}`}
+                onClick={() => onChangeCategory(asset.id, action.category)}
+              >
+                {action.icon === "user" ? <UserRound size={15} /> : <Shapes size={15} />}
+              </button>
+            ))}
+        </div>
+      )}
 
       {editingName ? (
         <form

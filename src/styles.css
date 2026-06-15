@@ -241,6 +241,14 @@ button {
   gap: 8px;
 }
 
+.sort-mode-label {
+  min-width: 32px;
+  color: #9b343b;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
 .section-action-button {
   display: inline-flex;
   width: 34px;
@@ -261,8 +269,8 @@ button {
 
 .asset-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
   padding: 12px 22px 20px;
 }
 
@@ -318,11 +326,20 @@ button {
   gap: 5px;
 }
 
-.asset-card-overlay button {
+.asset-card-overlay button,
+.asset-category-overlay button {
   width: 28px;
   height: 28px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
+}
+
+.asset-category-overlay {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  display: grid;
+  gap: 5px;
 }
 
 .asset-name {
@@ -449,7 +466,7 @@ button {
 
 .prompt-row {
   display: grid;
-  grid-template-columns: minmax(640px, 860px) 240px;
+  grid-template-columns: minmax(720px, 940px) 220px;
   align-items: stretch;
   gap: 10px;
 }
@@ -476,14 +493,15 @@ button {
 }
 
 .generate-panel {
+  position: relative;
   display: grid;
   height: 118px;
-  grid-template-rows: auto auto 1fr;
-  gap: 6px;
+  grid-template-rows: 18px 28px 22px 30px;
+  gap: 3px;
   border: 1px solid #d7d4cc;
   border-radius: 8px;
   background: #ffffff;
-  padding: 10px;
+  padding: 8px;
   transition:
     height 160ms ease,
     box-shadow 160ms ease;
@@ -502,13 +520,28 @@ button {
 }
 
 .generate-panel strong,
-.generate-panel span {
+.generate-panel span,
+.generate-panel b,
+.generate-panel em {
   display: block;
 }
 
 .generate-panel span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   color: #68705f;
   font-size: 12px;
+}
+
+.generate-panel b {
+  color: #202734;
+  font-weight: 700;
+}
+
+.generate-panel em {
+  color: #68705f;
+  font-style: normal;
 }
 
 .toggle-line {
@@ -530,7 +563,7 @@ button {
 
 .field-line select {
   min-width: 0;
-  height: 28px;
+  height: 26px;
   border: 1px solid #d7d4cc;
   border-radius: 7px;
   background: #ffffff;
@@ -538,8 +571,13 @@ button {
   padding: 0 8px;
 }
 
+.field-line input[type="range"] {
+  min-width: 0;
+  accent-color: #d94c54;
+}
+
 .generate-button {
-  height: 36px;
+  height: 30px;
   gap: 8px;
   border-color: #d94c54;
   border-radius: 8px;
@@ -553,7 +591,10 @@ button {
 }
 
 .generate-status {
-  align-self: end;
+  position: absolute;
+  right: 8px;
+  bottom: -18px;
+  left: 8px;
   overflow: hidden;
   color: #68705f;
   font-size: 12px;

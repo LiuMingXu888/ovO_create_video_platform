@@ -3,9 +3,32 @@ import { downloadAsset } from "./downloadAsset";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("downloadAsset", () => {
+  it("uses the desktop bridge to save assets into the downloads folder when available", async () => {
+    const saveAsset = vi.fn().mockResolvedValue({ ok: true, path: "/Users/mac/Downloads/素材.png" });
+    vi.stubGlobal("window", {
+      ovoDesktop: {
+        file: { saveAsset }
+      }
+    });
+
+    await downloadAsset({
+      id: "asset-1",
+      name: "素材",
+      kind: "image",
+      category: "characters",
+      url: "https://example.com/image.png"
+    });
+
+    expect(saveAsset).toHaveBeenCalledWith({
+      url: "https://example.com/image.png",
+      fileName: "素材.png"
+    });
+  });
+
   it("downloads remote assets through a temporary blob URL", async () => {
     const blob = new Blob(["asset"], { type: "image/png" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(blob) }));

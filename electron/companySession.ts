@@ -35,6 +35,11 @@ export interface CompanyApiRequestResult {
   message?: string;
 }
 
+export interface SaveAssetInput {
+  url: string;
+  fileName: string;
+}
+
 export function getStoragePaths() {
   return createStoragePaths(path.join(app.getPath("userData"), "storage"));
 }
@@ -169,6 +174,34 @@ export async function requestCompanyApi(pathname: string, options: CompanyApiReq
   }
 }
 
+export async function saveAssetToDownloads(input: SaveAssetInput) {
+  const fileName = sanitizeFileName(input.fileName);
+  const destinationPath = path.join(app.getPath("downloads"), fileName);
+
+  try {
+    const response = await fetchWithCompanySession(input.url);
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: `下载失败 (${response.status})`
+      };
+    }
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(destinationPath, bytes);
+
+    return {
+      ok: true,
+      path: destinationPath
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "保存下载文件失败"
+    };
+  }
+}
+
 export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
   const paths = getStoragePaths();
   await fs.mkdir(paths.capturesDir, { recursive: true });
@@ -222,4 +255,9 @@ function getResponseMessage(data: unknown, status: number) {
   }
 
   return `请求失败 (${status})`;
+}
+
+function sanitizeFileName(fileName: string) {
+  const trimmed = fileName.trim() || "asset";
+  return trimmed.replace(/[/:*?"<>|]/g, "_");
 }
