@@ -209,6 +209,12 @@ export function App() {
     setAuthState(nextState);
   }
 
+  async function handleOpenLogin() {
+    setAuthState({ status: "checking" });
+    const nextState = await companyApiFacade.openLogin();
+    setAuthState(nextState);
+  }
+
   async function handleLoadCanvas() {
     setCanvasLoading(true);
     setCanvasError(undefined);
@@ -348,6 +354,7 @@ export function App() {
         loading={canvasLoading}
         errorMessage={canvasError}
         onCanvasUrlChange={setCanvasUrl}
+        onOpenLogin={handleOpenLogin}
         onCheckAuth={handleCheckAuth}
         onLoadCanvas={handleLoadCanvas}
       />

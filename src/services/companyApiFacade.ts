@@ -1,10 +1,32 @@
 import { checkAuth } from "../api/authClient";
 import { FetchApiTransport } from "../api/transport";
 import { loadCanvasResources } from "./canvasLoader";
+import type { AuthState, AuthUser } from "../types";
 
 const transport = new FetchApiTransport();
 
+function authStateFromDesktopResult(result: { ok: boolean; message?: string; user?: unknown }): AuthState {
+  if (result.ok) {
+    return { status: "authenticated", user: (result.user ?? {}) as AuthUser };
+  }
+
+  return { status: "unauthenticated", message: result.message ?? "登录已失效，请重新登录" };
+}
+
 export const companyApiFacade = {
-  checkAuth: () => checkAuth(transport),
+  openLogin: async () => {
+    if (!window.ovoDesktop) {
+      return { status: "unauthenticated", message: "请在 Electron 桌面端打开登录窗口" } satisfies AuthState;
+    }
+
+    return authStateFromDesktopResult(await window.ovoDesktop.auth.openLoginWindow());
+  },
+  checkAuth: async () => {
+    if (window.ovoDesktop) {
+      return authStateFromDesktopResult(await window.ovoDesktop.auth.checkSession());
+    }
+
+    return checkAuth(transport);
+  },
   loadCanvasResources: (canvasUrl: string) => loadCanvasResources(transport, canvasUrl)
 };

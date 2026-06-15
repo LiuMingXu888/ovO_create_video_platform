@@ -1,17 +1,18 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, session } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { summarizeCapture, type SanitizedApiSummary } from "./apiDiscovery.js";
+import {
+  checkCompanySession,
+  COMPANY_ORIGIN,
+  COMPANY_SESSION_PARTITION,
+  TARGET_CANVAS_URL,
+  type CompanySessionResult
+} from "./companySessionClient.js";
 import { createStoragePaths } from "./storagePaths.js";
 
-const COMPANY_ORIGIN = "http://qijing.kjjhz.cn";
-const TARGET_CANVAS_URL = "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x";
-
-export interface CompanySessionResult {
-  ok: boolean;
-  message?: string;
-  user?: unknown;
-}
+const LOGIN_POLL_INTERVAL_MS = 2000;
+const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 
 export interface InspectCanvasResult {
   ok: boolean;
@@ -24,12 +25,24 @@ export function getStoragePaths() {
   return createStoragePaths(path.join(app.getPath("userData"), "storage"));
 }
 
+function getCompanySession() {
+  return session.fromPartition(COMPANY_SESSION_PARTITION);
+}
+
+function fetchWithCompanySession(url: string, init?: RequestInit) {
+  return getCompanySession().fetch(url, {
+    ...init,
+    credentials: "include"
+  });
+}
+
 export async function openLoginWindow(): Promise<CompanySessionResult> {
   const loginWindow = new BrowserWindow({
     width: 1280,
     height: 900,
     title: "登录公司账号",
     webPreferences: {
+      partition: COMPANY_SESSION_PARTITION,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -40,45 +53,61 @@ export async function openLoginWindow(): Promise<CompanySessionResult> {
 
   return new Promise((resolve) => {
     let resolved = false;
+    let pollTimer: NodeJS.Timeout | undefined;
+
+    function finish(result: CompanySessionResult) {
+      if (resolved) {
+        return;
+      }
+
+      resolved = true;
+      clearTimeout(timeout);
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+      }
+      resolve(result);
+    }
+
+    async function pollSession() {
+      const result = await checkSession();
+      if (result.ok) {
+        finish(result);
+        return;
+      }
+
+      if (!loginWindow.isDestroyed()) {
+        pollTimer = setTimeout(() => {
+          void pollSession();
+        }, LOGIN_POLL_INTERVAL_MS);
+      }
+    }
+
     const timeout = setTimeout(() => {
       if (!resolved) {
-        resolved = true;
-        resolve({ ok: false, message: "登录窗口已打开，请登录后点击检查登录态" });
+        finish({ ok: false, message: "登录窗口已打开，请登录后点击检查登录态" });
       }
-    }, 3000);
+    }, LOGIN_TIMEOUT_MS);
 
     loginWindow.on("closed", () => {
-      clearTimeout(timeout);
-      if (!resolved) {
-        resolved = true;
-        resolve({ ok: false, message: "登录窗口已关闭" });
-      }
+      finish({ ok: false, message: "登录窗口已关闭" });
     });
+
+    void pollSession();
   });
 }
 
 export async function checkSession(): Promise<CompanySessionResult> {
-  try {
-    const response = await fetch(`${COMPANY_ORIGIN}/api/auth/me`, {
-      credentials: "include",
-      headers: {
-        accept: "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      return { ok: false, message: `登录态无效：${response.status}` };
-    }
-
-    const user = await response.json();
-    return { ok: true, user };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : "检查登录态失败" };
-  }
+  return checkCompanySession(fetchWithCompanySession);
 }
 
 export async function clearSession(): Promise<CompanySessionResult> {
   const paths = getStoragePaths();
+  const companySession = getCompanySession();
+  await companySession.clearStorageData({
+    origin: COMPANY_ORIGIN,
+    storages: ["cookies", "filesystem", "indexdb", "localstorage", "serviceworkers", "cachestorage"]
+  });
+  await companySession.clearCache();
   await fs.rm(paths.authDir, { recursive: true, force: true });
   return { ok: true };
 }

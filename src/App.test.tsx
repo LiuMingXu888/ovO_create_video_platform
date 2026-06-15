@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./services/companyApiFacade", () => ({
   companyApiFacade: {
+    openLogin: vi.fn(),
     checkAuth: vi.fn(),
     loadCanvasResources: vi.fn()
   }
@@ -185,6 +186,20 @@ describe("App shell", () => {
 
     expect(await screen.findByText("已登录：23176")).toBeInTheDocument();
     expect(screen.getByText("23176")).toBeInTheDocument();
+  });
+
+  it("opens the company login window and applies the returned auth state", async () => {
+    vi.mocked(companyApiFacade.openLogin).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176" }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "登录公司账号" }));
+
+    expect(await screen.findByText("已登录：23176")).toBeInTheDocument();
+    expect(companyApiFacade.openLogin).toHaveBeenCalledTimes(1);
   });
 
   it("loads canvas resources into the existing grid", async () => {

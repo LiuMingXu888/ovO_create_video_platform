@@ -7,6 +7,7 @@ interface CanvasControlsProps {
   loading: boolean;
   errorMessage?: string;
   onCanvasUrlChange: (value: string) => void;
+  onOpenLogin: () => void;
   onCheckAuth: () => void;
   onLoadCanvas: () => void;
 }
@@ -17,6 +18,7 @@ export function CanvasControls({
   loading,
   errorMessage,
   onCanvasUrlChange,
+  onOpenLogin,
   onCheckAuth,
   onLoadCanvas
 }: CanvasControlsProps) {
@@ -41,6 +43,10 @@ export function CanvasControls({
       </div>
 
       <div className="canvas-control-actions">
+        <button type="button" className="secondary-button" onClick={onOpenLogin} disabled={loading || authState.status === "checking"}>
+          {authState.status === "checking" ? <Loader2 size={16} /> : <LogIn size={16} />}
+          <span>登录公司账号</span>
+        </button>
         <button type="button" className="secondary-button" onClick={onCheckAuth} disabled={loading}>
           {authState.status === "checking" ? <Loader2 size={16} /> : <LogIn size={16} />}
           <span>检查登录态</span>
