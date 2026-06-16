@@ -633,6 +633,76 @@ describe("App shell", () => {
     });
   });
 
+  it("shows the real generation failure reason on the failed video card", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.generateVideo).mockRejectedValue(new Error("参考素材不能为空"));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+      target: { value: "随机生成一个视频" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("生成视频 1").closest("article")).toHaveTextContent("参考素材不能为空");
+    });
+  });
+
+  it("does not submit real generation without an image reference", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+      target: { value: "随机生成一个视频" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    expect(await screen.findByText("真实生成至少需要 1 张参考图，请先添加图片参考素材")).toBeInTheDocument();
+    expect(companyApiFacade.generateVideo).not.toHaveBeenCalled();
+    expect(screen.queryByText("生成视频 1")).not.toBeInTheDocument();
+  });
+
   it("reuses a generated video's prompt and source references when metadata exists", async () => {
     render(<App />);
 

@@ -944,6 +944,11 @@ export function App() {
       return;
     }
 
+    if (project && references.every((reference) => reference.kind !== "image")) {
+      setGenerateStatus("真实生成至少需要 1 张参考图，请先添加图片参考素材");
+      return;
+    }
+
     const generatedAsset: CanvasAsset = project
       ? createGeneratedVideoPlaceholder()
       : {
@@ -996,17 +1001,19 @@ export function App() {
           return;
         }
 
+        const errorMessage = error instanceof Error ? error.message : "视频生成失败";
         setAssets((current) =>
           current.map((asset) =>
             asset.id === generatedAsset.id
               ? {
                   ...asset,
-                  status: "failed" as const
+                  status: "failed" as const,
+                  errorMessage
                 }
               : asset
           )
         );
-        setGenerateStatus(error instanceof Error ? error.message : "视频生成失败");
+        setGenerateStatus(errorMessage);
         await refreshAuthState();
       }
 

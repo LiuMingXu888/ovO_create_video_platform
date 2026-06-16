@@ -31,6 +31,7 @@ export interface CanvasAsset {
   sizeBytes?: number;
   createdAt?: string;
   status?: "ready" | "generating" | "failed";
+  errorMessage?: string;
   generationPrompt?: string;
   generationReferences?: ReferenceItem[];
 }

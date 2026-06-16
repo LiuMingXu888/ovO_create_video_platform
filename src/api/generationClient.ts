@@ -29,11 +29,20 @@ export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput)
 }
 
 export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
-  const payload = buildGenerateVideoPayload(input);
+  const settings: GenerationSettings = input.settings ?? {
+    aspectRatio: "9:16",
+    durationSeconds: 15,
+    omnireference: true
+  };
+
   return {
-    ...payload,
+    prompt: input.prompt,
     model: "ep-20260319213857-htd7q",
-    generateAudio: true
+    aspectRatio: settings.aspectRatio,
+    resolution: "720p",
+    duration: settings.durationSeconds,
+    generateAudio: true,
+    referenceImages: input.references.filter((item) => item.kind === "image").map((item) => item.name)
   };
 }
 
@@ -118,8 +127,12 @@ function getPollErrorMessage(error: unknown) {
     return error;
   }
 
-  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
-    return error.message;
+  if (typeof error === "object" && error !== null) {
+    for (const key of ["message", "error", "errorDetail"]) {
+      if (key in error && typeof error[key as keyof typeof error] === "string") {
+        return error[key as keyof typeof error] as string;
+      }
+    }
   }
 
   return undefined;

@@ -25,9 +25,14 @@ describe("buildGenerateVideoPayload", () => {
   });
 
   it("maps the Seedance display model to the company backend model id", () => {
-    expect(buildCompanyGenerateVideoPayload({ prompt: "生成一段视频", references: refs })).toMatchObject({
+    expect(buildCompanyGenerateVideoPayload({ prompt: "生成一段视频", references: refs })).toEqual({
+      prompt: "生成一段视频",
       model: "ep-20260319213857-htd7q",
-      generateAudio: true
+      aspectRatio: "9:16",
+      resolution: "720p",
+      duration: 15,
+      generateAudio: true,
+      referenceImages: ["图"]
     });
   });
 });
@@ -91,5 +96,14 @@ describe("pollTaskUntilComplete", () => {
 
     await expect(pollTaskUntilComplete(transport, "/api/generate-video/task-1", { intervalMs: 0, maxAttempts: 2 }))
       .rejects.toThrow("积分不足");
+  });
+
+  it("throws structured task error details when the task fails", async () => {
+    const transport: ApiTransport = {
+      request: vi.fn().mockResolvedValue({ status: "failed", error: { errorDetail: "参考素材不能为空" } })
+    };
+
+    await expect(pollTaskUntilComplete(transport, "/api/generate-video/task-1", { intervalMs: 0, maxAttempts: 2 }))
+      .rejects.toThrow("参考素材不能为空");
   });
 });
