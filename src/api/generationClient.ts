@@ -2,6 +2,8 @@ import type { GenerationSettings, ReferenceItem } from "../types";
 import { endpoints } from "./endpoints";
 import type { ApiTransport } from "./transport";
 
+export const DEFAULT_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 240 };
+
 interface BuildGenerateVideoPayloadInput {
   prompt: string;
   references: ReferenceItem[];
@@ -74,12 +76,9 @@ interface GenerateVideoPollResponse {
 export async function generateVideo(
   transport: ApiTransport,
   input: BuildGenerateVideoPayloadInput,
-  options: PollOptions = { intervalMs: 1500, maxAttempts: 80 }
+  options: PollOptions = DEFAULT_GENERATION_POLL_OPTIONS
 ): Promise<GenerateVideoResult> {
-  const submitResult = await transport.request<GenerateVideoResponse>(endpoints.generateVideo(), {
-    method: "POST",
-    body: buildCompanyGenerateVideoPayload(input)
-  });
+  const submitResult = await requestGenerateVideo(transport, input);
 
   if (!submitResult.taskId) {
     throw new Error("生成接口未返回任务 ID");
@@ -107,10 +106,10 @@ export interface PollOptions {
 export async function pollTaskUntilComplete(
   transport: ApiTransport,
   path: string,
-  options: PollOptions = { intervalMs: 1500, maxAttempts: 80 }
+  options: PollOptions = DEFAULT_GENERATION_POLL_OPTIONS
 ) {
   for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
-    const result = await transport.request<GenerateVideoPollResponse>(path);
+    const result = await requestPollStatus(transport, path);
 
     if (result.status === "failed") {
       throw new Error(result.errorMessage ?? getPollErrorMessage(result.error) ?? "视频生成失败");
@@ -128,6 +127,33 @@ export async function pollTaskUntilComplete(
   throw new Error("任务轮询超时");
 }
 
+async function requestGenerateVideo(transport: ApiTransport, input: BuildGenerateVideoPayloadInput) {
+  try {
+    return await transport.request<GenerateVideoResponse>(endpoints.generateVideo(), {
+      method: "POST",
+      body: buildCompanyGenerateVideoPayload(input)
+    });
+  } catch (error) {
+    if (isAuthExpiredError(error)) {
+      throw new Error("登录态已失效，请重新登录后再试");
+    }
+
+    throw error;
+  }
+}
+
+async function requestPollStatus(transport: ApiTransport, path: string) {
+  try {
+    return await transport.request<GenerateVideoPollResponse>(path);
+  } catch (error) {
+    if (isAuthExpiredError(error)) {
+      throw new Error("登录态已失效，请重新登录后再试");
+    }
+
+    throw error;
+  }
+}
+
 function getPollErrorMessage(error: unknown) {
   if (typeof error === "string" && error.trim()) {
     return error;
@@ -142,4 +168,16 @@ function getPollErrorMessage(error: unknown) {
   }
 
   return undefined;
+}
+
+function isAuthExpiredError(error: unknown) {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return error.status === 401 || error.status === 403;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

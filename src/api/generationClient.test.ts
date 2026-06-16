@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ReferenceItem } from "../types";
+import type { ApiError } from "../types";
 import type { ApiTransport } from "./transport";
-import { buildCompanyGenerateVideoPayload, buildGenerateVideoPayload, generateVideo, pollTaskUntilComplete } from "./generationClient";
+import {
+  DEFAULT_GENERATION_POLL_OPTIONS,
+  buildCompanyGenerateVideoPayload,
+  buildGenerateVideoPayload,
+  generateVideo,
+  pollTaskUntilComplete
+} from "./generationClient";
 
 const refs: ReferenceItem[] = [
   { id: "img", name: "图", kind: "image", sizeBytes: 1, source: "asset", url: "https://example.com/image.png" },
@@ -40,6 +47,24 @@ describe("buildGenerateVideoPayload", () => {
 });
 
 describe("generateVideo", () => {
+  it("uses a longer default polling window for real Seedance tasks", async () => {
+    expect(DEFAULT_GENERATION_POLL_OPTIONS).toEqual({
+      intervalMs: 1500,
+      maxAttempts: 240
+    });
+  });
+
+  it("throws a login-expired error when submitting generation is unauthorized", async () => {
+    const authError = { status: 401, message: "请求失败 (401)" } satisfies ApiError;
+    const transport: ApiTransport = {
+      request: vi.fn().mockRejectedValue(authError)
+    };
+
+    await expect(generateVideo(transport, { prompt: "生成一段视频", references: refs }, { intervalMs: 0, maxAttempts: 1 }))
+      .rejects.toThrow("登录态已失效，请重新登录后再试");
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+
   it("submits a generation task and returns the first completed video URL", async () => {
     const transport: ApiTransport = {
       request: vi.fn()
@@ -89,6 +114,17 @@ describe("pollTaskUntilComplete", () => {
 
     await expect(pollTaskUntilComplete(transport, "/api/generate-video/task-1", { intervalMs: 0, maxAttempts: 2 }))
       .rejects.toThrow("任务轮询超时");
+  });
+
+  it("throws a login-expired error instead of timing out when polling is unauthorized", async () => {
+    const authError = { status: 401, message: "请求失败 (401)" } satisfies ApiError;
+    const transport: ApiTransport = {
+      request: vi.fn().mockRejectedValue(authError)
+    };
+
+    await expect(pollTaskUntilComplete(transport, "/api/generate-video/task-1", { intervalMs: 0, maxAttempts: 2 }))
+      .rejects.toThrow("登录态已失效，请重新登录后再试");
+    expect(transport.request).toHaveBeenCalledTimes(1);
   });
 
   it("throws the server error when the task fails", async () => {
