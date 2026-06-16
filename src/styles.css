@@ -687,16 +687,18 @@ button {
   display: grid;
   width: min(96vw, 1800px);
   grid-template-columns: minmax(0, 1fr) 220px;
-  align-items: start;
+  align-items: end;
   gap: 10px;
 }
 
 .prompt-token-editor {
+  position: relative;
   display: grid;
+  align-self: end;
   min-width: 0;
   min-height: 154px;
   max-height: 90vh;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid #d94c54;
   border-radius: 8px;
   background: #ffffff;
@@ -709,15 +711,40 @@ button {
 
 .prompt-token-editor textarea {
   width: 100%;
-  min-height: 154px;
+  height: 100%;
+  min-height: 0;
   max-height: 90vh;
   overflow: auto;
-  resize: vertical;
+  resize: none;
   border: 0;
   outline: none;
   background: transparent;
   color: #202734;
   padding: 14px;
+}
+
+.prompt-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid rgba(217, 76, 84, 0.18);
+  border-bottom: 1px solid rgba(217, 76, 84, 0.18);
+  border-bottom-left-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #9b3139;
+  cursor: ns-resize;
+}
+
+.prompt-resize-handle:hover,
+.prompt-resize-handle:focus-visible {
+  background: #fff4f4;
+  color: #d94c54;
 }
 
 .generate-panel {
@@ -734,7 +761,7 @@ button {
 }
 
 .generate-panel-fixed {
-  align-self: start;
+  align-self: end;
   height: 154px;
 }
 

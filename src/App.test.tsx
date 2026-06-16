@@ -101,9 +101,9 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
 
-    expect(screen.getByRole("button", { name: "图一 小区楼道" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "图片1 小区楼道" })).toBeInTheDocument();
     expect(referenceChips()).toHaveLength(1);
-    expect(referenceChips()[0]).toHaveTextContent("图一");
+    expect(referenceChips()[0]).toHaveTextContent("图片1");
     expect(referenceChips()[0]).toHaveTextContent("小区楼道");
     expect(document.querySelector(".prompt-token-line")).not.toBeInTheDocument();
   });
@@ -118,10 +118,10 @@ describe("App shell", () => {
     fireEvent.click(addButtons[1]);
 
     expect(referenceChips().map((chip) => chip.querySelector(".reference-kind")?.textContent)).toEqual([
-      "图一",
-      "音频一",
-      "视频一",
-      "图二"
+      "图片1",
+      "音频1",
+      "视频1",
+      "图片2"
     ]);
     expect(screen.queryByRole("img", { name: "小区楼道 预览" })).not.toBeInTheDocument();
 
@@ -143,9 +143,9 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.click(screen.getByRole("button", { name: "图一 小区楼道" }));
+    fireEvent.click(screen.getByRole("button", { name: "图片1 小区楼道" }));
 
-    expect(screen.queryByRole("button", { name: "图一 小区楼道" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "图片1 小区楼道" })).not.toBeInTheDocument();
     expect(referenceChips()).toHaveLength(0);
   });
 
@@ -186,7 +186,7 @@ describe("App shell", () => {
     const referenceInput = screen.getByTitle("添加参考素材").querySelector("input");
     fireEvent.change(referenceInput as HTMLInputElement, { target: { files: [file] } });
 
-    fireEvent.click(await screen.findByRole("button", { name: /音频一 short-audio/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /音频1 short-audio/ }));
 
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:valid-audio"));
   });
@@ -518,7 +518,7 @@ describe("App shell", () => {
 
     expect(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签")).toHaveValue("镜头缓慢推进，人物回头");
     expect(referenceChips()).toHaveLength(1);
-    expect(referenceChips()[0]).toHaveTextContent("图一");
+    expect(referenceChips()[0]).toHaveTextContent("图片1");
     expect(referenceChips()[0]).toHaveTextContent("小区楼道");
   });
 
@@ -981,13 +981,13 @@ describe("PromptDock", () => {
       />
     );
 
-    fireEvent.mouseEnter(screen.getByRole("button", { name: "图一 横图" }));
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "图片1 横图" }));
 
     expect(document.querySelector(".reference-hover-preview")).toHaveClass("reference-hover-preview-large");
     expect(screen.getByRole("img", { name: "横图 预览" })).toHaveClass("reference-hover-preview-image");
   });
 
-  it("keeps the prompt editor resizable while the generate panel remains fixed", () => {
+  it("resizes the prompt editor from the top-right while the generate panel stays bottom-aligned", () => {
     render(
       <PromptDock
         prompt=""
@@ -1001,7 +1001,41 @@ describe("PromptDock", () => {
       />
     );
 
+    const editor = document.querySelector(".prompt-token-editor") as HTMLElement;
+    const handle = screen.getByRole("button", { name: "调整提示词高度" });
+
+    expect(handle).toHaveClass("prompt-resize-handle");
     expect(document.querySelector(".prompt-token-editor textarea")).toHaveClass("prompt-resizable-textarea");
+    expect(document.querySelector(".prompt-token-editor textarea")).toHaveStyle({ resize: "none" });
     expect(document.querySelector(".generate-panel")).toHaveClass("generate-panel-fixed");
+    expect(editor).toHaveStyle({ height: "154px" });
+
+    fireEvent(
+      handle,
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientY: 320
+      })
+    );
+    fireEvent(
+      window,
+      new MouseEvent("pointermove", {
+        bubbles: true,
+        clientY: 220
+      })
+    );
+
+    expect(editor).toHaveStyle({ height: "254px" });
+
+    fireEvent(
+      window,
+      new MouseEvent("pointermove", {
+        bubbles: true,
+        clientY: 620
+      })
+    );
+    fireEvent(window, new MouseEvent("pointerup", { bubbles: true }));
+
+    expect(editor).toHaveStyle({ height: "154px" });
   });
 });

@@ -23,19 +23,14 @@ function getReferenceLabel(item: ReferenceItem, references: ReferenceItem[]) {
   const sameKindIndex = references.filter((reference) => reference.kind === item.kind).findIndex((reference) => reference.id === item.id) + 1;
 
   if (item.kind === "image") {
-    return `图${numberToChinese(sameKindIndex)}`;
+    return `图片${sameKindIndex}`;
   }
 
   if (item.kind === "video") {
-    return `视频${numberToChinese(sameKindIndex)}`;
+    return `视频${sameKindIndex}`;
   }
 
-  return `音频${numberToChinese(sameKindIndex)}`;
-}
-
-function numberToChinese(value: number) {
-  const labels = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
-  return labels[value] ?? String(value);
+  return `音频${sameKindIndex}`;
 }
 
 export function PromptDock({
