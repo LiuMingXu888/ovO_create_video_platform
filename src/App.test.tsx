@@ -23,6 +23,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  localStorage.clear();
   vi.mocked(companyApiFacade.uploadCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.renameCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.loadCanvasResources).mockReset();
@@ -286,7 +287,7 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
-    await screen.findByText("接口项目");
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     const videoSection = screen.getByRole("button", { name: "视频" }).closest("section") as HTMLElement;
     const videoInput = videoSection.querySelector("input") as HTMLInputElement;
@@ -370,8 +371,66 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
 
     expect(await screen.findByText("接口图片")).toBeInTheDocument();
-    expect(screen.getByText("接口项目")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "接口项目" })).toBeInTheDocument();
     expect(screen.getByText("已加载 1 个资源")).toBeInTheDocument();
+  });
+
+  it("persists canvas history names and applies saved local asset layout when reloading the same canvas", async () => {
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: {
+        snapshot: {
+          nodes: []
+        }
+      },
+      assets: [
+        {
+          id: "api-a",
+          name: "接口图片 A",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/a.png"
+        },
+        {
+          id: "api-b",
+          name: "接口图片 B",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/b.png"
+        }
+      ]
+    });
+
+    const { unmount } = render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.change(screen.getByLabelText("当前画布名称"), { target: { value: "我的第一块画布" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存画布名称" }));
+    fireEvent.dragStart(screen.getByText("接口图片 A").closest("article") as HTMLElement);
+    fireEvent.drop(screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement);
+
+    const scenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    expect(scenesSection).toHaveTextContent("接口图片 A");
+    unmount();
+
+    render(<App />);
+
+    expect(screen.getByRole("button", { name: "我的第一块画布" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "我的第一块画布" }));
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+
+    await screen.findByText("接口图片 B");
+    const reloadedScenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    expect(reloadedScenesSection).toHaveTextContent("接口图片 A");
+    const reloadedCharactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
+    expect(reloadedCharactersSection).toHaveTextContent("接口图片 B");
+    expect(reloadedCharactersSection).not.toHaveTextContent("接口图片 A");
   });
 
   it("builds a local generation payload preview without submitting the company API", async () => {
@@ -431,6 +490,29 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
 
     expect(await screen.findByText("视频改名")).toBeInTheDocument();
+  });
+
+  it("opens the name editor by double-clicking the visible asset name", async () => {
+    render(<App />);
+
+    fireEvent.doubleClick(screen.getByText("小区楼道"));
+    fireEvent.change(screen.getByDisplayValue("小区楼道"), { target: { value: "场景-小区楼道" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
+
+    expect(await screen.findByText("场景-小区楼道")).toBeInTheDocument();
+  });
+
+  it("keeps text selection inside the name editor from starting card drag", () => {
+    render(<App />);
+
+    fireEvent.doubleClick(screen.getByText("小区楼道"));
+    const card = screen.getByDisplayValue("小区楼道").closest("article") as HTMLElement;
+    const dragStart = vi.fn();
+    card.addEventListener("dragstart", dragStart);
+
+    fireEvent.dragStart(screen.getByDisplayValue("小区楼道"));
+
+    expect(dragStart).not.toHaveBeenCalled();
   });
 
   it("deletes a real canvas asset after confirmation and syncs the snapshot", async () => {
@@ -823,5 +905,36 @@ describe("PromptDock", () => {
     );
 
     expect(screen.getByText("图片最多 9 张")).toBeInTheDocument();
+  });
+
+  it("renders image hover previews in a large uncropped viewport", () => {
+    const references: ReferenceItem[] = [
+      {
+        id: "wide",
+        name: "横图",
+        kind: "image",
+        sizeBytes: 1024,
+        source: "asset",
+        previewUrl: "https://example.com/wide.png"
+      }
+    ];
+
+    render(
+      <PromptDock
+        prompt=""
+        references={references}
+        onPromptChange={() => undefined}
+        onRemoveReference={() => undefined}
+        onLocalFilesSelected={() => undefined}
+        onGenerate={() => undefined}
+        generationSettings={{ aspectRatio: "16:9", durationSeconds: 5, omnireference: true }}
+        onGenerationSettingsChange={() => undefined}
+      />
+    );
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "图一 横图" }));
+
+    expect(document.querySelector(".reference-hover-preview")).toHaveClass("reference-hover-preview-large");
+    expect(screen.getByRole("img", { name: "横图 预览" })).toHaveClass("reference-hover-preview-image");
   });
 });

@@ -49,6 +49,7 @@ export function AssetCard({
   const [draftName, setDraftName] = useState(asset.name);
   const mediaElementRef = useRef<HTMLMediaElement | null>(null);
   const isPlaying = playingAssetId === asset.id;
+  const canDragCard = draggable && !editingName;
 
   function saveName() {
     const nextName = draftName.trim();
@@ -101,15 +102,23 @@ export function AssetCard({
   return (
     <article
       className={`asset-card asset-card-${asset.kind}`}
-      draggable={draggable}
-      onDragStart={() => onDragStart?.(asset)}
+      draggable={canDragCard}
+      onDragStart={(event) => {
+        if (!canDragCard) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
+        onDragStart?.(asset);
+      }}
       onDragOver={(event) => {
-        if (draggable) {
+        if (canDragCard) {
           event.preventDefault();
         }
       }}
       onDrop={(event) => {
-        if (draggable) {
+        if (canDragCard) {
           event.preventDefault();
           onDropOnAsset?.(asset);
         }
@@ -213,6 +222,18 @@ export function AssetCard({
       {editingName ? (
         <form
           className="asset-name-editor"
+          draggable={false}
+          onMouseDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onDragStartCapture={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onDragStart={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             saveName();
@@ -230,10 +251,20 @@ export function AssetCard({
             aria-label={`编辑名称 ${asset.name}`}
             value={draftName}
             onChange={(event) => setDraftName(event.currentTarget.value)}
+            onMouseDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onDragStartCapture={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onDragStart={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
           />
         </form>
       ) : (
-        <div className="asset-name" title={asset.name}>
+        <div className="asset-name" title={asset.name} onDoubleClick={() => setEditingName(true)}>
           {asset.name}
         </div>
       )}

@@ -94,8 +94,8 @@ export function PromptDock({
       </div>
 
       {hoveredReference?.previewUrl && (
-        <div className="reference-hover-preview">
-          <img src={hoveredReference.previewUrl} alt={`${hoveredReference.name} 预览`} />
+        <div className="reference-hover-preview reference-hover-preview-large">
+          <img className="reference-hover-preview-image" src={hoveredReference.previewUrl} alt={`${hoveredReference.name} 预览`} />
         </div>
       )}
 

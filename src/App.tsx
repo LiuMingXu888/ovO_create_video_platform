@@ -6,6 +6,16 @@ import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
 import { buildGenerateVideoPayload } from "./api/generationClient";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
+import {
+  applyCanvasAssetLayout,
+  createCanvasAssetLayout,
+  loadCanvasHistory,
+  type CanvasHistoryEntry,
+  renameCanvasHistoryEntry,
+  saveCanvasHistory,
+  updateCanvasHistoryLayout,
+  upsertCanvasHistoryEntry
+} from "./lib/canvasHistory";
 import { downloadAsset, downloadAssets } from "./lib/downloadAsset";
 import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
 import { getCategoryForAssetName } from "./lib/assetCategory";
@@ -126,6 +136,10 @@ function createAssetOrder(sourceAssets: CanvasAsset[]): Record<AssetCategory, st
   );
 }
 
+function getCanvasUrlFromProject(project?: CanvasProject | null) {
+  return project?.canvasUrl ?? "";
+}
+
 function readMediaDuration(kind: AssetKind, objectUrl: string): Promise<number | undefined> {
   if (kind === "image") {
     return Promise.resolve(undefined);
@@ -176,6 +190,8 @@ export function App() {
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
   const [canvasUrl, setCanvasUrl] = useState("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x");
+  const [canvasName, setCanvasName] = useState("未命名画布");
+  const [canvasHistory, setCanvasHistory] = useState(() => loadCanvasHistory());
   const [authState, setAuthState] = useState<AuthState>({ status: "unknown" });
   const [project, setProject] = useState<CanvasProject | null>(null);
   const [canvasSnapshot, setCanvasSnapshot] = useState<unknown>(null);
@@ -209,6 +225,10 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    saveCanvasHistory(canvasHistory);
+  }, [canvasHistory]);
+
   const assetsByCategory = useMemo(() => {
     return sectionDefinitions.reduce<Record<AssetCategory, CanvasAsset[]>>(
       (groups, section) => {
@@ -223,6 +243,65 @@ export function App() {
     setExpandedSections((current) =>
       current.includes(category) ? current.filter((item) => item !== category) : [...current, category]
     );
+  }
+
+  function persistCanvasHistoryEntry(nextUrl = canvasUrl, nextName = canvasName, nextProject = project, nextAssets = assets) {
+    setCanvasHistory((current) => {
+      const nextEntries = upsertCanvasHistoryEntry(current, {
+        url: nextUrl,
+        project: nextProject,
+        name: nextName,
+        layout: createCanvasAssetLayout(nextAssets)
+      });
+      return nextEntries;
+    });
+  }
+
+  function handleCanvasUrlChange(value: string) {
+    setCanvasUrl(value);
+    const historyEntry = canvasHistory.find((entry) => entry.url === value);
+    if (historyEntry) {
+      setCanvasName(historyEntry.name);
+    }
+  }
+
+  function handleSaveCanvasName() {
+    const nextName = canvasName.trim() || "未命名画布";
+    setCanvasName(nextName);
+    setCanvasHistory((current) => {
+      const currentUrl = getCanvasUrlFromProject(project) || canvasUrl;
+      const renamedEntries = current.some((entry) => entry.url === currentUrl)
+        ? renameCanvasHistoryEntry(current, currentUrl, nextName)
+        : current;
+      return upsertCanvasHistoryEntry(renamedEntries, {
+        url: currentUrl,
+        project,
+        name: nextName,
+        layout: createCanvasAssetLayout(assets)
+      });
+    });
+    setCanvasNotice(`已保存画布名称：${nextName}`);
+  }
+
+  function selectCanvasHistory(entry: CanvasHistoryEntry) {
+    setCanvasUrl(entry.url);
+    setCanvasName(entry.name);
+    setProject((current) =>
+      current && (current.canvasUrl === entry.url || current.projectId === entry.projectId)
+        ? { ...current, title: entry.name }
+        : current
+    );
+  }
+
+  const displayProject = project ? { ...project, title: canvasName || project.title } : project;
+
+  function createNewCanvasSession() {
+    setCanvasUrl("");
+    setCanvasName("未命名画布");
+    setProject(null);
+    setCanvasSnapshot(null);
+    setCanvasError(undefined);
+    setCanvasNotice(undefined);
   }
 
   function insertAsset(asset: CanvasAsset) {
@@ -340,7 +419,11 @@ export function App() {
     }
 
     if (!project || !canvasSnapshot) {
-      setAssets((current) => current.filter((item) => item.id !== asset.id));
+      setAssets((current) => {
+        const nextAssets = current.filter((item) => item.id !== asset.id);
+        persistCanvasHistoryEntry(canvasUrl, canvasName, project, nextAssets);
+        return nextAssets;
+      });
       setDefaultAssetOrder((current) => {
         const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
           (order, section) => {
@@ -362,7 +445,11 @@ export function App() {
         assetId: asset.id
       });
       setCanvasSnapshot(result.snapshot);
-      setAssets((current) => current.filter((item) => item.id !== asset.id));
+      setAssets((current) => {
+        const nextAssets = current.filter((item) => item.id !== asset.id);
+        persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, nextAssets);
+        return nextAssets;
+      });
       setDefaultAssetOrder((current) => {
         const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
           (order, section) => {
@@ -460,11 +547,23 @@ export function App() {
 
     try {
       const result = await companyApiFacade.loadCanvasResources(canvasUrl);
+      const historyEntry = canvasHistory.find((entry) => entry.url === result.project.canvasUrl || entry.projectId === result.project.projectId);
+      const nextAssets = applyCanvasAssetLayout(result.assets, historyEntry?.layout);
+      const nextCanvasName = historyEntry?.name ?? result.project.title ?? "未命名画布";
       setProject(result.project);
       setCanvasSnapshot(result.snapshot);
-      setAssets(result.assets);
+      setAssets(nextAssets);
+      setCanvasName(nextCanvasName);
       setSortModes(defaultSortModes);
-      setDefaultAssetOrder(createAssetOrder(result.assets));
+      setDefaultAssetOrder(createAssetOrder(nextAssets));
+      setCanvasHistory((current) =>
+        upsertCanvasHistoryEntry(current, {
+          url: result.project.canvasUrl,
+          project: result.project,
+          name: nextCanvasName,
+          layout: createCanvasAssetLayout(nextAssets)
+        })
+      );
       setCanvasNotice(`已加载 ${result.assets.length} 个资源`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
@@ -478,7 +577,18 @@ export function App() {
       return;
     }
 
-    setAssets((current) => current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category } : asset)));
+    setAssets((current) => {
+      const nextAssets = current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category } : asset));
+      setCanvasHistory((history) =>
+        updateCanvasHistoryLayout(history, {
+          url: getCanvasUrlFromProject(project) || canvasUrl,
+          project,
+          assets: nextAssets,
+          fallbackName: canvasName
+        })
+      );
+      return nextAssets;
+    });
     setDraggedAsset(null);
   }
 
@@ -506,7 +616,18 @@ export function App() {
   }
 
   function changeAssetCategory(assetId: string, category: AssetCategory) {
-    setAssets((current) => current.map((asset) => (asset.id === assetId && asset.kind === "image" ? { ...asset, category } : asset)));
+    setAssets((current) => {
+      const nextAssets = current.map((asset) => (asset.id === assetId && asset.kind === "image" ? { ...asset, category } : asset));
+      setCanvasHistory((history) =>
+        updateCanvasHistoryLayout(history, {
+          url: getCanvasUrlFromProject(project) || canvasUrl,
+          project,
+          assets: nextAssets,
+          fallbackName: canvasName
+        })
+      );
+      return nextAssets;
+    });
     setDefaultAssetOrder((current) => {
       const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
         (order, section) => {
@@ -574,7 +695,18 @@ export function App() {
     }
 
     if (draggedAsset.kind === "image" && draggedAsset.category !== targetAsset.category && imageCategories.includes(targetAsset.category)) {
-      setAssets((current) => current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category: targetAsset.category } : asset)));
+      setAssets((current) => {
+        const nextAssets = current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category: targetAsset.category } : asset));
+        setCanvasHistory((history) =>
+          updateCanvasHistoryLayout(history, {
+            url: getCanvasUrlFromProject(project) || canvasUrl,
+            project,
+            assets: nextAssets,
+            fallbackName: canvasName
+          })
+        );
+        return nextAssets;
+      });
       setDraggedAsset(null);
       return;
     }
@@ -592,11 +724,20 @@ export function App() {
         return current;
       }
 
-      return [
+      const nextAssets = [
         ...withoutDragged.slice(0, targetIndex + 1),
         draggedAsset,
         ...withoutDragged.slice(targetIndex + 1)
       ];
+      setCanvasHistory((history) =>
+        updateCanvasHistoryLayout(history, {
+          url: getCanvasUrlFromProject(project) || canvasUrl,
+          project,
+          assets: nextAssets,
+          fallbackName: canvasName
+        })
+      );
+      return nextAssets;
     });
     setDraggedAsset(null);
   }
@@ -640,6 +781,7 @@ export function App() {
         setCanvasSnapshot(nextSnapshot);
         setAssets(normalizedAssets);
         setDefaultAssetOrder(createAssetOrder(normalizedAssets));
+        persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, normalizedAssets);
         setCanvasNotice(`已同步上传 ${uploadedAssets.length} 个资源`);
       } catch (error) {
         if (!mounted.current) {
@@ -667,7 +809,11 @@ export function App() {
       };
     });
 
-    setAssets((current) => [...current, ...createdAssets]);
+    setAssets((current) => {
+      const nextAssets = [...current, ...createdAssets];
+      persistCanvasHistoryEntry(canvasUrl, canvasName, project, nextAssets);
+      return nextAssets;
+    });
     setDefaultAssetOrder((current) => {
       const nextOrder = { ...current };
       for (const asset of createdAssets) {
@@ -774,6 +920,7 @@ export function App() {
       generationReferences: references.map(cloneReferenceForReuse)
     };
     setAssets((current) => [...current, generatedAsset]);
+    persistCanvasHistoryEntry(canvasUrl, canvasName, project, [...assets, generatedAsset]);
     setDefaultAssetOrder((current) => ({
       ...current,
       video: [...current.video, generatedAsset.id]
@@ -790,7 +937,7 @@ export function App() {
     <main className="app-shell">
       <AppHeader
         authState={authState}
-        project={project}
+        project={displayProject}
         selectionMode={selectionMode}
         selectedCount={selectedAssetIds.size}
         onToggleSelectionMode={toggleSelectionMode}
@@ -800,11 +947,17 @@ export function App() {
 
       <CanvasControls
         canvasUrl={canvasUrl}
+        canvasName={canvasName}
+        canvasHistory={canvasHistory}
         authState={authState}
         loading={canvasLoading}
         errorMessage={canvasError}
         notice={canvasNotice}
-        onCanvasUrlChange={setCanvasUrl}
+        onCanvasUrlChange={handleCanvasUrlChange}
+        onCanvasNameChange={setCanvasName}
+        onSaveCanvasName={handleSaveCanvasName}
+        onSelectCanvasHistory={selectCanvasHistory}
+        onNewCanvas={createNewCanvasSession}
         onOpenLogin={handleOpenLogin}
         onCheckAuth={handleCheckAuth}
         onLoadCanvas={handleLoadCanvas}
