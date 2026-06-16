@@ -19,6 +19,8 @@ import { PromptDock } from "./components/PromptDock";
 import { companyApiFacade } from "./services/companyApiFacade";
 import type { ReferenceItem } from "./types";
 
+const promptPlaceholder = "输入视频提示词，可用图片1、音频1说明参考素材";
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -563,11 +565,28 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "图片1是女主，镜头缓慢推进" }
+    });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
 
     expect(await screen.findByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
     expect(screen.getByText(/Seedance 2.0/)).toBeInTheDocument();
     expect(companyApiFacade.checkAuth).toHaveBeenCalledTimes(2);
+  });
+
+  it("requires prompt text instead of using selected resource names as the prompt", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    expect(await screen.findByText("请输入提示词")).toBeInTheDocument();
+    expect(screen.queryByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).not.toBeInTheDocument();
   });
 
   it("submits real generation for a loaded canvas, shows a loading card, then replaces it with the returned video", async () => {
@@ -605,7 +624,7 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "镜头缓慢推进" }
     });
 
@@ -623,8 +642,14 @@ describe("App shell", () => {
     expect(screen.getByText("已生成真实视频：生成视频 1")).toBeInTheDocument();
     expect(companyApiFacade.generateVideo).toHaveBeenCalledWith({
       projectId: "cmq6fwhft0bg5m2l5u78zby8x",
-      prompt: "镜头缓慢推进 小区楼道",
-      references: expect.any(Array),
+      prompt: "镜头缓慢推进",
+      references: [
+        expect.objectContaining({
+          name: "小区楼道",
+          kind: "image",
+          url: "https://example.com/image.png"
+        })
+      ],
       settings: {
         aspectRatio: "9:16",
         durationSeconds: 15,
@@ -663,7 +688,7 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "随机生成一个视频" }
     });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
@@ -693,7 +718,7 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "随机生成一个视频" }
     });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
@@ -707,7 +732,7 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "镜头缓慢推进，人物回头" }
     });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
@@ -715,14 +740,14 @@ describe("App shell", () => {
     expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
 
     fireEvent.click(referenceChips()[0]);
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "" }
     });
     expect(referenceChips()).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复用生成 生成视频 1" }));
 
-    expect(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签")).toHaveValue("镜头缓慢推进，人物回头");
+    expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("镜头缓慢推进，人物回头");
     expect(referenceChips()).toHaveLength(1);
     expect(referenceChips()[0]).toHaveTextContent("图片1");
     expect(referenceChips()[0]).toHaveTextContent("小区楼道");
@@ -954,13 +979,13 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "第一个生成" }
     });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
     await screen.findByText("生成视频 1");
 
-    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "第二个生成" }
     });
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
@@ -1007,6 +1032,9 @@ describe("App shell", () => {
     expect(screen.getByText("全能参考")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "图片1是角色参考" }
+    });
     fireEvent.change(screen.getByLabelText("比例"), { target: { value: "16:9" } });
     fireEvent.change(screen.getByLabelText("时长"), { target: { value: "12" } });
     expect(screen.getByText("需 120 积分")).toBeInTheDocument();

@@ -97,6 +97,7 @@ function createReferenceFromAsset(asset: CanvasAsset): ReferenceItem {
     id: createId(`ref-${asset.id}`),
     name: asset.name,
     kind: asset.kind,
+    url: asset.url,
     sizeBytes: getReferenceSize(asset),
     durationSeconds: asset.durationSeconds,
     source: "asset",
@@ -883,6 +884,7 @@ export function App() {
             id,
             name,
             kind,
+            url: objectUrl,
             sizeBytes: file.size,
             durationSeconds,
             mimeType: file.type,
@@ -933,7 +935,7 @@ export function App() {
   async function handleGeneratePreview() {
     await refreshAuthState();
     const validation = validateReferenceItems(references);
-    const promptText = buildPromptText(prompt, references);
+    const promptText = prompt.trim();
     if (!promptText.trim()) {
       setGenerateStatus("请输入提示词");
       return;
@@ -1102,8 +1104,4 @@ export function App() {
       <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
     </main>
   );
-}
-
-function buildPromptText(prompt: string, references: ReferenceItem[]) {
-  return [prompt.trim(), ...references.map((item) => item.name)].filter(Boolean).join(" ");
 }

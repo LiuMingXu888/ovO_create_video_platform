@@ -40,6 +40,7 @@ export interface ReferenceItem {
   id: string;
   name: string;
   kind: AssetKind;
+  url?: string;
   sizeBytes: number;
   durationSeconds?: number;
   mimeType?: string;

@@ -266,6 +266,7 @@ function parseReferenceList(value: unknown): ReferenceItem[] {
         id: stringValue(item.id) ?? `source-ref-${index + 1}`,
         name,
         kind,
+        url,
         sizeBytes: numberValue(item.sizeBytes) ?? numberValue(item.size) ?? 1024 * 1024,
         durationSeconds: numberValue(item.durationSeconds) ?? numberValue(item.duration),
         mimeType: stringValue(item.mimeType),
@@ -298,6 +299,7 @@ function parseNamedReferences(value: unknown, kind: AssetKind): ReferenceItem[] 
         id: stringValue(item.id) ?? `source-${kind}-${index + 1}`,
         name,
         kind,
+        url,
         sizeBytes: numberValue(item.sizeBytes) ?? numberValue(item.size) ?? 1024 * 1024,
         durationSeconds: numberValue(item.durationSeconds) ?? numberValue(item.duration),
         mimeType: stringValue(item.mimeType),
@@ -315,6 +317,7 @@ function createReferenceItem(nameOrUrl: string, kind: AssetKind, index: number):
     id: `source-${kind}-${index + 1}`,
     name: looksLikeUrl ? fallbackName(nameOrUrl) : nameOrUrl,
     kind,
+    url: looksLikeUrl ? nameOrUrl : undefined,
     sizeBytes: 1024 * 1024,
     source: "asset",
     previewUrl: kind === "image" && looksLikeUrl ? nameOrUrl : undefined

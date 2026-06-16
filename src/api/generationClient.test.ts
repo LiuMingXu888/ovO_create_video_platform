@@ -4,9 +4,9 @@ import type { ApiTransport } from "./transport";
 import { buildCompanyGenerateVideoPayload, buildGenerateVideoPayload, generateVideo, pollTaskUntilComplete } from "./generationClient";
 
 const refs: ReferenceItem[] = [
-  { id: "img", name: "图", kind: "image", sizeBytes: 1, source: "asset" },
-  { id: "vid", name: "视频", kind: "video", sizeBytes: 1, durationSeconds: 4, source: "asset" },
-  { id: "aud", name: "音频", kind: "audio", sizeBytes: 1, durationSeconds: 5, source: "asset" }
+  { id: "img", name: "图", kind: "image", sizeBytes: 1, source: "asset", url: "https://example.com/image.png" },
+  { id: "vid", name: "视频", kind: "video", sizeBytes: 1, durationSeconds: 4, source: "asset", url: "https://example.com/video.mp4" },
+  { id: "aud", name: "音频", kind: "audio", sizeBytes: 1, durationSeconds: 5, source: "asset", url: "https://example.com/audio.mp3" }
 ];
 
 describe("buildGenerateVideoPayload", () => {
@@ -18,9 +18,9 @@ describe("buildGenerateVideoPayload", () => {
       resolution: "720p",
       duration: 15,
       referenceMode: "omnireference",
-      referenceImages: ["图"],
-      referenceVideos: ["视频"],
-      referenceAudios: ["音频"]
+      referenceImages: ["https://example.com/image.png"],
+      referenceVideos: ["https://example.com/video.mp4"],
+      referenceAudios: ["https://example.com/audio.mp3"]
     });
   });
 
@@ -32,7 +32,9 @@ describe("buildGenerateVideoPayload", () => {
       resolution: "720p",
       duration: 15,
       generateAudio: true,
-      referenceImages: ["图"]
+      referenceImages: ["https://example.com/image.png"],
+      referenceVideos: ["https://example.com/video.mp4"],
+      referenceAudios: ["https://example.com/audio.mp3"]
     });
   });
 });

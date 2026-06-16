@@ -67,7 +67,7 @@ export function PromptTokenEditor({ prompt, onPromptChange }: PromptTokenEditorP
         style={{ resize: "none" }}
         value={prompt}
         onChange={(event) => onPromptChange(event.currentTarget.value)}
-        placeholder="输入视频提示词，点击资源 + 会插入资源标签"
+        placeholder="输入视频提示词，可用图片1、音频1说明参考素材"
       />
     </div>
   );

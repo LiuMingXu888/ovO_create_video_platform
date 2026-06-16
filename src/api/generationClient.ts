@@ -22,9 +22,9 @@ export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput)
     resolution: "720p",
     duration: settings.durationSeconds,
     referenceMode: settings.omnireference ? "omnireference" : "standard",
-    referenceImages: input.references.filter((item) => item.kind === "image").map((item) => item.name),
-    referenceVideos: input.references.filter((item) => item.kind === "video").map((item) => item.name),
-    referenceAudios: input.references.filter((item) => item.kind === "audio").map((item) => item.name)
+    referenceImages: getReferenceValues(input.references, "image"),
+    referenceVideos: getReferenceValues(input.references, "video"),
+    referenceAudios: getReferenceValues(input.references, "audio")
   };
 }
 
@@ -42,8 +42,14 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
     resolution: "720p",
     duration: settings.durationSeconds,
     generateAudio: true,
-    referenceImages: input.references.filter((item) => item.kind === "image").map((item) => item.name)
+    referenceImages: getReferenceValues(input.references, "image"),
+    referenceVideos: getReferenceValues(input.references, "video"),
+    referenceAudios: getReferenceValues(input.references, "audio")
   };
+}
+
+function getReferenceValues(references: ReferenceItem[], kind: ReferenceItem["kind"]) {
+  return references.filter((item) => item.kind === kind).map((item) => item.url ?? item.previewUrl ?? item.name);
 }
 
 interface GenerateVideoResponse {
