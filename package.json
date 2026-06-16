@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --strictPort",
     "dev:electron": "concurrently -k \"npm run dev\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "launch:mac": "node scripts/launch-mac.mjs",
+    "install:mac-app": "node scripts/install-mac-app.mjs",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && vite build",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
