@@ -139,7 +139,8 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-export async function openLoginWindow(): Promise<CompanySessionResult> {
+export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<CompanySessionResult> {
+  const initialUrl = normalizeCompanyWindowUrl(targetUrl);
   const loginWindow = new BrowserWindow({
     width: 1280,
     height: 900,
@@ -212,8 +213,8 @@ export async function openLoginWindow(): Promise<CompanySessionResult> {
   loginView.webContents.on("did-start-navigation", updateToolbarUrl);
 
   resizeLoginView();
-  await loginWindow.loadURL(createLoginToolbarUrl(COMPANY_ORIGIN, actionChannel, urlChannel));
-  await loginView.webContents.loadURL(COMPANY_ORIGIN);
+  await loginWindow.loadURL(createLoginToolbarUrl(initialUrl, actionChannel, urlChannel));
+  await loginView.webContents.loadURL(initialUrl);
   updateToolbarUrl();
 
   return new Promise((resolve) => {
@@ -260,6 +261,19 @@ export async function openLoginWindow(): Promise<CompanySessionResult> {
 
     void pollSession();
   });
+}
+
+function normalizeCompanyWindowUrl(targetUrl: string) {
+  try {
+    const url = new URL(targetUrl);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.toString();
+    }
+  } catch {
+    return COMPANY_ORIGIN;
+  }
+
+  return COMPANY_ORIGIN;
 }
 
 export async function checkSession(): Promise<CompanySessionResult> {

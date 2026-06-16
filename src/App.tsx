@@ -140,6 +140,15 @@ function getCanvasUrlFromProject(project?: CanvasProject | null) {
   return project?.canvasUrl ?? "";
 }
 
+function isSharedCanvasUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.pathname.split("/").filter(Boolean)[0] === "share";
+  } catch {
+    return false;
+  }
+}
+
 function readMediaDuration(kind: AssetKind, objectUrl: string): Promise<number | undefined> {
   if (kind === "image") {
     return Promise.resolve(undefined);
@@ -291,6 +300,18 @@ export function App() {
         ? { ...current, title: entry.name }
         : current
     );
+  }
+
+  function deleteCanvasHistory(entry: CanvasHistoryEntry) {
+    const confirmed = window.confirm(`确定要删除历史画布「${entry.name}」吗？`);
+    if (!confirmed) {
+      return;
+    }
+
+    setCanvasHistory((current) => current.filter((item) => item !== entry));
+    if (entry.url === canvasUrl || (project?.projectId && entry.projectId === project.projectId)) {
+      setCanvasNotice(`已删除历史画布：${entry.name}`);
+    }
   }
 
   const displayProject = project ? { ...project, title: canvasName || project.title } : project;
@@ -525,9 +546,9 @@ export function App() {
     await refreshAuthState();
   }
 
-  async function handleOpenLogin() {
+  async function handleOpenLogin(targetUrl?: string) {
     setAuthState({ status: "checking" });
-    const nextState = await companyApiFacade.openLogin();
+    const nextState = await companyApiFacade.openLogin(targetUrl);
     setAuthState(nextState);
     await refreshAuthState();
   }
@@ -546,6 +567,12 @@ export function App() {
     setCanvasNotice(undefined);
 
     try {
+      if (isSharedCanvasUrl(canvasUrl)) {
+        await handleOpenLogin(canvasUrl);
+        setCanvasNotice("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载");
+        return;
+      }
+
       const result = await companyApiFacade.loadCanvasResources(canvasUrl);
       const historyEntry = canvasHistory.find((entry) => entry.url === result.project.canvasUrl || entry.projectId === result.project.projectId);
       const nextAssets = applyCanvasAssetLayout(result.assets, historyEntry?.layout);
@@ -957,6 +984,7 @@ export function App() {
         onCanvasNameChange={setCanvasName}
         onSaveCanvasName={handleSaveCanvasName}
         onSelectCanvasHistory={selectCanvasHistory}
+        onDeleteCanvasHistory={deleteCanvasHistory}
         onNewCanvas={createNewCanvasSession}
         onOpenLogin={handleOpenLogin}
         onCheckAuth={handleCheckAuth}

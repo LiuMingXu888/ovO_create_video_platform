@@ -41,7 +41,7 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle("ovo:auth:open-login-window", () => openLoginWindow());
+  ipcMain.handle("ovo:auth:open-login-window", (_event, targetUrl?: string) => openLoginWindow(targetUrl));
   ipcMain.handle("ovo:auth:check-session", () => checkSession());
   ipcMain.handle("ovo:auth:clear-session", () => clearSession());
   ipcMain.handle("ovo:discovery:inspect-canvas", (_event, canvasUrl: string) => inspectCanvas(canvasUrl));

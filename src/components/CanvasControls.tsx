@@ -1,4 +1,4 @@
-import { Check, Link, Loader2, LogIn, Plus, RefreshCw } from "lucide-react";
+import { Check, Link, Loader2, LogIn, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { CanvasHistoryEntry } from "../lib/canvasHistory";
 import type { AuthState } from "../types";
 
@@ -14,8 +14,9 @@ interface CanvasControlsProps {
   onCanvasNameChange: (value: string) => void;
   onSaveCanvasName: () => void;
   onSelectCanvasHistory: (entry: CanvasHistoryEntry) => void;
+  onDeleteCanvasHistory: (entry: CanvasHistoryEntry) => void;
   onNewCanvas: () => void;
-  onOpenLogin: () => void;
+  onOpenLogin: (canvasUrl?: string) => void;
   onCheckAuth: () => void;
   onLoadCanvas: () => void;
 }
@@ -32,6 +33,7 @@ export function CanvasControls({
   onCanvasNameChange,
   onSaveCanvasName,
   onSelectCanvasHistory,
+  onDeleteCanvasHistory,
   onNewCanvas,
   onOpenLogin,
   onCheckAuth,
@@ -54,16 +56,28 @@ export function CanvasControls({
           <span>新增画布</span>
         </button>
         {canvasHistory.map((entry) => (
-          <button
-            key={`${entry.projectId ?? entry.url}-${entry.createdAt}`}
-            type="button"
-            className={`canvas-history-item${entry.url === canvasUrl ? " canvas-history-item-active" : ""}`}
-            title={entry.url}
-            onClick={() => onSelectCanvasHistory(entry)}
-            disabled={loading}
-          >
-            {entry.name}
-          </button>
+          <div key={`${entry.projectId ?? entry.url}-${entry.createdAt}`} className="canvas-history-item-row">
+            <button
+              type="button"
+              className={`canvas-history-item${entry.url === canvasUrl ? " canvas-history-item-active" : ""}`}
+              title={entry.url}
+              aria-label={`打开画布 ${entry.name}`}
+              onClick={() => onSelectCanvasHistory(entry)}
+              disabled={loading}
+            >
+              {entry.name}
+            </button>
+            <button
+              type="button"
+              className="canvas-history-delete"
+              title={`删除历史画布 ${entry.name}`}
+              aria-label={`删除历史画布 ${entry.name}`}
+              onClick={() => onDeleteCanvasHistory(entry)}
+              disabled={loading}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         ))}
       </div>
 
@@ -90,7 +104,7 @@ export function CanvasControls({
         </div>
 
         <div className="canvas-control-actions">
-          <button type="button" className="secondary-button" onClick={onOpenLogin} disabled={loading || authState.status === "checking"}>
+          <button type="button" className="secondary-button" onClick={() => onOpenLogin()} disabled={loading || authState.status === "checking"}>
             {authState.status === "checking" ? <Loader2 size={16} /> : <LogIn size={16} />}
             <span>登录公司账号</span>
           </button>

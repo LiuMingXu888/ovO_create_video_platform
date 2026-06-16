@@ -13,7 +13,7 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
   const creditCost = settings.durationSeconds * 10;
 
   return (
-    <aside className="generate-panel" aria-label="生成设置">
+    <aside className="generate-panel generate-panel-fixed" aria-label="生成设置">
       <div className="generate-summary">
         <strong>Seedance 2.0</strong>
         <span>

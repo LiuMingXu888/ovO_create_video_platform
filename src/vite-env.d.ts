@@ -2,7 +2,7 @@ interface Window {
   ovoDesktop?: {
     version: string;
     auth: {
-      openLoginWindow: () => Promise<{ ok: boolean; message?: string; user?: unknown }>;
+      openLoginWindow: (targetUrl?: string) => Promise<{ ok: boolean; message?: string; user?: unknown }>;
       checkSession: () => Promise<{ ok: boolean; message?: string; user?: unknown }>;
       clearSession: () => Promise<{ ok: boolean; message?: string }>;
     };

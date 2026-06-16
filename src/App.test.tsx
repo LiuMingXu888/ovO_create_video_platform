@@ -371,7 +371,7 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
 
     expect(await screen.findByText("接口图片")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "接口项目" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开画布 接口项目" })).toBeInTheDocument();
     expect(screen.getByText("已加载 1 个资源")).toBeInTheDocument();
   });
 
@@ -421,8 +421,8 @@ describe("App shell", () => {
 
     render(<App />);
 
-    expect(screen.getByRole("button", { name: "我的第一块画布" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "我的第一块画布" }));
+    expect(screen.getByRole("button", { name: "打开画布 我的第一块画布" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "打开画布 我的第一块画布" }));
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
 
     await screen.findByText("接口图片 B");
@@ -431,6 +431,55 @@ describe("App shell", () => {
     const reloadedCharactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
     expect(reloadedCharactersSection).toHaveTextContent("接口图片 B");
     expect(reloadedCharactersSection).not.toHaveTextContent("接口图片 A");
+  });
+
+  it("deletes a saved canvas history entry after confirmation", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+
+    const { unmount } = render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.change(screen.getByLabelText("当前画布名称"), { target: { value: "要删除的画布" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存画布名称" }));
+
+    expect(screen.getByRole("button", { name: "打开画布 要删除的画布" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "删除历史画布 要删除的画布" }));
+
+    expect(window.confirm).toHaveBeenCalledWith("确定要删除历史画布「要删除的画布」吗？");
+    expect(screen.queryByRole("button", { name: "打开画布 要删除的画布" })).not.toBeInTheDocument();
+    unmount();
+
+    render(<App />);
+
+    expect(screen.queryByRole("button", { name: "打开画布 要删除的画布" })).not.toBeInTheDocument();
+  });
+
+  it("opens a company window for shared canvas links instead of loading resources directly", async () => {
+    vi.mocked(companyApiFacade.openLogin).mockResolvedValue({
+      status: "unauthenticated",
+      message: "登录窗口已打开，请点击查看后复制进入后的画布地址"
+    });
+    render(<App />);
+
+    fireEvent.change(screen.getByPlaceholderText("粘贴画布地址，例如 http://qijing.kjjhz.cn/canvas/..."), {
+      target: { value: "http://qijing.kjjhz.cn/share/3xYG8A11G2Z9BsNlQX2p97nafHVWrTFV" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+
+    await waitFor(() => expect(companyApiFacade.openLogin).toHaveBeenCalledWith("http://qijing.kjjhz.cn/share/3xYG8A11G2Z9BsNlQX2p97nafHVWrTFV"));
+    expect(companyApiFacade.loadCanvasResources).not.toHaveBeenCalled();
+    expect(screen.getByText("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载")).toBeInTheDocument();
   });
 
   it("builds a local generation payload preview without submitting the company API", async () => {
@@ -936,5 +985,23 @@ describe("PromptDock", () => {
 
     expect(document.querySelector(".reference-hover-preview")).toHaveClass("reference-hover-preview-large");
     expect(screen.getByRole("img", { name: "横图 预览" })).toHaveClass("reference-hover-preview-image");
+  });
+
+  it("keeps the prompt editor resizable while the generate panel remains fixed", () => {
+    render(
+      <PromptDock
+        prompt=""
+        references={[]}
+        onPromptChange={() => undefined}
+        onRemoveReference={() => undefined}
+        onLocalFilesSelected={() => undefined}
+        onGenerate={() => undefined}
+        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true }}
+        onGenerationSettingsChange={() => undefined}
+      />
+    );
+
+    expect(document.querySelector(".prompt-token-editor textarea")).toHaveClass("prompt-resizable-textarea");
+    expect(document.querySelector(".generate-panel")).toHaveClass("generate-panel-fixed");
   });
 });

@@ -187,7 +187,8 @@ button {
 }
 
 .canvas-history-new,
-.canvas-history-item {
+.canvas-history-item,
+.canvas-history-delete {
   display: inline-flex;
   min-width: 0;
   height: 32px;
@@ -203,6 +204,12 @@ button {
   text-align: left;
 }
 
+.canvas-history-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 6px;
+}
+
 .canvas-history-new {
   justify-content: center;
   color: #d94c54;
@@ -210,15 +217,24 @@ button {
 }
 
 .canvas-history-item {
+  width: 100%;
   overflow: hidden;
   justify-content: flex-start;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.canvas-history-delete {
+  width: 32px;
+  justify-content: center;
+  padding: 0;
+  color: #68705f;
+}
+
 .canvas-history-item-active,
 .canvas-history-item:hover,
-.canvas-history-new:hover {
+.canvas-history-new:hover,
+.canvas-history-delete:hover {
   border-color: #d94c54;
   background: #fff8f7;
   color: #d94c54;
@@ -671,15 +687,16 @@ button {
   display: grid;
   width: min(96vw, 1800px);
   grid-template-columns: minmax(0, 1fr) 220px;
-  align-items: stretch;
+  align-items: start;
   gap: 10px;
 }
 
 .prompt-token-editor {
   display: grid;
   min-width: 0;
-  height: 154px;
-  overflow: hidden;
+  min-height: 154px;
+  max-height: 90vh;
+  overflow: visible;
   border: 1px solid #d94c54;
   border-radius: 8px;
   background: #ffffff;
@@ -692,9 +709,10 @@ button {
 
 .prompt-token-editor textarea {
   width: 100%;
-  height: 100%;
+  min-height: 154px;
+  max-height: 90vh;
   overflow: auto;
-  resize: none;
+  resize: vertical;
   border: 0;
   outline: none;
   background: transparent;
@@ -713,6 +731,11 @@ button {
   background: #ffffff;
   padding: 8px;
   transition: box-shadow 160ms ease;
+}
+
+.generate-panel-fixed {
+  align-self: start;
+  height: 154px;
 }
 
 .prompt-row:focus-within .generate-panel {

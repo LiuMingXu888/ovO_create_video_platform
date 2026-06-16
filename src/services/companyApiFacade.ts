@@ -24,12 +24,12 @@ function normalizeAuthUser(user: unknown): AuthUser {
 }
 
 export const companyApiFacade = {
-  openLogin: async () => {
+  openLogin: async (targetUrl?: string) => {
     if (!window.ovoDesktop) {
       return { status: "unauthenticated", message: "请在 Electron 桌面端打开登录窗口" } satisfies AuthState;
     }
 
-    return authStateFromDesktopResult(await window.ovoDesktop.auth.openLoginWindow());
+    return authStateFromDesktopResult(await window.ovoDesktop.auth.openLoginWindow(targetUrl));
   },
   checkAuth: async () => {
     if (window.ovoDesktop) {
