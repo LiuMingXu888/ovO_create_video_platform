@@ -1,4 +1,5 @@
 import { ImagePlus, X } from "lucide-react";
+import { useState } from "react";
 import { validateReferenceItems } from "../lib/referenceValidation";
 import type { GenerationSettings, ReferenceItem } from "../types";
 import { GeneratePanel } from "./GeneratePanel";
@@ -52,6 +53,8 @@ export function PromptDock({
 }: PromptDockProps) {
   const validation = validateReferenceItems(references);
   const errors = [...validation.errors, ...validationErrors];
+  const [hoveredReferenceId, setHoveredReferenceId] = useState<string | null>(null);
+  const hoveredReference = references.find((item) => item.id === hoveredReferenceId && item.previewUrl);
 
   return (
     <div className="prompt-dock">
@@ -78,27 +81,30 @@ export function PromptDock({
             type="button"
             className={`reference-chip reference-chip-${item.kind}`}
             onClick={() => onRemoveReference(item.id)}
+            onMouseEnter={() => setHoveredReferenceId(item.id)}
+            onMouseLeave={() => setHoveredReferenceId((current) => (current === item.id ? null : current))}
+            onFocus={() => setHoveredReferenceId(item.id)}
+            onBlur={() => setHoveredReferenceId((current) => (current === item.id ? null : current))}
           >
             <span className="reference-kind">{getReferenceLabel(item, references)}</span>
             <strong>{item.name}</strong>
-            {item.kind === "image" && item.previewUrl && (
-              <span className="reference-preview" aria-hidden="true">
-                <img src={item.previewUrl} alt="" />
-              </span>
-            )}
             <X size={14} />
           </button>
         ))}
       </div>
+
+      {hoveredReference?.previewUrl && (
+        <div className="reference-hover-preview">
+          <img src={hoveredReference.previewUrl} alt={`${hoveredReference.name} 预览`} />
+        </div>
+      )}
 
       {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
 
       <div className="prompt-row">
         <PromptTokenEditor
           prompt={prompt}
-          references={references}
           onPromptChange={onPromptChange}
-          onRemoveReference={onRemoveReference}
         />
         <GeneratePanel
           settings={generationSettings}

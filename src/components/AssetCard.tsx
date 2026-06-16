@@ -24,6 +24,12 @@ const categoryActions: Array<{ category: AssetCategory; label: string; icon: "us
   { category: "props", label: "道具图片", icon: "package" }
 ];
 
+const categoryActionOrder: Record<"characters" | "scenes" | "props", AssetCategory[]> = {
+  characters: ["scenes", "props"],
+  scenes: ["characters", "props"],
+  props: ["characters", "scenes"]
+};
+
 export function AssetCard({
   asset,
   draggable = false,
@@ -85,6 +91,13 @@ export function AssetCard({
     return <Package size={15} />;
   }
 
+  const imageCategoryActions =
+    asset.kind === "image" && (asset.category === "characters" || asset.category === "scenes" || asset.category === "props")
+      ? categoryActionOrder[asset.category]
+          .map((category) => categoryActions.find((action) => action.category === category))
+          .filter((action): action is (typeof categoryActions)[number] => Boolean(action))
+      : [];
+
   return (
     <article
       className={`asset-card asset-card-${asset.kind}`}
@@ -134,72 +147,68 @@ export function AssetCard({
       </div>
 
       <div className="asset-card-overlay">
-        <button type="button" title="放大预览" aria-label={`放大预览 ${asset.name}`} onClick={() => onAction(asset, "preview")}>
-          <Maximize2 size={16} />
-        </button>
-        <button type="button" title="重命名" aria-label={`重命名 ${asset.name}`} onClick={() => setEditingName(true)}>
-          <Pencil size={15} />
-        </button>
-        <button type="button" title="下载" aria-label={`下载资源 ${asset.name}`} onClick={() => onAction(asset, "download")}>
-          <Download size={16} />
-        </button>
-        {asset.kind !== "image" && (
-          <button
-            type="button"
-            title={isPlaying ? "暂停" : "播放"}
-            aria-label={`${isPlaying ? "暂停" : "播放"} ${asset.name}`}
-            onClick={() => onAction(asset, "toggle-play")}
-          >
-            {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+        <div className="asset-card-primary-actions">
+          <button type="button" title="放大预览" aria-label={`放大预览 ${asset.name}`} onClick={() => onAction(asset, "preview")}>
+            <Maximize2 size={16} />
           </button>
-        )}
-        {asset.kind === "video" && (
-          <button
-            type="button"
-            title={asset.generationPrompt && asset.generationReferences?.length ? "复用生成" : "暂无可复用的生成提示词和引用"}
-            aria-label={`复用生成 ${asset.name}`}
-            disabled={!asset.generationPrompt || !asset.generationReferences?.length}
-            onClick={() => onAction(asset, "reuse-generation")}
-          >
-            <RefreshCcw size={15} />
+          <button type="button" title="重命名" aria-label={`重命名 ${asset.name}`} onClick={() => setEditingName(true)}>
+            <Pencil size={15} />
           </button>
-        )}
-        <button type="button" title="加入提示词" aria-label={`加入提示词 ${asset.name}`} onClick={() => onAction(asset, "insert")}>
-          <Plus size={17} />
-        </button>
-        <button type="button" title="删除" aria-label={`删除 ${asset.name}`} onClick={() => onAction(asset, "delete")}>
-          <Trash2 size={15} />
-        </button>
-      </div>
-
-      {(asset.kind === "image" || asset.kind === "video") && (
-        <div className="asset-category-overlay">
-          {asset.kind === "video" ? (
+          <button type="button" title="下载" aria-label={`下载资源 ${asset.name}`} onClick={() => onAction(asset, "download")}>
+            <Download size={16} />
+          </button>
+          <button type="button" title="加入提示词" aria-label={`加入提示词 ${asset.name}`} onClick={() => onAction(asset, "insert")}>
+            <Plus size={17} />
+          </button>
+        </div>
+        <div className="asset-card-secondary-actions">
+          {imageCategoryActions.map((action) => (
+            <button
+              key={action.category}
+              type="button"
+              title={`设为${action.label}`}
+              aria-label={`设为${action.label} ${asset.name}`}
+              onClick={() => onChangeCategory(asset.id, action.category)}
+            >
+              {renderCategoryIcon(action.icon)}
+            </button>
+          ))}
+          {asset.kind !== "image" && (
             <button
               type="button"
-              title="去除字幕"
-              aria-label={`去除字幕 ${asset.name}`}
-              onClick={() => onAction(asset, "remove-subtitles")}
+              title={isPlaying ? "暂停" : "播放"}
+              aria-label={`${isPlaying ? "暂停" : "播放"} ${asset.name}`}
+              onClick={() => onAction(asset, "toggle-play")}
             >
-              <CaptionsOff size={15} />
+              {isPlaying ? <Pause size={15} /> : <Play size={15} />}
             </button>
-          ) : (
-            categoryActions
-              .filter((action) => action.category !== asset.category)
-              .map((action) => (
-                <button
-                  key={action.category}
-                  type="button"
-                  title={`设为${action.label}`}
-                  aria-label={`设为${action.label} ${asset.name}`}
-                  onClick={() => onChangeCategory(asset.id, action.category)}
-                >
-                  {renderCategoryIcon(action.icon)}
-                </button>
-              ))
           )}
+          {asset.kind === "video" && (
+            <>
+              <button
+                type="button"
+                title={asset.generationPrompt && asset.generationReferences?.length ? "复用生成" : "暂无可复用的生成提示词和引用"}
+                aria-label={`复用生成 ${asset.name}`}
+                disabled={!asset.generationPrompt || !asset.generationReferences?.length}
+                onClick={() => onAction(asset, "reuse-generation")}
+              >
+                <RefreshCcw size={15} />
+              </button>
+              <button
+                type="button"
+                title="去除字幕"
+                aria-label={`去除字幕 ${asset.name}`}
+                onClick={() => onAction(asset, "remove-subtitles")}
+              >
+                <CaptionsOff size={15} />
+              </button>
+            </>
+          )}
+          <button type="button" title="删除" aria-label={`删除 ${asset.name}`} onClick={() => onAction(asset, "delete")}>
+            <Trash2 size={15} />
+          </button>
         </div>
-      )}
+      </div>
 
       {editingName ? (
         <form
@@ -209,17 +218,19 @@ export function AssetCard({
             saveName();
           }}
         >
+          <div className="asset-name-editor-actions">
+            <button type="submit" title="保存名称" aria-label="保存名称">
+              <Check size={14} />
+            </button>
+            <button type="button" title="取消重命名" aria-label="取消重命名" onClick={cancelEdit}>
+              <X size={14} />
+            </button>
+          </div>
           <input
             aria-label={`编辑名称 ${asset.name}`}
             value={draftName}
             onChange={(event) => setDraftName(event.currentTarget.value)}
           />
-          <button type="submit" title="保存名称" aria-label="保存名称">
-            <Check size={14} />
-          </button>
-          <button type="button" title="取消重命名" aria-label="取消重命名" onClick={cancelEdit}>
-            <X size={14} />
-          </button>
         </form>
       ) : (
         <div className="asset-name" title={asset.name}>

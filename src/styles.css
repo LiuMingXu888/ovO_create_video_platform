@@ -385,30 +385,32 @@ button {
   position: absolute;
   inset: 8px 8px auto auto;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 28px;
-  justify-content: flex-end;
+  justify-items: end;
   gap: 5px;
 }
 
-.asset-card-overlay button,
-.asset-category-overlay button,
-.asset-video-actions button {
+.asset-card-primary-actions,
+.asset-card-secondary-actions {
+  display: grid;
+  gap: 5px;
+}
+
+.asset-card-primary-actions {
+  grid-template-columns: repeat(4, 28px);
+}
+
+.asset-card-secondary-actions {
+  width: 28px;
+}
+
+.asset-card-overlay button {
   width: 28px;
   height: 28px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
 }
 
-.asset-video-actions {
-  position: absolute;
-  top: 44px;
-  right: 8px;
-  display: grid;
-  gap: 5px;
-}
-
-.asset-video-actions button {
+.asset-card-overlay button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -417,22 +419,14 @@ button {
   cursor: pointer;
 }
 
-.asset-video-actions button:hover:not(:disabled) {
+.asset-card-overlay button:hover:not(:disabled) {
   border-color: #e24f57;
   color: #e24f57;
 }
 
-.asset-video-actions button:disabled {
+.asset-card-overlay button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
-}
-
-.asset-category-overlay {
-  position: absolute;
-  top: 44px;
-  right: 8px;
-  display: grid;
-  gap: 5px;
 }
 
 .asset-name {
@@ -457,11 +451,17 @@ button {
   bottom: 8px;
   left: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  grid-template-rows: 28px 30px;
   gap: 4px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.96);
   padding: 5px;
+}
+
+.asset-name-editor-actions {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
 }
 
 .asset-name-editor input {
@@ -554,31 +554,28 @@ button {
   white-space: nowrap;
 }
 
-.reference-preview {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 40;
-  display: none;
-  width: 148px;
-  height: 148px;
+.reference-hover-preview {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 70;
+  width: min(360px, 72vw);
+  aspect-ratio: 1 / 1;
   overflow: hidden;
-  border: 1px solid #d7d4cc;
+  border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 14px 34px rgba(32, 39, 52, 0.18);
-  padding: 4px;
+  box-shadow: 0 24px 70px rgba(32, 39, 52, 0.28);
+  padding: 6px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 
-.reference-preview img {
+.reference-hover-preview img {
   width: 100%;
   height: 100%;
   border-radius: 6px;
   object-fit: cover;
-}
-
-.reference-chip:hover .reference-preview {
-  display: block;
 }
 
 .validation-errors {
@@ -599,7 +596,6 @@ button {
   display: grid;
   min-width: 0;
   height: 154px;
-  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid #d94c54;
   border-radius: 8px;
@@ -609,53 +605,6 @@ button {
 
 .prompt-token-editor:focus-within {
   box-shadow: 0 10px 28px rgba(217, 76, 84, 0.16);
-}
-
-.prompt-token-line {
-  display: flex;
-  min-height: 38px;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  border-bottom: 1px solid #f0d4d6;
-  padding: 7px 10px;
-}
-
-.prompt-token {
-  display: inline-flex;
-  height: 25px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 5px;
-  border-radius: 7px;
-  padding: 0 5px 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.prompt-token-image {
-  background: #e8f4ff;
-  color: #075985;
-}
-
-.prompt-token-video {
-  background: #fff1e6;
-  color: #9a3412;
-}
-
-.prompt-token-audio {
-  background: #edf7ed;
-  color: #166534;
-}
-
-.prompt-token button {
-  display: inline-flex;
-  width: 18px;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.72);
 }
 
 .prompt-token-editor textarea {

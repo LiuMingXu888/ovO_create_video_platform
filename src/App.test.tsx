@@ -100,13 +100,14 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
 
-    expect(screen.getByRole("button", { name: "删除提示词资源 小区楼道" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "图一 小区楼道" })).toBeInTheDocument();
     expect(referenceChips()).toHaveLength(1);
     expect(referenceChips()[0]).toHaveTextContent("图一");
     expect(referenceChips()[0]).toHaveTextContent("小区楼道");
+    expect(document.querySelector(".prompt-token-line")).not.toBeInTheDocument();
   });
 
-  it("labels references by kind and only gives image references hover previews", () => {
+  it("labels references by kind and shows a centered preview only while hovering previewable references", () => {
     render(<App />);
 
     const addButtons = screen.getAllByTitle("加入提示词");
@@ -121,22 +122,29 @@ describe("App shell", () => {
       "视频一",
       "图二"
     ]);
-    expect(document.querySelectorAll(".reference-preview")).toHaveLength(2);
-    expect(referenceChips()[0].querySelector(".reference-preview img")).toHaveAttribute(
+    expect(screen.queryByRole("img", { name: "小区楼道 预览" })).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(referenceChips()[0]);
+    expect(screen.getByRole("img", { name: "小区楼道 预览" })).toHaveAttribute(
       "src",
       expect.stringContaining("images.unsplash.com")
     );
-    expect(referenceChips()[1].querySelector(".reference-preview")).toBeNull();
-    expect(referenceChips()[2].querySelector(".reference-preview")).toBeNull();
+    expect(document.querySelector(".reference-hover-preview")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(referenceChips()[0]);
+    expect(screen.queryByRole("img", { name: "小区楼道 预览" })).not.toBeInTheDocument();
+
+    fireEvent.mouseEnter(referenceChips()[1]);
+    expect(document.querySelector(".reference-hover-preview")).not.toBeInTheDocument();
   });
 
   it("removes prompt tokens and reference chips as one synced item", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.click(screen.getByRole("button", { name: "删除提示词资源 小区楼道" }));
+    fireEvent.click(screen.getByRole("button", { name: "图一 小区楼道" }));
 
-    expect(screen.queryByRole("button", { name: "删除提示词资源 小区楼道" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "图一 小区楼道" })).not.toBeInTheDocument();
     expect(referenceChips()).toHaveLength(0);
   });
 
@@ -410,6 +418,9 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "重命名 小区楼道" }));
+    const editor = screen.getByDisplayValue("小区楼道").closest("form") as HTMLElement;
+    expect(editor.querySelector(".asset-name-editor-actions")).toBeInTheDocument();
+    expect(editor.querySelector(".asset-name-editor-actions + input")).toBe(screen.getByDisplayValue("小区楼道"));
     fireEvent.change(screen.getByDisplayValue("小区楼道"), { target: { value: "小区楼道改名" } });
     fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
 
@@ -714,15 +725,50 @@ describe("App shell", () => {
     expect(play).toHaveBeenCalledTimes(2);
   });
 
-  it("swaps media play and plus action order", () => {
+  it("orders card actions by asset category", () => {
     render(<App />);
+
+    const imageCard = screen.getByText("小区楼道").closest("article") as HTMLElement;
+    const imageActions = Array.from(imageCard.querySelectorAll(".asset-card-overlay button")).map((button) =>
+      button.getAttribute("aria-label")
+    );
+    expect(imageActions).toEqual([
+      "放大预览 小区楼道",
+      "重命名 小区楼道",
+      "下载资源 小区楼道",
+      "加入提示词 小区楼道",
+      "设为场景图片 小区楼道",
+      "设为道具图片 小区楼道",
+      "删除 小区楼道"
+    ]);
 
     const audioCard = screen.getByText("紧张背景音乐").closest("article") as HTMLElement;
     const audioActions = Array.from(audioCard.querySelectorAll(".asset-card-overlay button")).map((button) =>
       button.getAttribute("aria-label")
     );
+    expect(audioActions).toEqual([
+      "放大预览 紧张背景音乐",
+      "重命名 紧张背景音乐",
+      "下载资源 紧张背景音乐",
+      "加入提示词 紧张背景音乐",
+      "播放 紧张背景音乐",
+      "删除 紧张背景音乐"
+    ]);
 
-    expect(audioActions.indexOf("播放 紧张背景音乐")).toBeLessThan(audioActions.indexOf("加入提示词 紧张背景音乐"));
+    const videoCard = screen.getByText("开场参考视频").closest("article") as HTMLElement;
+    const videoActions = Array.from(videoCard.querySelectorAll(".asset-card-overlay button")).map((button) =>
+      button.getAttribute("aria-label")
+    );
+    expect(videoActions).toEqual([
+      "放大预览 开场参考视频",
+      "重命名 开场参考视频",
+      "下载资源 开场参考视频",
+      "加入提示词 开场参考视频",
+      "播放 开场参考视频",
+      "复用生成 开场参考视频",
+      "去除字幕 开场参考视频",
+      "删除 开场参考视频"
+    ]);
   });
 
   it("selects assets for batch desktop download from the header", async () => {
