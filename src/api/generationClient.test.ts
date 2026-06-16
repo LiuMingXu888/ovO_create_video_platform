@@ -50,7 +50,7 @@ describe("generateVideo", () => {
   it("uses a longer default polling window for real Seedance tasks", async () => {
     expect(DEFAULT_GENERATION_POLL_OPTIONS).toEqual({
       intervalMs: 1500,
-      maxAttempts: 240
+      maxAttempts: 1400
     });
   });
 

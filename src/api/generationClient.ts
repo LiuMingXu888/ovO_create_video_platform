@@ -2,7 +2,7 @@ import type { GenerationSettings, ReferenceItem } from "../types";
 import { endpoints } from "./endpoints";
 import type { ApiTransport } from "./transport";
 
-export const DEFAULT_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 240 };
+export const DEFAULT_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 1400 };
 
 interface BuildGenerateVideoPayloadInput {
   prompt: string;
