@@ -12,7 +12,7 @@ export type AssetAction =
   | "delete"
   | "reuse-generation";
 
-export type SortMode = "default" | "asc" | "desc";
+export type SortMode = "default" | "generated-asc" | "generated-desc" | "name-asc" | "name-desc";
 
 export interface GenerationSettings {
   aspectRatio: "9:16" | "16:9" | "1:1";
@@ -29,6 +29,8 @@ export interface CanvasAsset {
   thumbnailUrl?: string;
   durationSeconds?: number;
   sizeBytes?: number;
+  createdAt?: string;
+  status?: "ready" | "generating" | "failed";
   generationPrompt?: string;
   generationReferences?: ReferenceItem[];
 }

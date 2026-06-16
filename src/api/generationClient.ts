@@ -1,4 +1,5 @@
 import type { GenerationSettings, ReferenceItem } from "../types";
+import { endpoints } from "./endpoints";
 import type { ApiTransport } from "./transport";
 
 interface BuildGenerateVideoPayloadInput {
@@ -27,6 +28,62 @@ export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput)
   };
 }
 
+export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
+  const payload = buildGenerateVideoPayload(input);
+  return {
+    ...payload,
+    model: "ep-20260319213857-htd7q",
+    generateAudio: true
+  };
+}
+
+interface GenerateVideoResponse {
+  taskId?: string;
+}
+
+export interface GenerateVideoResult {
+  taskId: string;
+  videoUrl: string;
+  providerVideoUrl?: string;
+}
+
+interface GenerateVideoPollResponse {
+  status?: string;
+  videoUrl?: string;
+  providerVideoUrl?: string;
+  outputUrl?: string;
+  errorMessage?: string;
+  error?: unknown;
+}
+
+export async function generateVideo(
+  transport: ApiTransport,
+  input: BuildGenerateVideoPayloadInput,
+  options: PollOptions = { intervalMs: 1500, maxAttempts: 80 }
+): Promise<GenerateVideoResult> {
+  const submitResult = await transport.request<GenerateVideoResponse>(endpoints.generateVideo(), {
+    method: "POST",
+    body: buildCompanyGenerateVideoPayload(input)
+  });
+
+  if (!submitResult.taskId) {
+    throw new Error("生成接口未返回任务 ID");
+  }
+
+  const pollResult = await pollTaskUntilComplete(transport, endpoints.generateVideoTask(submitResult.taskId), options);
+  const videoUrl = pollResult.videoUrl ?? pollResult.outputUrl ?? pollResult.providerVideoUrl;
+
+  if (!videoUrl) {
+    throw new Error("生成成功但接口未返回视频地址");
+  }
+
+  return {
+    taskId: submitResult.taskId,
+    videoUrl,
+    providerVideoUrl: pollResult.providerVideoUrl
+  };
+}
+
 export interface PollOptions {
   intervalMs: number;
   maxAttempts: number;
@@ -38,9 +95,13 @@ export async function pollTaskUntilComplete(
   options: PollOptions = { intervalMs: 1500, maxAttempts: 80 }
 ) {
   for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
-    const result = await transport.request<{ status?: string; outputUrl?: string; errorMessage?: string }>(path);
+    const result = await transport.request<GenerateVideoPollResponse>(path);
 
-    if (result.status === "succeeded" || result.status === "failed") {
+    if (result.status === "failed") {
+      throw new Error(result.errorMessage ?? getPollErrorMessage(result.error) ?? "视频生成失败");
+    }
+
+    if (result.status === "succeeded") {
       return result;
     }
 
@@ -50,4 +111,16 @@ export async function pollTaskUntilComplete(
   }
 
   throw new Error("任务轮询超时");
+}
+
+function getPollErrorMessage(error: unknown) {
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+
+  return undefined;
 }

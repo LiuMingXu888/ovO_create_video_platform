@@ -50,6 +50,8 @@ export function AssetCard({
   const mediaElementRef = useRef<HTMLMediaElement | null>(null);
   const isPlaying = playingAssetId === asset.id;
   const canDragCard = draggable && !editingName;
+  const isGenerating = asset.status === "generating";
+  const isFailed = asset.status === "failed";
 
   function saveName() {
     const nextName = draftName.trim();
@@ -136,7 +138,9 @@ export function AssetCard({
       )}
       <div className="asset-media">
         {asset.kind === "image" && <img src={asset.thumbnailUrl ?? asset.url} alt={asset.name} />}
-        {asset.kind === "video" && (
+        {asset.kind === "video" && isGenerating && <div className="video-generating">生成中</div>}
+        {asset.kind === "video" && isFailed && <div className="video-generating video-failed">生成失败</div>}
+        {asset.kind === "video" && !isGenerating && !isFailed && (
           <video
             ref={setMediaElement}
             src={asset.url}
@@ -157,13 +161,25 @@ export function AssetCard({
 
       <div className="asset-card-overlay">
         <div className="asset-card-primary-actions">
-          <button type="button" title="放大预览" aria-label={`放大预览 ${asset.name}`} onClick={() => onAction(asset, "preview")}>
+          <button
+            type="button"
+            title="放大预览"
+            aria-label={`放大预览 ${asset.name}`}
+            disabled={isGenerating || isFailed}
+            onClick={() => onAction(asset, "preview")}
+          >
             <Maximize2 size={16} />
           </button>
           <button type="button" title="重命名" aria-label={`重命名 ${asset.name}`} onClick={() => setEditingName(true)}>
             <Pencil size={15} />
           </button>
-          <button type="button" title="下载" aria-label={`下载资源 ${asset.name}`} onClick={() => onAction(asset, "download")}>
+          <button
+            type="button"
+            title="下载"
+            aria-label={`下载资源 ${asset.name}`}
+            disabled={isGenerating || isFailed}
+            onClick={() => onAction(asset, "download")}
+          >
             <Download size={16} />
           </button>
           <button type="button" title="加入提示词" aria-label={`加入提示词 ${asset.name}`} onClick={() => onAction(asset, "insert")}>
@@ -187,6 +203,7 @@ export function AssetCard({
               type="button"
               title={isPlaying ? "暂停" : "播放"}
               aria-label={`${isPlaying ? "暂停" : "播放"} ${asset.name}`}
+              disabled={isGenerating || isFailed}
               onClick={() => onAction(asset, "toggle-play")}
             >
               {isPlaying ? <Pause size={15} /> : <Play size={15} />}

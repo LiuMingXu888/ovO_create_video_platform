@@ -9,7 +9,8 @@ vi.mock("./services/companyApiFacade", () => ({
     loadCanvasResources: vi.fn(),
     renameCanvasAsset: vi.fn(),
     uploadCanvasAsset: vi.fn(),
-    deleteCanvasAsset: vi.fn()
+    deleteCanvasAsset: vi.fn(),
+    generateVideo: vi.fn()
   }
 }));
 
@@ -30,6 +31,7 @@ beforeEach(() => {
   vi.mocked(companyApiFacade.openLogin).mockReset();
   vi.mocked(companyApiFacade.checkAuth).mockReset();
   vi.mocked(companyApiFacade.deleteCanvasAsset).mockReset();
+  vi.mocked(companyApiFacade.generateVideo).mockReset();
 });
 
 function mockObjectUrl(url: string) {
@@ -305,6 +307,69 @@ describe("App shell", () => {
     expect(screen.getByText("已同步上传 1 个资源")).toBeInTheDocument();
   });
 
+  it("uploads local audio through the same canvas node flow and keeps it in the audio section", async () => {
+    const file = new File(["audio"], "voice-over.mp3", { type: "audio/mpeg" });
+    const originalSnapshot = { snapshot: { nodes: [] } };
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: originalSnapshot,
+      assets: []
+    });
+    vi.mocked(companyApiFacade.uploadCanvasAsset).mockResolvedValue({
+      ok: true,
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "uploaded-audio-node",
+              type: "audio-node",
+              data: {
+                name: "voice-over",
+                kind: "audio",
+                category: "audio",
+                audioUrl: "https://example.com/voice-over.mp3",
+                sizeBytes: 5
+              }
+            }
+          ]
+        }
+      },
+      asset: {
+        id: "uploaded-audio-node",
+        name: "voice-over",
+        kind: "audio",
+        category: "audio",
+        url: "https://example.com/voice-over.mp3",
+        sizeBytes: 5
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    const audioSection = screen.getByRole("button", { name: "音频" }).closest("section") as HTMLElement;
+    const audioInput = audioSection.querySelector("input") as HTMLInputElement;
+    fireEvent.change(audioInput, { target: { files: [file] } });
+
+    expect(await screen.findByText("voice-over")).toBeInTheDocument();
+    expect(audioSection).toHaveTextContent("voice-over");
+    expect(companyApiFacade.uploadCanvasAsset).toHaveBeenCalledWith({
+      projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      snapshot: originalSnapshot,
+      file,
+      name: "voice-over",
+      kind: "audio",
+      category: "audio"
+    });
+  });
+
   it("checks auth state from the company API facade", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
@@ -443,7 +508,15 @@ describe("App shell", () => {
         loadedAt: "2026-06-15T00:00:00.000Z"
       },
       snapshot: { snapshot: { nodes: [] } },
-      assets: []
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
     });
 
     const { unmount } = render(<App />);
@@ -495,6 +568,69 @@ describe("App shell", () => {
     expect(await screen.findByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
     expect(screen.getByText(/Seedance 2.0/)).toBeInTheDocument();
     expect(companyApiFacade.checkAuth).toHaveBeenCalledTimes(2);
+  });
+
+  it("submits real generation for a loaded canvas, shows a loading card, then replaces it with the returned video", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    let resolveGeneration: (value: { taskId: string; videoUrl: string }) => void = () => undefined;
+    vi.mocked(companyApiFacade.generateVideo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+      target: { value: "镜头缓慢推进" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    resolveGeneration({ taskId: "task-1", videoUrl: "https://example.com/generated.mp4" });
+
+    await waitFor(() => {
+      const generatedVideo = screen.getByText("生成视频 1").closest("article")?.querySelector("video") as HTMLVideoElement;
+      expect(generatedVideo).toHaveAttribute("src", "https://example.com/generated.mp4");
+    });
+    expect(screen.queryByText("生成中")).not.toBeInTheDocument();
+    expect(screen.getByText("已生成真实视频：生成视频 1")).toBeInTheDocument();
+    expect(companyApiFacade.generateVideo).toHaveBeenCalledWith({
+      projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      prompt: "镜头缓慢推进 小区楼道",
+      references: expect.any(Array),
+      settings: {
+        aspectRatio: "9:16",
+        durationSeconds: 15,
+        omnireference: true
+      }
+    });
   });
 
   it("reuses a generated video's prompt and source references when metadata exists", async () => {
@@ -715,15 +851,15 @@ describe("App shell", () => {
     expect(await screen.findByText("已同步名称：接口图片改名")).toBeInTheDocument();
   });
 
-  it("cycles section sorting through default, ascending, descending, and default", async () => {
+  it("selects section sorting across default, generated time, and name modes", async () => {
     render(<App />);
 
     const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
     const beforeSortNames = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
 
-    expect(screen.getAllByText("默认")).toHaveLength(5);
-    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序：默认" }));
-    expect(screen.getByText("升序")).toBeInTheDocument();
+    expect(screen.getByLabelText("人物排序")).toHaveValue("default");
+    expect(screen.getByLabelText("视频排序")).toHaveValue("generated-desc");
+    fireEvent.change(screen.getByLabelText("人物排序"), { target: { value: "name-asc" } });
     expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual([
       "高铁站",
       "绿色行李箱",
@@ -731,8 +867,7 @@ describe("App shell", () => {
       "小区楼道"
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序：升序" }));
-    expect(screen.getByText("降序")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("人物排序"), { target: { value: "name-desc" } });
     expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual([
       "小区楼道",
       "男主秦扬人脸参考",
@@ -740,9 +875,32 @@ describe("App shell", () => {
       "高铁站"
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: "人物 按名称排序：降序" }));
+    fireEvent.change(screen.getByLabelText("人物排序"), { target: { value: "default" } });
     expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual(beforeSortNames);
     expect(screen.getByText("紧张背景音乐")).toBeInTheDocument();
+  });
+
+  it("keeps the latest generated video at the top when video sorting uses generated time descending", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+      target: { value: "第一个生成" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    await screen.findByText("生成视频 1");
+
+    fireEvent.change(screen.getByPlaceholderText("输入视频提示词，点击资源 + 会插入资源标签"), {
+      target: { value: "第二个生成" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    await screen.findByText("生成视频 2");
+
+    const videoSection = screen.getByRole("button", { name: "视频" }).closest("section") as HTMLElement;
+    expect(Array.from(videoSection.querySelectorAll(".asset-name")).map((node) => node.textContent).slice(0, 2)).toEqual([
+      "生成视频 2",
+      "生成视频 1"
+    ]);
   });
 
   it("reorders images inside the same section by drag and drop", async () => {

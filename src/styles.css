@@ -369,12 +369,15 @@ button {
   gap: 8px;
 }
 
-.sort-mode-label {
-  min-width: 32px;
+.section-sort-select {
+  width: 132px;
+  height: 34px;
+  border: 1px solid #f0c3c6;
+  border-radius: 8px;
+  background: #ffffff;
   color: #9b343b;
   font-size: 13px;
   font-weight: 700;
-  text-align: right;
 }
 
 .section-action-button {
@@ -475,6 +478,21 @@ button {
     repeating-linear-gradient(90deg, #e8efe5 0 8px, #cdd8c5 8px 14px);
   color: #475266;
   font-weight: 700;
+}
+
+.video-generating {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background: linear-gradient(135deg, #fff8f7 0%, #f4f1ea 100%);
+  color: #9b343b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.video-failed {
+  color: #b4232d;
 }
 
 .asset-card-overlay {

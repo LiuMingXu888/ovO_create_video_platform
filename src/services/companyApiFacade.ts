@@ -1,10 +1,11 @@
 import { checkAuth } from "../api/authClient";
 import { DesktopApiTransport } from "../api/desktopTransport";
+import { generateVideo as generateVideoWithTransport } from "../api/generationClient";
 import { FetchApiTransport } from "../api/transport";
 import { uploadCanvasAsset as uploadCanvasAssetWithTransport } from "../api/uploadClient";
 import { extractCreditBalance } from "../lib/credits";
 import { deleteCanvasAsset, loadCanvasResources, renameCanvasAsset } from "./canvasLoader";
-import type { AssetCategory, AssetKind, AuthState, AuthUser } from "../types";
+import type { AssetCategory, AssetKind, AuthState, AuthUser, GenerationSettings, ReferenceItem } from "../types";
 
 const transport = new FetchApiTransport();
 const desktopTransport = new DesktopApiTransport();
@@ -54,7 +55,13 @@ export const companyApiFacade = {
     name: string;
     kind: AssetKind;
     category: AssetCategory;
-  }) => uploadCanvasAssetWithTransport(window.ovoDesktop ? desktopTransport : transport, input)
+  }) => uploadCanvasAssetWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
+  generateVideo: (input: {
+    projectId: string;
+    prompt: string;
+    references: ReferenceItem[];
+    settings: GenerationSettings;
+  }) => generateVideoWithTransport(window.ovoDesktop ? desktopTransport : transport, input)
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

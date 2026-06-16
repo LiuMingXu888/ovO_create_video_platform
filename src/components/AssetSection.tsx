@@ -1,4 +1,4 @@
-import { ArrowDownAZ, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { AssetAction, AssetCategory, CanvasAsset, SectionDefinition, SortMode } from "../types";
 import { AssetCard } from "./AssetCard";
 import { UploadPlaceholder } from "./UploadPlaceholder";
@@ -15,7 +15,7 @@ interface AssetSectionProps {
   onChangeCategory: (assetId: string, category: AssetCategory) => void;
   onMediaElement: (assetId: string, element: HTMLMediaElement | null) => void;
   onMediaEnded: (assetId: string) => void;
-  onCycleSort: (category: AssetCategory) => void;
+  onSortModeChange: (category: AssetCategory, mode: SortMode) => void;
   onFilesSelected: (category: AssetCategory, files: FileList) => void;
   onDragStart: (asset: CanvasAsset) => void;
   onDropAsset: (category: AssetCategory) => void;
@@ -47,7 +47,7 @@ export function AssetSection({
   onChangeCategory,
   onMediaElement,
   onMediaEnded,
-  onCycleSort,
+  onSortModeChange,
   onFilesSelected,
   onDragStart,
   onDropAsset,
@@ -57,7 +57,6 @@ export function AssetSection({
   onSelectionChange
 }: AssetSectionProps) {
   const acceptsDraggedImages = imageCategories.includes(section.id);
-  const sortLabel = sortMode === "asc" ? "升序" : sortMode === "desc" ? "降序" : "默认";
 
   return (
     <section
@@ -77,16 +76,18 @@ export function AssetSection({
       <div className="section-header">
         <span>{section.title}</span>
         <div className="section-actions">
-          <span className="sort-mode-label">{sortLabel}</span>
-          <button
-            type="button"
-            className="section-action-button"
-            title="按名称排序"
-            aria-label={`${section.title} 按名称排序：${sortLabel}`}
-            onClick={() => onCycleSort(section.id)}
+          <select
+            className="section-sort-select"
+            aria-label={`${section.title}排序`}
+            value={sortMode}
+            onChange={(event) => onSortModeChange(section.id, event.currentTarget.value as SortMode)}
           >
-            <ArrowDownAZ size={18} />
-          </button>
+            <option value="default">默认排序</option>
+            <option value="generated-asc">生成时间升序</option>
+            <option value="generated-desc">生成时间降序</option>
+            <option value="name-asc">名字升序</option>
+            <option value="name-desc">名字降序</option>
+          </select>
           <button
             type="button"
             className="section-action-button"

@@ -4,7 +4,6 @@ import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
-import { buildGenerateVideoPayload } from "./api/generationClient";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
 import {
   applyCanvasAssetLayout,
@@ -40,7 +39,7 @@ const defaultSortModes: Record<AssetCategory, SortMode> = {
   scenes: "default",
   props: "default",
   audio: "default",
-  video: "default"
+  video: "generated-desc"
 };
 
 interface ReferenceIssue {
@@ -138,6 +137,37 @@ function createAssetOrder(sourceAssets: CanvasAsset[]): Record<AssetCategory, st
 
 function getCanvasUrlFromProject(project?: CanvasProject | null) {
   return project?.canvasUrl ?? "";
+}
+
+function getGeneratedTime(asset: CanvasAsset, defaultIndex: number) {
+  const timestamp = asset.createdAt ? Date.parse(asset.createdAt) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : defaultIndex;
+}
+
+function sortCategoryAssets(assets: CanvasAsset[], category: AssetCategory, mode: SortMode, defaultOrder: string[]) {
+  if (mode === "default") {
+    const defaultRank = new Map(defaultOrder.map((assetId, index) => [assetId, index]));
+    return assets
+      .slice()
+      .sort((left, right) => (defaultRank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (defaultRank.get(right.id) ?? Number.MAX_SAFE_INTEGER));
+  }
+
+  const collator = new Intl.Collator("zh-Hans-CN");
+  return assets.slice().sort((left, right) => {
+    if (mode === "name-asc") {
+      return collator.compare(left.name, right.name);
+    }
+
+    if (mode === "name-desc") {
+      return collator.compare(right.name, left.name);
+    }
+
+    const leftDefaultIndex = defaultOrder.includes(left.id) ? defaultOrder.indexOf(left.id) : assets.indexOf(left);
+    const rightDefaultIndex = defaultOrder.includes(right.id) ? defaultOrder.indexOf(right.id) : assets.indexOf(right);
+    const leftTime = getGeneratedTime(left, leftDefaultIndex);
+    const rightTime = getGeneratedTime(right, rightDefaultIndex);
+    return mode === "generated-asc" ? leftTime - rightTime : rightTime - leftTime;
+  });
 }
 
 function isSharedCanvasUrl(value: string) {
@@ -241,12 +271,13 @@ export function App() {
   const assetsByCategory = useMemo(() => {
     return sectionDefinitions.reduce<Record<AssetCategory, CanvasAsset[]>>(
       (groups, section) => {
-        groups[section.id] = assets.filter((asset) => asset.category === section.id);
+        const categoryAssets = assets.filter((asset) => asset.category === section.id);
+        groups[section.id] = sortCategoryAssets(categoryAssets, section.id, sortModes[section.id], defaultAssetOrder[section.id]);
         return groups;
       },
       { characters: [], scenes: [], props: [], audio: [], video: [] }
     );
-  }, [assets]);
+  }, [assets, defaultAssetOrder, sortModes]);
 
   function toggleSection(category: AssetCategory) {
     setExpandedSections((current) =>
@@ -362,6 +393,24 @@ export function App() {
     setReferences([]);
     setReferenceIssues(validation.errors.map((message) => ({ id: createId("reference-error"), message })));
     setGenerateStatus(validation.errors.join(" / "));
+  }
+
+  function createGeneratedVideoPlaceholder() {
+    const placeholderId = createId("generated-video");
+    return {
+      id: placeholderId,
+      name: `生成视频 ${assets.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`,
+      kind: "video" as const,
+      category: "video" as const,
+      url: "",
+      thumbnailUrl: undefined,
+      durationSeconds: generationSettings.durationSeconds,
+      sizeBytes: 0,
+      createdAt: new Date().toISOString(),
+      status: "generating" as const,
+      generationPrompt: prompt,
+      generationReferences: references.map(cloneReferenceForReuse)
+    };
   }
 
   function handleAssetAction(asset: CanvasAsset, action: AssetAction) {
@@ -606,6 +655,7 @@ export function App() {
 
     setAssets((current) => {
       const nextAssets = current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category } : asset));
+      setDefaultAssetOrder(createAssetOrder(nextAssets));
       setCanvasHistory((history) =>
         updateCanvasHistoryLayout(history, {
           url: getCanvasUrlFromProject(project) || canvasUrl,
@@ -669,51 +719,8 @@ export function App() {
     });
   }
 
-  function cycleSort(category: AssetCategory) {
-    const currentMode = sortModes[category];
-    const nextMode: SortMode = currentMode === "default" ? "asc" : currentMode === "asc" ? "desc" : "default";
-    if (currentMode === "default" && nextMode === "asc") {
-      setDefaultAssetOrder((current) => ({
-        ...current,
-        [category]: assets.filter((asset) => asset.category === category).map((asset) => asset.id)
-      }));
-    }
-    setSortModes((current) => ({ ...current, [category]: nextMode }));
-
-    setAssets((current) => {
-      if (nextMode === "default") {
-        const defaultOrder = defaultAssetOrder[category];
-        return current
-          .slice()
-          .sort((left, right) => {
-            if (left.category !== category || right.category !== category) {
-              return 0;
-            }
-
-            return defaultOrder.indexOf(left.id) - defaultOrder.indexOf(right.id);
-          });
-      }
-
-      const collator = new Intl.Collator("zh-Hans-CN");
-      const sortedIds = current
-        .filter((asset) => asset.category === category)
-        .slice()
-        .sort((left, right) =>
-          nextMode === "asc" ? collator.compare(left.name, right.name) : collator.compare(right.name, left.name)
-        )
-        .map((asset) => asset.id);
-      let index = 0;
-
-      return current.map((asset) => {
-        if (asset.category !== category) {
-          return asset;
-        }
-
-        const nextAsset = current.find((candidate) => candidate.id === sortedIds[index]);
-        index += 1;
-        return nextAsset ?? asset;
-      });
-    });
+  function changeSortMode(category: AssetCategory, mode: SortMode) {
+    setSortModes((current) => ({ ...current, [category]: mode }));
   }
 
   function dropOnAsset(targetAsset: CanvasAsset) {
@@ -724,6 +731,7 @@ export function App() {
     if (draggedAsset.kind === "image" && draggedAsset.category !== targetAsset.category && imageCategories.includes(targetAsset.category)) {
       setAssets((current) => {
         const nextAssets = current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category: targetAsset.category } : asset));
+        setDefaultAssetOrder(createAssetOrder(nextAssets));
         setCanvasHistory((history) =>
           updateCanvasHistoryLayout(history, {
             url: getCanvasUrlFromProject(project) || canvasUrl,
@@ -756,6 +764,7 @@ export function App() {
         draggedAsset,
         ...withoutDragged.slice(targetIndex + 1)
       ];
+      setDefaultAssetOrder(createAssetOrder(nextAssets));
       setCanvasHistory((history) =>
         updateCanvasHistoryLayout(history, {
           url: getCanvasUrlFromProject(project) || canvasUrl,
@@ -832,7 +841,9 @@ export function App() {
         kind,
         category: getAssetCategoryForUpload(assetCategory, kind),
         url,
-        sizeBytes: file.size
+        sizeBytes: file.size,
+        createdAt: new Date().toISOString(),
+        status: "ready"
       };
     });
 
@@ -933,25 +944,75 @@ export function App() {
       return;
     }
 
-    buildGenerateVideoPayload({ prompt: promptText, references, settings: generationSettings });
-    const generatedAsset: CanvasAsset = {
-      id: createId("generated-video"),
-      name: `生成视频 ${assets.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`,
-      kind: "video",
-      category: "video",
-      url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-      thumbnailUrl: "https://images.unsplash.com/photo-1496062031456-07b8f162a322?auto=format&fit=crop&w=300&q=80",
-      durationSeconds: generationSettings.durationSeconds,
-      sizeBytes: 6_000_000,
-      generationPrompt: prompt,
-      generationReferences: references.map(cloneReferenceForReuse)
-    };
-    setAssets((current) => [...current, generatedAsset]);
-    persistCanvasHistoryEntry(canvasUrl, canvasName, project, [...assets, generatedAsset]);
+    const generatedAsset: CanvasAsset = project
+      ? createGeneratedVideoPlaceholder()
+      : {
+          ...createGeneratedVideoPlaceholder(),
+          url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+          thumbnailUrl: "https://images.unsplash.com/photo-1496062031456-07b8f162a322?auto=format&fit=crop&w=300&q=80",
+          sizeBytes: 6_000_000,
+          status: "ready"
+        };
+    const assetsWithPlaceholder = [...assets, generatedAsset];
+
+    setAssets(assetsWithPlaceholder);
+    persistCanvasHistoryEntry(canvasUrl, canvasName, project, assetsWithPlaceholder);
     setDefaultAssetOrder((current) => ({
       ...current,
       video: [...current.video, generatedAsset.id]
     }));
+
+    if (project) {
+      setGenerateStatus(`正在生成真实视频：${generatedAsset.name}`);
+
+      try {
+        const result = await companyApiFacade.generateVideo({
+          projectId: project.projectId,
+          prompt: promptText,
+          references,
+          settings: generationSettings
+        });
+
+        if (!mounted.current) {
+          return;
+        }
+
+        const completedAssets = assetsWithPlaceholder.map((asset) =>
+          asset.id === generatedAsset.id
+            ? {
+                ...asset,
+                url: result.videoUrl,
+                sizeBytes: undefined,
+                status: "ready" as const
+              }
+            : asset
+        );
+        setAssets(completedAssets);
+        persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
+        setGenerateStatus(`已生成真实视频：${generatedAsset.name}`);
+        await refreshAuthState();
+      } catch (error) {
+        if (!mounted.current) {
+          return;
+        }
+
+        setAssets((current) =>
+          current.map((asset) =>
+            asset.id === generatedAsset.id
+              ? {
+                  ...asset,
+                  status: "failed" as const
+                }
+              : asset
+          )
+        );
+        setGenerateStatus(error instanceof Error ? error.message : "视频生成失败");
+        await refreshAuthState();
+      }
+
+      return;
+    }
+
     setGenerateStatus(
       `已生成 ${generationSettings.aspectRatio} · ${generationSettings.durationSeconds}s · ${
         generationSettings.omnireference ? "全能参考" : "标准参考"
@@ -1006,7 +1067,7 @@ export function App() {
             onChangeCategory={changeAssetCategory}
             onMediaElement={registerMediaElement}
             onMediaEnded={handleMediaEnded}
-            onCycleSort={cycleSort}
+            onSortModeChange={changeSortMode}
             onFilesSelected={handleFilesSelected}
             onDragStart={setDraggedAsset}
             onDropAsset={handleDropAsset}
