@@ -984,16 +984,29 @@ export function App() {
           return;
         }
 
+        const savedResult = await companyApiFacade.saveCanvasAsset({
+          projectId: project.projectId,
+          snapshot: canvasSnapshot,
+          id: generatedAsset.id,
+          name: generatedAsset.name,
+          kind: "video",
+          category: "video",
+          url: result.videoUrl,
+          durationSeconds: generatedAsset.durationSeconds,
+          generationPrompt: promptText,
+          generationReferences: references.map(cloneReferenceForReuse)
+        });
+
+        const completedAsset = {
+          ...generatedAsset,
+          ...savedResult.asset,
+          url: savedResult.asset.url,
+          status: "ready" as const
+        };
         const completedAssets = assetsWithPlaceholder.map((asset) =>
-          asset.id === generatedAsset.id
-            ? {
-                ...asset,
-                url: result.videoUrl,
-                sizeBytes: undefined,
-                status: "ready" as const
-              }
-            : asset
+          asset.id === generatedAsset.id ? completedAsset : asset
         );
+        setCanvasSnapshot(savedResult.snapshot);
         setAssets(completedAssets);
         persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
         setGenerateStatus(`已生成真实视频：${generatedAsset.name}`);

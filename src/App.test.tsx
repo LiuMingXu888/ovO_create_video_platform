@@ -9,6 +9,7 @@ vi.mock("./services/companyApiFacade", () => ({
     loadCanvasResources: vi.fn(),
     renameCanvasAsset: vi.fn(),
     uploadCanvasAsset: vi.fn(),
+    saveCanvasAsset: vi.fn(),
     deleteCanvasAsset: vi.fn(),
     generateVideo: vi.fn()
   }
@@ -28,6 +29,7 @@ afterEach(() => {
 beforeEach(() => {
   localStorage.clear();
   vi.mocked(companyApiFacade.uploadCanvasAsset).mockReset();
+  vi.mocked(companyApiFacade.saveCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.renameCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.loadCanvasResources).mockReset();
   vi.mocked(companyApiFacade.openLogin).mockReset();
@@ -618,6 +620,40 @@ describe("App shell", () => {
         resolveGeneration = resolve;
       })
     );
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-video-node",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4",
+        sizeBytes: 1234
+      },
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "generated-video-node",
+              type: "video-node",
+              x: 0,
+              y: 0,
+              position: { x: 0, y: 0 },
+              data: {
+                id: "generated-video-node",
+                assetId: "generated-video-node",
+                name: "生成视频 1",
+                type: "video",
+                kind: "video",
+                category: "video",
+                videoUrl: "https://example.com/generated.mp4",
+                sizeBytes: 1234
+              }
+            }
+          ]
+        }
+      }
+    });
 
     render(<App />);
 
@@ -640,6 +676,16 @@ describe("App shell", () => {
     });
     expect(screen.queryByText("生成中")).not.toBeInTheDocument();
     expect(screen.getByText("已生成真实视频：生成视频 1")).toBeInTheDocument();
+    expect(companyApiFacade.saveCanvasAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        name: "生成视频 1",
+        snapshot: { snapshot: { nodes: [] } },
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4"
+      })
+    );
     expect(companyApiFacade.generateVideo).toHaveBeenCalledWith({
       projectId: "cmq6fwhft0bg5m2l5u78zby8x",
       prompt: "镜头缓慢推进",

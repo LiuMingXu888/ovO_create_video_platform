@@ -61,7 +61,7 @@ describe("loadProjectSnapshot", () => {
     expect(snapshot.snapshot.nodes[0].data.name).toBe("旧名称");
   });
 
-  it("removes only the matching canvas node without mutating the original snapshot", () => {
+  it("removes the matching canvas node and connected edges without mutating the original snapshot", () => {
     const snapshot = {
       snapshot: {
         nodes: [
@@ -98,9 +98,10 @@ describe("loadProjectSnapshot", () => {
             }
           }
         ],
-        edges: [{ id: "edge-1", source: "node-image", target: "node-video" }]
+        edges: []
       }
     });
     expect(snapshot.snapshot.nodes).toHaveLength(2);
+    expect(snapshot.snapshot.edges).toHaveLength(1);
   });
 });

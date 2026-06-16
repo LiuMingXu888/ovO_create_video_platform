@@ -4,7 +4,7 @@ import { generateVideo as generateVideoWithTransport } from "../api/generationCl
 import { FetchApiTransport } from "../api/transport";
 import { uploadCanvasAsset as uploadCanvasAssetWithTransport } from "../api/uploadClient";
 import { extractCreditBalance } from "../lib/credits";
-import { deleteCanvasAsset, loadCanvasResources, renameCanvasAsset } from "./canvasLoader";
+import { deleteCanvasAsset, loadCanvasResources, renameCanvasAsset, saveCanvasAsset } from "./canvasLoader";
 import type { AssetCategory, AssetKind, AuthState, AuthUser, GenerationSettings, ReferenceItem } from "../types";
 
 const transport = new FetchApiTransport();
@@ -56,6 +56,20 @@ export const companyApiFacade = {
     kind: AssetKind;
     category: AssetCategory;
   }) => uploadCanvasAssetWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
+  saveCanvasAsset: (input: {
+    projectId: string;
+    snapshot: unknown;
+    id?: string;
+    name: string;
+    kind: AssetKind;
+    category: AssetCategory;
+    url: string;
+    thumbnailUrl?: string;
+    durationSeconds?: number;
+    sizeBytes?: number;
+    generationPrompt?: string;
+    generationReferences?: ReferenceItem[];
+  }) => saveCanvasAsset(window.ovoDesktop ? desktopTransport : transport, input),
   generateVideo: (input: {
     projectId: string;
     prompt: string;

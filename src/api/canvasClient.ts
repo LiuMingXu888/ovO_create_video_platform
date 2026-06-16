@@ -54,10 +54,25 @@ function removeInValue(value: unknown, assetId: string, seen: Set<unknown>): boo
   seen.add(value);
 
   let updated = false;
+  const removedNodeIds = new Set<string>();
   if (Array.isArray(value.nodes)) {
-    const nextNodes = value.nodes.filter((node) => !matchesNodeAsset(node, assetId));
+    const nextNodes = value.nodes.filter((node) => {
+      const shouldRemove = matchesNodeAsset(node, assetId);
+      if (shouldRemove && isRecord(node) && typeof node.id === "string") {
+        removedNodeIds.add(node.id);
+      }
+      return !shouldRemove;
+    });
     if (nextNodes.length !== value.nodes.length) {
       value.nodes = nextNodes;
+      updated = true;
+    }
+  }
+
+  if (removedNodeIds.size > 0 && Array.isArray(value.edges)) {
+    const nextEdges = value.edges.filter((edge) => !matchesEdgeNode(edge, removedNodeIds));
+    if (nextEdges.length !== value.edges.length) {
+      value.edges = nextEdges;
       updated = true;
     }
   }
@@ -81,6 +96,14 @@ function matchesNodeAsset(value: unknown, assetId: string) {
   }
 
   return matchesAsset(value, assetId) || (isRecord(value.data) && matchesAsset(value.data, assetId));
+}
+
+function matchesEdgeNode(value: unknown, nodeIds: Set<string>) {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (typeof value.source === "string" && nodeIds.has(value.source)) || (typeof value.target === "string" && nodeIds.has(value.target));
 }
 
 function setNameFields(record: Record<string, unknown>, name: string) {

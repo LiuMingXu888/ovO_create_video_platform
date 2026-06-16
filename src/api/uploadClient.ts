@@ -122,7 +122,14 @@ function createAssetNode(asset: CanvasAsset) {
       kind: asset.kind,
       category: asset.category,
       [mediaField]: asset.url,
-      sizeBytes: asset.sizeBytes
+      sizeBytes: asset.sizeBytes,
+      durationSeconds: asset.durationSeconds,
+      duration: asset.durationSeconds,
+      thumbnailUrl: asset.thumbnailUrl,
+      createdAt: asset.createdAt,
+      status: asset.status,
+      generationPrompt: asset.generationPrompt,
+      generationReferences: asset.generationReferences
     }
   };
 }
