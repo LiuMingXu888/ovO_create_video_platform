@@ -17,7 +17,7 @@ describe("Mac launcher core", () => {
           return viteProcess;
         }
 
-        if (command === "npx" && args.join(" ") === "electron .") {
+        if (command === "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron" && args.join(" ") === "/repo") {
           return electronProcess;
         }
 
@@ -32,7 +32,7 @@ describe("Mac launcher core", () => {
 
     const launchPromise = launcher.launch();
 
-    await waitUntil(() => calls.some((call) => call.command === "npx"));
+    await waitUntil(() => calls.some((call) => call.command.includes("Contents/MacOS/Electron")));
     electronProcess.emit("exit", 0);
     await launchPromise;
 
@@ -40,7 +40,7 @@ describe("Mac launcher core", () => {
       { command: "git", args: ["pull", "origin", "feature/ui-shell"] },
       { command: "bash", args: ["-lc", "lsof -ti tcp:5173 | xargs kill -TERM 2>/dev/null || true"] },
       { command: "npm", args: ["run", "dev"], cwd: "/repo" },
-      { command: "npx", args: ["electron", "."], cwd: "/repo" },
+      { command: "/repo/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron", args: ["/repo"], cwd: "/repo" },
       { command: "bash", args: ["-lc", "lsof -ti tcp:5173 | xargs kill -TERM 2>/dev/null || true"] }
     ]);
     expect(viteProcess.killedWith).toEqual(["SIGTERM"]);

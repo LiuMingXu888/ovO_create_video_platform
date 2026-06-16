@@ -16,6 +16,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+const appIconPath = path.join(__dirname, "../resources/ovO.png");
+
+app.setName("ovO");
 
 function createMainWindow() {
   const window = new BrowserWindow({
@@ -23,7 +26,8 @@ function createMainWindow() {
     height: 1000,
     minWidth: 1180,
     minHeight: 760,
-    title: "ovO Create Video",
+    title: "ovO",
+    icon: appIconPath,
     backgroundColor: "#f7f8fb",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -41,6 +45,10 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin") {
+    app.dock?.setIcon(appIconPath);
+  }
+
   ipcMain.handle("ovo:auth:open-login-window", (_event, targetUrl?: string) => openLoginWindow(targetUrl));
   ipcMain.handle("ovo:auth:check-session", () => checkSession());
   ipcMain.handle("ovo:auth:clear-session", () => clearSession());

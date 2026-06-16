@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import net from "node:net";
+import path from "node:path";
 
 export function createLauncher({
   cwd,
@@ -60,7 +61,8 @@ export function createLauncher({
       ...env,
       VITE_DEV_SERVER_URL: `http://127.0.0.1:${port}`
     };
-    const electronProcess = spawnTracked("npx", ["electron", "."], { cwd, env: electronEnv, stdio: "inherit" });
+    const electronBinary = path.join(cwd, "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
+    const electronProcess = spawnTracked(electronBinary, [cwd], { cwd, env: electronEnv, stdio: "inherit" });
 
     const exitCode = await waitForExit(electronProcess);
     cleanupChildren();

@@ -10,4 +10,14 @@ describe("Electron main lifecycle", () => {
     expect(source).not.toContain('process.platform !== "darwin"');
     expect(source).toContain("app.quit();");
   });
+
+  it("uses the ovO name and icon instead of Electron defaults", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "electron/main.ts"), "utf8");
+
+    expect(source).toContain('app.setName("ovO")');
+    expect(source).toContain("../resources/ovO.png");
+    expect(source).toContain('title: "ovO"');
+    expect(source).toContain("icon: appIconPath");
+    expect(source).toContain("app.dock?.setIcon(appIconPath)");
+  });
 });
