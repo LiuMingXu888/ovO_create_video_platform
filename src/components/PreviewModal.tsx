@@ -24,7 +24,7 @@ export function PreviewModal({ asset, onClose, onPrevious, onNext, hasPrevious =
 
   const videoOrientation = getVideoOrientation(videoSize);
   const videoClassName = ["preview-media", videoOrientation ? `preview-media-${videoOrientation}` : ""].filter(Boolean).join(" ");
-  const videoStyle = videoSize ? { aspectRatio: `${videoSize.width} / ${videoSize.height}` } : undefined;
+  const videoStyle = undefined;
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${asset.name} 预览`}>
