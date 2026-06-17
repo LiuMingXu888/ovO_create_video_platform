@@ -79,6 +79,7 @@ export const companyApiFacade = {
   }) => removeCanvasAssetSubtitles(window.ovoDesktop ? desktopTransport : transport, input),
   generateVideo: (input: {
     projectId: string;
+    nodeId: string;
     prompt: string;
     references: ReferenceItem[];
     settings: GenerationSettings;

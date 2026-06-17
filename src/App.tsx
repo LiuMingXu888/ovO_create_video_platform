@@ -1150,6 +1150,7 @@ export function App() {
       try {
         const result = await companyApiFacade.generateVideo({
           projectId: project.projectId,
+          nodeId: generatedAsset.id,
           prompt: promptText,
           references: submittedReferences,
           settings: generationSettings

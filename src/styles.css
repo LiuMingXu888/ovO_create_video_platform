@@ -985,6 +985,26 @@ button {
   object-fit: contain;
 }
 
+.preview-frame video.preview-media {
+  display: block;
+  object-fit: contain;
+}
+
+.preview-frame video.preview-media-portrait {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.preview-frame video.preview-media-landscape,
+.preview-frame video.preview-media-square {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .preview-frame audio {
   width: min(760px, calc(100% - 32px));
 }

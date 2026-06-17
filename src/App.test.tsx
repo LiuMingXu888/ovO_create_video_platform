@@ -817,6 +817,7 @@ describe("App shell", () => {
     );
     expect(companyApiFacade.generateVideo).toHaveBeenCalledWith({
       projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      nodeId: expect.stringMatching(/^generated-video-/),
       prompt: "镜头缓慢推进",
       references: [
         expect.objectContaining({
@@ -1447,6 +1448,21 @@ describe("App shell", () => {
 
     const previewVideo = screen.getByTitle("完整视频预览");
     expect(previewVideo).toHaveClass("preview-media");
+  });
+
+  it("uses loaded video dimensions to choose a portrait preview frame", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "放大预览 开场参考视频" }));
+
+    const previewVideo = screen.getByTitle("完整视频预览") as HTMLVideoElement;
+    Object.defineProperty(previewVideo, "videoWidth", { configurable: true, value: 720 });
+    Object.defineProperty(previewVideo, "videoHeight", { configurable: true, value: 1280 });
+    fireEvent.loadedMetadata(previewVideo);
+
+    expect(previewVideo).toHaveClass("preview-media-portrait");
+    expect(previewVideo).toHaveStyle({ aspectRatio: "720 / 1280" });
+    expect(previewVideo).not.toHaveStyle({ contain: "size layout paint" });
   });
 
   it("disables preview navigation at the edges", async () => {

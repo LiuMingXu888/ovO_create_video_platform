@@ -5,10 +5,15 @@ import type { ApiTransport } from "./transport";
 export const DEFAULT_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 1400 };
 
 interface BuildGenerateVideoPayloadInput {
+  projectId?: string;
+  nodeId?: string;
   prompt: string;
   references: ReferenceItem[];
   settings?: GenerationSettings;
 }
+
+const SEEDANCE_MODEL_ID = "ep-20260319213857-htd7q";
+const SEEDANCE_MODEL_NAME = "Seedance 2.0";
 
 export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
   const settings: GenerationSettings = input.settings ?? {
@@ -19,7 +24,7 @@ export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput)
 
   return {
     prompt: input.prompt,
-    model: "Seedance 2.0",
+    model: SEEDANCE_MODEL_NAME,
     aspectRatio: settings.aspectRatio,
     resolution: "720p",
     duration: settings.durationSeconds,
@@ -36,10 +41,36 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
     durationSeconds: 15,
     omnireference: true
   };
+  const params = buildCompanyGenerateVideoParams(input, settings);
 
+  if (input.projectId && input.nodeId) {
+    return {
+      ...params,
+      ratio: settings.aspectRatio,
+      _meta: {
+        nodeId: input.nodeId,
+        projectId: input.projectId,
+        label: getTaskLabel(input.prompt)
+      },
+      task: {
+        projectId: input.projectId,
+        nodeId: input.nodeId,
+        type: "video",
+        label: getTaskLabel(input.prompt),
+        modelName: SEEDANCE_MODEL_NAME,
+        duration: settings.durationSeconds,
+        aspectRatio: settings.aspectRatio
+      }
+    };
+  }
+
+  return params;
+}
+
+function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, settings: GenerationSettings) {
   return {
     prompt: input.prompt,
-    model: "ep-20260319213857-htd7q",
+    model: SEEDANCE_MODEL_ID,
     aspectRatio: settings.aspectRatio,
     resolution: "720p",
     duration: settings.durationSeconds,
@@ -53,12 +84,19 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
   };
 }
 
+function getTaskLabel(prompt: string) {
+  const trimmed = prompt.trim();
+  return trimmed.length > 32 ? `${trimmed.slice(0, 32)}...` : trimmed || "生成视频";
+}
+
 function getReferenceValues(references: ReferenceItem[], kind: ReferenceItem["kind"]) {
   return references.filter((item) => item.kind === kind).map((item) => item.url ?? item.previewUrl ?? item.name);
 }
 
 interface GenerateVideoResponse {
   taskId?: string;
+  queueTaskId?: unknown;
+  _genTaskId?: unknown;
 }
 
 export interface GenerateVideoResult {
@@ -72,7 +110,9 @@ interface GenerateVideoPollResponse {
   status?: string;
   videoUrl?: string;
   providerVideoUrl?: string;
+  seedanceProviderUrl?: string;
   outputUrl?: string;
+  resultUrl?: string;
   persisted?: boolean;
   errorMessage?: string;
   error?: unknown;
@@ -95,9 +135,19 @@ export async function generateVideo(
     throw new Error("生成接口未返回任务 ID");
   }
 
-  const pollResult = await pollTaskUntilComplete(transport, endpoints.generateVideoTask(submitResult.taskId), options);
+  const pollResult =
+    input.projectId && input.nodeId
+      ? await pollCanvasQueueUntilComplete(transport, input.projectId, input.nodeId, submitResult.taskId, options)
+      : await pollTaskUntilComplete(transport, endpoints.generateVideoTask(submitResult.taskId), options);
   const persistResult = await persistTaskIfNeeded(transport, submitResult.taskId, pollResult);
-  const videoUrl = persistResult?.url ?? pollResult.videoUrl ?? pollResult.outputUrl ?? pollResult.providerVideoUrl;
+  const videoUrl =
+    persistResult?.url ??
+    pollResult.videoUrl ??
+    pollResult.outputUrl ??
+    pollResult.resultUrl ??
+    pollResult.providerVideoUrl ??
+    pollResult.seedanceProviderUrl;
+  const providerVideoUrl = pollResult.providerVideoUrl ?? pollResult.seedanceProviderUrl;
 
   if (!videoUrl) {
     throw new Error("生成成功但接口未返回视频地址");
@@ -106,7 +156,7 @@ export async function generateVideo(
   return {
     taskId: submitResult.taskId,
     videoUrl,
-    providerVideoUrl: pollResult.providerVideoUrl,
+    providerVideoUrl,
     persisted: persistResult?.persisted ?? pollResult.persisted
   };
 }
@@ -159,10 +209,14 @@ export async function pollTaskUntilComplete(
 
 async function requestGenerateVideo(transport: ApiTransport, input: BuildGenerateVideoPayloadInput) {
   try {
-    return await transport.request<GenerateVideoResponse>(endpoints.generateVideo(), {
+    const result = await transport.request<GenerateVideoResponse>(endpoints.generateVideo(), {
       method: "POST",
       body: buildCompanyGenerateVideoPayload(input)
     });
+    return {
+      ...result,
+      taskId: result.taskId ?? extractTaskId(result.queueTaskId) ?? extractTaskId(result._genTaskId) ?? extractTaskId(result)
+    };
   } catch (error) {
     if (isAuthExpiredError(error)) {
       throw new Error("登录态已失效，请重新登录后再试");
@@ -170,6 +224,139 @@ async function requestGenerateVideo(transport: ApiTransport, input: BuildGenerat
 
     throw error;
   }
+}
+
+async function pollCanvasQueueUntilComplete(
+  transport: ApiTransport,
+  projectId: string,
+  nodeId: string,
+  taskId: string,
+  options: PollOptions
+): Promise<GenerateVideoPollResponse> {
+  for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
+    const queueResult = await requestQueueStatus(transport, projectId, taskId);
+    const taskResult = findQueueTask(queueResult, taskId, nodeId);
+
+    if (taskResult?.status === "failed") {
+      throw new Error(taskResult.errorMessage ?? getPollErrorMessage(taskResult.error) ?? "视频生成失败");
+    }
+
+    if (taskResult?.status === "succeeded") {
+      return taskResult;
+    }
+
+    if (options.intervalMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, options.intervalMs));
+    }
+  }
+
+  throw new Error("任务轮询超时");
+}
+
+async function requestQueueStatus(transport: ApiTransport, projectId: string, taskId?: string) {
+  try {
+    return await transport.request<unknown>(endpoints.genQueue(projectId, taskId));
+  } catch (error) {
+    if (isAuthExpiredError(error)) {
+      throw new Error("登录态已失效，请重新登录后再试");
+    }
+
+    throw error;
+  }
+}
+
+function findQueueTask(value: unknown, taskId: string, nodeId: string): GenerateVideoPollResponse | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findQueueTask(item, taskId, nodeId);
+      if (found) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (matchesQueueTask(value, taskId, nodeId)) {
+    return normalizeQueueTask(value);
+  }
+
+  for (const key of ["items", "tasks", "data", "result"]) {
+    const found = findQueueTask(value[key], taskId, nodeId);
+    if (found) {
+      return found;
+    }
+  }
+
+  return undefined;
+}
+
+function matchesQueueTask(value: Record<string, unknown>, taskId: string, nodeId: string) {
+  return (
+    value.taskId === taskId ||
+    value.id === taskId ||
+    value._id === taskId ||
+    value.queueTaskId === taskId ||
+    value.nodeId === nodeId ||
+    (isRecord(value.params) && value.params.nodeId === nodeId)
+  );
+}
+
+function normalizeQueueTask(value: Record<string, unknown>): GenerateVideoPollResponse {
+  return {
+    status: stringValue(value.status),
+    videoUrl: stringValue(value.videoUrl),
+    providerVideoUrl: stringValue(value.providerVideoUrl),
+    seedanceProviderUrl: stringValue(value.seedanceProviderUrl),
+    outputUrl: stringValue(value.outputUrl),
+    resultUrl: stringValue(value.resultUrl),
+    persisted: typeof value.persisted === "boolean" ? value.persisted : undefined,
+    errorMessage: stringValue(value.errorMessage),
+    error: value.error
+  };
+}
+
+function extractTaskId(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const taskId = extractTaskId(item);
+      if (taskId) {
+        return taskId;
+      }
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  for (const key of ["taskId", "id", "_id", "genTaskId", "queueTaskId"]) {
+    const taskId = extractTaskId(value[key]);
+    if (taskId) {
+      return taskId;
+    }
+  }
+
+  for (const key of ["tasks", "items", "data", "result"]) {
+    const taskId = extractTaskId(value[key]);
+    if (taskId) {
+      return taskId;
+    }
+  }
+
+  return undefined;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
 
 async function requestPollStatus(transport: ApiTransport, path: string) {
@@ -185,11 +372,14 @@ async function requestPollStatus(transport: ApiTransport, path: string) {
 }
 
 async function persistTaskIfNeeded(transport: ApiTransport, taskId: string, pollResult: GenerateVideoPollResponse) {
-  if (pollResult.persisted === true && (pollResult.videoUrl || pollResult.outputUrl)) {
+  if (pollResult.persisted === true && (pollResult.videoUrl || pollResult.outputUrl || pollResult.resultUrl)) {
     return undefined;
   }
 
-  if (pollResult.persisted === false || (!pollResult.videoUrl && Boolean(pollResult.providerVideoUrl))) {
+  if (
+    pollResult.persisted === false ||
+    (!pollResult.videoUrl && !pollResult.outputUrl && !pollResult.resultUrl && Boolean(pollResult.providerVideoUrl ?? pollResult.seedanceProviderUrl))
+  ) {
     return persistGeneratedTask(transport, taskId);
   }
 

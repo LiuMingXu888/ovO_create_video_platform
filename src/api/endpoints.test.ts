@@ -8,6 +8,7 @@ describe("endpoints", () => {
     expect(endpoints.generateVideo()).toBe("/api/generate-video");
     expect(endpoints.generateVideoTask("task-1")).toBe("/api/generate-video/task-1");
     expect(endpoints.genQueue("project-1")).toBe("/api/gen-queue?projectId=project-1");
+    expect(endpoints.genQueue("project-1", "task-1")).toBe("/api/gen-queue?projectId=project-1&taskId=task-1");
     expect(endpoints.persistTask()).toBe("/api/asset/persist-task");
     expect(endpoints.subtitleRemove()).toBe("/api/subtitle-remove");
     expect(endpoints.subtitleRemoveTask("task-2")).toBe("/api/subtitle-remove/task-2");

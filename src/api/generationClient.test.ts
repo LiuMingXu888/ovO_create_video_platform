@@ -49,6 +49,50 @@ describe("buildGenerateVideoPayload", () => {
       referenceAudios: ["https://example.com/audio.mp3"]
     });
   });
+
+  it("builds a canvas video generation payload with explicit vertical generation metadata", () => {
+    expect(
+      buildCompanyGenerateVideoPayload({
+        projectId: "project-1",
+        nodeId: "video-node-1",
+        prompt: "生成一段视频",
+        references: refs,
+        settings: {
+          aspectRatio: "9:16",
+          durationSeconds: 15,
+          omnireference: true
+        }
+      })
+    ).toEqual({
+      prompt: "生成一段视频",
+      model: "ep-20260319213857-htd7q",
+      aspectRatio: "9:16",
+      ratio: "9:16",
+      resolution: "720p",
+      duration: 15,
+      generateAudio: true,
+      genTab: "allref",
+      referenceMode: "omnireference",
+      networkEnabled: true,
+      referenceImages: ["https://example.com/image.png"],
+      referenceVideos: ["https://example.com/video.mp4"],
+      referenceAudios: ["https://example.com/audio.mp3"],
+      _meta: {
+        nodeId: "video-node-1",
+        projectId: "project-1",
+        label: "生成一段视频"
+      },
+      task: {
+        projectId: "project-1",
+        nodeId: "video-node-1",
+        type: "video",
+        label: "生成一段视频",
+        modelName: "Seedance 2.0",
+        duration: 15,
+        aspectRatio: "9:16"
+      }
+    });
+  });
 });
 
 describe("generateVideo", () => {
@@ -74,16 +118,28 @@ describe("generateVideo", () => {
     const transport: ApiTransport = {
       request: vi.fn()
         .mockResolvedValueOnce({ taskId: "task-1" })
-        .mockResolvedValueOnce({ status: "running" })
         .mockResolvedValueOnce({
-          status: "succeeded",
-          videoUrl: "https://example.com/generated.mp4",
-          providerVideoUrl: "https://provider.example.com/generated.mp4"
+          items: [{ taskId: "task-1", nodeId: "video-node-1", status: "running" }]
+        })
+        .mockResolvedValueOnce({
+          items: [
+            {
+              taskId: "task-1",
+              nodeId: "video-node-1",
+              status: "succeeded",
+              videoUrl: "https://example.com/generated.mp4",
+              providerVideoUrl: "https://provider.example.com/generated.mp4"
+            }
+          ]
         })
     };
 
     await expect(
-      generateVideo(transport, { prompt: "生成一段视频", references: refs }, { intervalMs: 0, maxAttempts: 3 })
+      generateVideo(
+        transport,
+        { projectId: "project-1", nodeId: "video-node-1", prompt: "生成一段视频", references: refs },
+        { intervalMs: 0, maxAttempts: 3 }
+      )
     ).resolves.toEqual({
       taskId: "task-1",
       videoUrl: "https://example.com/generated.mp4",
@@ -92,11 +148,60 @@ describe("generateVideo", () => {
     expect(transport.request).toHaveBeenNthCalledWith(1, "/api/generate-video", {
       method: "POST",
       body: expect.objectContaining({
+        ratio: "9:16",
+        aspectRatio: "9:16",
         model: "ep-20260319213857-htd7q",
-        prompt: "生成一段视频"
+        prompt: "生成一段视频",
+        _meta: {
+          projectId: "project-1",
+          nodeId: "video-node-1",
+          label: "生成一段视频"
+        },
+        task: expect.objectContaining({
+          projectId: "project-1",
+          nodeId: "video-node-1",
+          aspectRatio: "9:16"
+        })
       })
     });
-    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/generate-video/task-1");
+    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/gen-queue?projectId=project-1&taskId=task-1");
+  });
+
+  it("polls the canvas generation queue for queued canvas video tasks", async () => {
+    const transport: ApiTransport = {
+      request: vi.fn()
+        .mockResolvedValueOnce({ tasks: [{ taskId: "queue-task-1", nodeId: "video-node-1" }] })
+        .mockResolvedValueOnce({
+          items: [{ taskId: "queue-task-1", nodeId: "video-node-1", status: "running" }]
+        })
+        .mockResolvedValueOnce({
+          items: [
+            {
+              taskId: "queue-task-1",
+              nodeId: "video-node-1",
+              status: "succeeded",
+              resultUrl: "https://example.com/generated-queue.mp4",
+              providerVideoUrl: "https://provider.example.com/generated-queue.mp4",
+              persisted: true
+            }
+          ]
+        })
+    };
+
+    await expect(
+      generateVideo(
+        transport,
+        { projectId: "project-1", nodeId: "video-node-1", prompt: "生成一段视频", references: refs },
+        { intervalMs: 0, maxAttempts: 3 }
+      )
+    ).resolves.toEqual({
+      taskId: "queue-task-1",
+      videoUrl: "https://example.com/generated-queue.mp4",
+      providerVideoUrl: "https://provider.example.com/generated-queue.mp4",
+      persisted: true
+    });
+    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/gen-queue?projectId=project-1&taskId=queue-task-1");
+    expect(transport.request).toHaveBeenNthCalledWith(3, "/api/gen-queue?projectId=project-1&taskId=queue-task-1");
   });
 
   it("persists an unpersisted generated task before returning the final URL", async () => {
