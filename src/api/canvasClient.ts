@@ -12,6 +12,22 @@ export async function saveProjectSnapshot(transport: ApiTransport, projectId: st
   });
 }
 
+export async function saveProjectSnapshotAndVerify(
+  transport: ApiTransport,
+  projectId: string,
+  snapshot: unknown,
+  expectedNodeId: string
+): Promise<unknown> {
+  await saveProjectSnapshot(transport, projectId, snapshot);
+  const reloadedSnapshot = await loadProjectSnapshot(transport, projectId);
+
+  if (!snapshotHasNode(reloadedSnapshot, expectedNodeId)) {
+    throw new Error("画布保存后未找到新节点，请重新加载画布确认是否被自动保存覆盖");
+  }
+
+  return reloadedSnapshot;
+}
+
 export function removeAssetFromSnapshot(snapshot: unknown, assetId: string): { snapshot: unknown; updated: boolean } {
   const cloned = structuredClone(snapshot);
   const updated = removeInValue(cloned, assetId, new Set());
@@ -88,6 +104,23 @@ function removeInValue(value: unknown, assetId: string, seen: Set<unknown>): boo
 
 function matchesAsset(record: Record<string, unknown>, assetId: string) {
   return record.id === assetId || record.assetId === assetId;
+}
+
+function snapshotHasNode(snapshot: unknown, nodeId: string) {
+  const nodes = getSnapshotNodes(snapshot);
+  return nodes.some((node) => isRecord(node) && (node.id === nodeId || (isRecord(node.data) && node.data.id === nodeId)));
+}
+
+function getSnapshotNodes(snapshot: unknown): unknown[] {
+  if (isRecord(snapshot) && isRecord(snapshot.snapshot) && Array.isArray(snapshot.snapshot.nodes)) {
+    return snapshot.snapshot.nodes;
+  }
+
+  if (isRecord(snapshot) && Array.isArray(snapshot.nodes)) {
+    return snapshot.nodes;
+  }
+
+  return [];
 }
 
 function matchesNodeAsset(value: unknown, assetId: string) {

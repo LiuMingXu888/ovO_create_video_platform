@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyEndpoint, summarizeCapture } from "./apiDiscovery.js";
+import { buildCapturedRequestBody, classifyEndpoint, summarizeCapture } from "./apiDiscovery.js";
 
 describe("classifyEndpoint", () => {
   it.each([
@@ -8,10 +8,24 @@ describe("classifyEndpoint", () => {
     ["/api/asset/list?statuses=Active", "asset"],
     ["/api/upload-file", "upload"],
     ["/api/generate-video", "generation"],
+    ["/api/gen-queue?projectId=cmq", "generation"],
+    ["/api/asset/persist-task", "generation"],
     ["/api/subtitle-remove/ark", "subtitle"],
     ["/api/unknown", "unknown"]
   ] as const)("classifies %s as %s", (path, family) => {
     expect(classifyEndpoint(path)).toBe(family);
+  });
+});
+
+describe("buildCapturedRequestBody", () => {
+  it("parses JSON request bodies and ignores binary multipart uploads", () => {
+    expect(buildCapturedRequestBody("application/json", Buffer.from(JSON.stringify({ action: "batch" })))).toEqual({
+      action: "batch"
+    });
+    expect(buildCapturedRequestBody("multipart/form-data; boundary=test", Buffer.from("file bytes"))).toEqual({
+      formData: "[multipart]"
+    });
+    expect(buildCapturedRequestBody(undefined, undefined)).toBeUndefined();
   });
 });
 

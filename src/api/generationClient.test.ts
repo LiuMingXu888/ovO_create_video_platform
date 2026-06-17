@@ -7,6 +7,8 @@ import {
   buildCompanyGenerateVideoPayload,
   buildGenerateVideoPayload,
   generateVideo,
+  loadGenerationQueue,
+  persistGeneratedTask,
   pollTaskUntilComplete
 } from "./generationClient";
 
@@ -92,6 +94,83 @@ describe("generateVideo", () => {
       })
     });
     expect(transport.request).toHaveBeenNthCalledWith(2, "/api/generate-video/task-1");
+  });
+
+  it("persists an unpersisted generated task before returning the final URL", async () => {
+    const transport: ApiTransport = {
+      request: vi.fn()
+        .mockResolvedValueOnce({ taskId: "task-1" })
+        .mockResolvedValueOnce({
+          status: "succeeded",
+          providerVideoUrl: "https://provider.example.com/generated.mp4",
+          persisted: false
+        })
+        .mockResolvedValueOnce({
+          persisted: true,
+          url: "https://example.com/persisted.mp4"
+        })
+    };
+
+    await expect(
+      generateVideo(transport, { prompt: "生成一段视频", references: refs }, { intervalMs: 0, maxAttempts: 1 })
+    ).resolves.toEqual({
+      taskId: "task-1",
+      videoUrl: "https://example.com/persisted.mp4",
+      providerVideoUrl: "https://provider.example.com/generated.mp4",
+      persisted: true
+    });
+    expect(transport.request).toHaveBeenNthCalledWith(3, "/api/asset/persist-task", {
+      method: "POST",
+      body: { taskId: "task-1" }
+    });
+  });
+
+  it("does not call persist-task when generation already returned a persisted video URL", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ taskId: "task-1" })
+      .mockResolvedValueOnce({
+        status: "succeeded",
+        videoUrl: "https://example.com/generated.mp4",
+        providerVideoUrl: "https://provider.example.com/generated.mp4",
+        persisted: true
+      });
+    const transport: ApiTransport = { request };
+
+    await expect(
+      generateVideo(transport, { prompt: "生成一段视频", references: refs }, { intervalMs: 0, maxAttempts: 1 })
+    ).resolves.toEqual({
+      taskId: "task-1",
+      videoUrl: "https://example.com/generated.mp4",
+      providerVideoUrl: "https://provider.example.com/generated.mp4",
+      persisted: true
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("generation helpers", () => {
+  it("loads generation queue by project id", async () => {
+    const transport: ApiTransport = {
+      request: vi.fn().mockResolvedValue({ items: [] })
+    };
+
+    await expect(loadGenerationQueue(transport, "project-1")).resolves.toEqual({ items: [] });
+    expect(transport.request).toHaveBeenCalledWith("/api/gen-queue?projectId=project-1");
+  });
+
+  it("persists generated task output", async () => {
+    const transport: ApiTransport = {
+      request: vi.fn().mockResolvedValue({ persisted: true, url: "https://example.com/out.mp4" })
+    };
+
+    await expect(persistGeneratedTask(transport, "task-1")).resolves.toEqual({
+      persisted: true,
+      url: "https://example.com/out.mp4"
+    });
+    expect(transport.request).toHaveBeenCalledWith("/api/asset/persist-task", {
+      method: "POST",
+      body: { taskId: "task-1" }
+    });
   });
 });
 

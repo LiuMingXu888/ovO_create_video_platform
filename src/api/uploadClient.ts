@@ -1,5 +1,5 @@
 import { endpoints } from "./endpoints";
-import { saveProjectSnapshot } from "./canvasClient";
+import { loadProjectSnapshot, saveProjectSnapshotAndVerify } from "./canvasClient";
 import type { ApiTransport } from "./transport";
 import type { AssetCategory, AssetKind, CanvasAsset } from "../types";
 
@@ -26,6 +26,15 @@ interface UploadCanvasAssetInput {
   kind: AssetKind;
   category: AssetCategory;
 }
+
+type CompanyNode = {
+  id: string;
+  type: AssetKind;
+  x: number;
+  y: number;
+  position: { x: number; y: number };
+  data: Record<string, unknown>;
+};
 
 export function getUploadPrefix(file: File) {
   return file.name.replace(/\.[^.]+$/, "");
@@ -64,13 +73,14 @@ export async function uploadCanvasAsset(transport: ApiTransport, input: UploadCa
   }
 
   const asset = createUploadedAsset(input, publicUrl, uploadResult.fileSize ?? uploadResult.size ?? input.file.size);
-  const snapshot = addAssetNodeToSnapshot(input.snapshot, asset);
-  await saveProjectSnapshot(transport, input.projectId, snapshot);
+  const latestSnapshot = await loadProjectSnapshot(transport, input.projectId);
+  const snapshot = addAssetNodeToSnapshot(latestSnapshot, asset);
+  const verifiedSnapshot = await saveProjectSnapshotAndVerify(transport, input.projectId, snapshot, asset.id);
 
   return {
     ok: true,
     asset,
-    snapshot
+    snapshot: verifiedSnapshot
   };
 }
 
@@ -80,6 +90,42 @@ export function addAssetNodeToSnapshot(snapshot: unknown, asset: CanvasAsset) {
   const nodes = Array.isArray(snapshotBody.nodes) ? [...snapshotBody.nodes] : [];
   snapshotBody.nodes = [...nodes, createAssetNode(asset)];
   return cloned;
+}
+
+export function createCompanyImageNode(asset: CanvasAsset): CompanyNode {
+  return baseNode(asset, {
+    imageUrl: asset.url
+  });
+}
+
+export function createCompanyAudioNode(asset: CanvasAsset): CompanyNode {
+  return baseNode(asset, {
+    audioUrl: asset.url,
+    duration: asset.durationSeconds,
+    durationSeconds: asset.durationSeconds
+  });
+}
+
+export function createCompanyVideoNode(asset: CanvasAsset & { providerVideoUrl?: string }): CompanyNode {
+  return baseNode(asset, {
+    videoUrl: asset.url,
+    seedanceProviderUrl: asset.providerVideoUrl,
+    videoPersisted: true,
+    duration: asset.durationSeconds,
+    durationSeconds: asset.durationSeconds,
+    resolution: "720p",
+    generateAudio: true,
+    genTab: "allref",
+    model: "ep-20260319213857-htd7q",
+    modelName: "Seedance 2.0",
+    aspectRatio: "9:16",
+    generationPrompt: asset.generationPrompt,
+    prompt: asset.generationPrompt,
+    generationReferences: asset.generationReferences,
+    referenceImages: getReferenceUrls(asset, "image"),
+    referenceVideos: getReferenceUrls(asset, "video"),
+    referenceAudios: getReferenceUrls(asset, "audio")
+  });
 }
 
 function getSnapshotBody(snapshot: unknown): Record<string, unknown> {
@@ -106,32 +152,15 @@ function createUploadedAsset(input: UploadCanvasAssetInput, publicUrl: string, s
 }
 
 function createAssetNode(asset: CanvasAsset) {
-  const mediaField = asset.kind === "image" ? "imageUrl" : asset.kind === "audio" ? "audioUrl" : "videoUrl";
+  if (asset.kind === "image") {
+    return createCompanyImageNode(asset);
+  }
 
-  return {
-    id: asset.id,
-    type: `${asset.kind}-node`,
-    x: 0,
-    y: 0,
-    position: { x: 0, y: 0 },
-    data: {
-      id: asset.id,
-      assetId: asset.id,
-      name: asset.name,
-      type: asset.kind,
-      kind: asset.kind,
-      category: asset.category,
-      [mediaField]: asset.url,
-      sizeBytes: asset.sizeBytes,
-      durationSeconds: asset.durationSeconds,
-      duration: asset.durationSeconds,
-      thumbnailUrl: asset.thumbnailUrl,
-      createdAt: asset.createdAt,
-      status: asset.status,
-      generationPrompt: asset.generationPrompt,
-      generationReferences: asset.generationReferences
-    }
-  };
+  if (asset.kind === "audio") {
+    return createCompanyAudioNode(asset);
+  }
+
+  return createCompanyVideoNode(asset);
 }
 
 function createNodeId(kind: AssetKind) {
@@ -145,4 +174,42 @@ function createNodeId(kind: AssetKind) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function baseNode(asset: CanvasAsset, fields: Record<string, unknown>): CompanyNode {
+  return {
+    id: asset.id,
+    type: asset.kind,
+    x: 0,
+    y: 0,
+    position: { x: 0, y: 0 },
+    data: compactRecord({
+      id: asset.id,
+      assetId: asset.id,
+      name: asset.name,
+      label: asset.name,
+      type: asset.kind,
+      kind: asset.kind,
+      category: asset.category,
+      ...fields,
+      assetUri: asset.url,
+      assetStatus: "Active",
+      thumbnailUrl: asset.thumbnailUrl,
+      createdAt: asset.createdAt,
+      status: asset.status,
+      sizeBytes: asset.sizeBytes
+    })
+  };
+}
+
+function compactRecord(record: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
+}
+
+function getReferenceUrls(asset: CanvasAsset, kind: AssetKind) {
+  if (!asset.generationReferences) {
+    return undefined;
+  }
+
+  return asset.generationReferences.filter((reference) => reference.kind === kind).map((reference) => reference.url ?? reference.previewUrl ?? reference.name);
 }

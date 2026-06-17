@@ -1,4 +1,10 @@
-import { loadProjectSnapshot, removeAssetFromSnapshot, renameAssetInSnapshot, saveProjectSnapshot } from "../api/canvasClient";
+import {
+  loadProjectSnapshot,
+  removeAssetFromSnapshot,
+  renameAssetInSnapshot,
+  saveProjectSnapshot,
+  saveProjectSnapshotAndVerify
+} from "../api/canvasClient";
 import { addAssetNodeToSnapshot } from "../api/uploadClient";
 import type { ApiTransport } from "../api/transport";
 import { normalizeSnapshotAssets } from "../lib/assetNormalizer";
@@ -74,6 +80,7 @@ export async function saveCanvasAsset(
     kind: AssetKind;
     category: AssetCategory;
     url: string;
+    providerVideoUrl?: string;
     thumbnailUrl?: string;
     durationSeconds?: number;
     sizeBytes?: number;
@@ -87,6 +94,7 @@ export async function saveCanvasAsset(
     kind: input.kind,
     category: input.category,
     url: input.url,
+    providerVideoUrl: input.providerVideoUrl,
     thumbnailUrl: input.thumbnailUrl,
     durationSeconds: input.durationSeconds,
     sizeBytes: input.sizeBytes,
@@ -95,13 +103,14 @@ export async function saveCanvasAsset(
     generationPrompt: input.generationPrompt,
     generationReferences: input.generationReferences
   };
-  const snapshot = addAssetNodeToSnapshot(input.snapshot, asset);
+  const latestSnapshot = await loadProjectSnapshot(transport, input.projectId);
+  const snapshot = addAssetNodeToSnapshot(latestSnapshot, asset);
 
-  await saveProjectSnapshot(transport, input.projectId, snapshot);
+  const verifiedSnapshot = await saveProjectSnapshotAndVerify(transport, input.projectId, snapshot, asset.id);
   return {
     ok: true,
     asset,
-    snapshot
+    snapshot: verifiedSnapshot
   };
 }
 

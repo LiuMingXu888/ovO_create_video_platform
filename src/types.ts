@@ -26,6 +26,7 @@ export interface CanvasAsset {
   kind: AssetKind;
   category: AssetCategory;
   url: string;
+  providerVideoUrl?: string;
   thumbnailUrl?: string;
   durationSeconds?: number;
   sizeBytes?: number;

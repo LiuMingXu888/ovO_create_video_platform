@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateCompanyApiPath } from "./companySessionClient.js";
+import { normalizeCompanyWindowUrl, validateCompanyApiPath } from "./companySessionClient.js";
 
 describe("company API proxy", () => {
   it("allows only company API paths through the Electron session proxy", () => {
@@ -12,5 +12,12 @@ describe("company API proxy", () => {
       ok: false,
       message: "仅允许请求公司 /api/ 接口"
     });
+  });
+});
+
+describe("normalizeCompanyWindowUrl", () => {
+  it("keeps company canvas URLs and falls back for non-http URLs", () => {
+    expect(normalizeCompanyWindowUrl("http://qijing.kjjhz.cn/canvas/cmq")).toBe("http://qijing.kjjhz.cn/canvas/cmq");
+    expect(normalizeCompanyWindowUrl("file:///tmp/x")).toBe("http://qijing.kjjhz.cn");
   });
 });

@@ -24,11 +24,42 @@ export function classifyEndpoint(pathname: string): EndpointFamily {
   const path = pathname.split("?")[0];
   if (path === "/api/auth/me") return "auth";
   if (/^\/api\/projects\/[^/]+\/snapshot$/.test(path)) return "snapshot";
+  if (path === "/api/asset/persist-task") return "generation";
   if (path.startsWith("/api/asset/") || path === "/api/asset/list") return "asset";
   if (path === "/api/upload-file" || path === "/api/upload-public" || path === "/api/asset/upload") return "upload";
   if (path.startsWith("/api/generate-video") || path.startsWith("/api/gen-queue")) return "generation";
   if (path.startsWith("/api/subtitle-remove")) return "subtitle";
   return "unknown";
+}
+
+export function buildCapturedRequestBody(contentType: string | undefined, uploadData?: Buffer) {
+  if (!uploadData || uploadData.byteLength === 0) {
+    return undefined;
+  }
+
+  const normalizedContentType = contentType?.toLowerCase() ?? "";
+  const text = uploadData.toString("utf8");
+  if (normalizedContentType.includes("multipart/form-data")) {
+    return { formData: "[multipart]" };
+  }
+
+  if (normalizedContentType.includes("application/json")) {
+    try {
+      return JSON.parse(uploadData.toString("utf8"));
+    } catch {
+      return { raw: "[unparseable-json]" };
+    }
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (text.includes("Content-Disposition: form-data")) {
+      return { formData: "[multipart]" };
+    }
+  }
+
+  return { raw: "[binary]" };
 }
 
 export function summarizeCapture(capture: RawApiCapture): SanitizedApiSummary {

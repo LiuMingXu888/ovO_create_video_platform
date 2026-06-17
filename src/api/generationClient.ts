@@ -62,6 +62,7 @@ export interface GenerateVideoResult {
   taskId: string;
   videoUrl: string;
   providerVideoUrl?: string;
+  persisted?: boolean;
 }
 
 interface GenerateVideoPollResponse {
@@ -69,8 +70,15 @@ interface GenerateVideoPollResponse {
   videoUrl?: string;
   providerVideoUrl?: string;
   outputUrl?: string;
+  persisted?: boolean;
   errorMessage?: string;
   error?: unknown;
+}
+
+interface PersistTaskResponse {
+  persisted?: boolean;
+  url?: string;
+  error?: string;
 }
 
 export async function generateVideo(
@@ -85,7 +93,8 @@ export async function generateVideo(
   }
 
   const pollResult = await pollTaskUntilComplete(transport, endpoints.generateVideoTask(submitResult.taskId), options);
-  const videoUrl = pollResult.videoUrl ?? pollResult.outputUrl ?? pollResult.providerVideoUrl;
+  const persistResult = await persistTaskIfNeeded(transport, submitResult.taskId, pollResult);
+  const videoUrl = persistResult?.url ?? pollResult.videoUrl ?? pollResult.outputUrl ?? pollResult.providerVideoUrl;
 
   if (!videoUrl) {
     throw new Error("生成成功但接口未返回视频地址");
@@ -94,8 +103,26 @@ export async function generateVideo(
   return {
     taskId: submitResult.taskId,
     videoUrl,
-    providerVideoUrl: pollResult.providerVideoUrl
+    providerVideoUrl: pollResult.providerVideoUrl,
+    persisted: persistResult?.persisted ?? pollResult.persisted
   };
+}
+
+export async function loadGenerationQueue(transport: ApiTransport, projectId: string): Promise<unknown> {
+  return transport.request(endpoints.genQueue(projectId));
+}
+
+export async function persistGeneratedTask(transport: ApiTransport, taskId: string): Promise<PersistTaskResponse> {
+  const result = await transport.request<PersistTaskResponse>(endpoints.persistTask(), {
+    method: "POST",
+    body: { taskId }
+  });
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
+
+  return result;
 }
 
 export interface PollOptions {
@@ -152,6 +179,18 @@ async function requestPollStatus(transport: ApiTransport, path: string) {
 
     throw error;
   }
+}
+
+async function persistTaskIfNeeded(transport: ApiTransport, taskId: string, pollResult: GenerateVideoPollResponse) {
+  if (pollResult.persisted === true && (pollResult.videoUrl || pollResult.outputUrl)) {
+    return undefined;
+  }
+
+  if (pollResult.persisted === false || (!pollResult.videoUrl && Boolean(pollResult.providerVideoUrl))) {
+    return persistGeneratedTask(transport, taskId);
+  }
+
+  return undefined;
 }
 
 function getPollErrorMessage(error: unknown) {

@@ -27,6 +27,19 @@ export function validateCompanyApiPath(pathname: string) {
   return { ok: true };
 }
 
+export function normalizeCompanyWindowUrl(targetUrl: string) {
+  try {
+    const url = new URL(targetUrl);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.toString();
+    }
+  } catch {
+    return COMPANY_ORIGIN;
+  }
+
+  return COMPANY_ORIGIN;
+}
+
 export async function checkCompanySession(fetcher: CompanySessionFetch): Promise<CompanySessionResult> {
   try {
     const response = await fetcher(COMPANY_AUTH_ME_URL, {

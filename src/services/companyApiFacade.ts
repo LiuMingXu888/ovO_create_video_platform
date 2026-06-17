@@ -64,6 +64,7 @@ export const companyApiFacade = {
     kind: AssetKind;
     category: AssetCategory;
     url: string;
+    providerVideoUrl?: string;
     thumbnailUrl?: string;
     durationSeconds?: number;
     sizeBytes?: number;
@@ -75,7 +76,19 @@ export const companyApiFacade = {
     prompt: string;
     references: ReferenceItem[];
     settings: GenerationSettings;
-  }) => generateVideoWithTransport(window.ovoDesktop ? desktopTransport : transport, input)
+  }) => generateVideoWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
+  inspectCanvas: async (canvasUrl: string) => {
+    if (!window.ovoDesktop) {
+      throw new Error("请在 Electron 桌面端使用接口诊断");
+    }
+
+    const result = await window.ovoDesktop.discovery.inspectCanvas(canvasUrl);
+    if (!result.ok) {
+      throw new Error(result.message ?? "接口诊断失败");
+    }
+
+    return result;
+  }
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

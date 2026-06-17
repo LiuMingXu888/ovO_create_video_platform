@@ -17,6 +17,7 @@ interface Window {
           status?: number;
         }>;
         sanitizedMapPath?: string;
+        rawCapturePath?: string;
       }>;
     };
     api: {

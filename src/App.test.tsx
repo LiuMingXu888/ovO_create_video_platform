@@ -11,7 +11,8 @@ vi.mock("./services/companyApiFacade", () => ({
     uploadCanvasAsset: vi.fn(),
     saveCanvasAsset: vi.fn(),
     deleteCanvasAsset: vi.fn(),
-    generateVideo: vi.fn()
+    generateVideo: vi.fn(),
+    inspectCanvas: vi.fn()
   }
 }));
 
@@ -36,6 +37,7 @@ beforeEach(() => {
   vi.mocked(companyApiFacade.checkAuth).mockReset();
   vi.mocked(companyApiFacade.deleteCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.generateVideo).mockReset();
+  vi.mocked(companyApiFacade.inspectCanvas).mockReset();
 });
 
 function mockObjectUrl(url: string) {
@@ -559,6 +561,25 @@ describe("App shell", () => {
     expect(screen.getByText("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载")).toBeInTheDocument();
   });
 
+  it("runs the in-app canvas API diagnostic capture from the canvas controls", async () => {
+    vi.mocked(companyApiFacade.inspectCanvas).mockResolvedValue({
+      ok: true,
+      summaries: [
+        { method: "GET", path: "/api/projects/cmq/snapshot", family: "snapshot", status: 200 },
+        { method: "POST", path: "/api/gen-queue", family: "generation", status: 200 }
+      ],
+      sanitizedMapPath: "/Users/mac/Library/Application Support/ovO/storage/api/sanitized-api-map.json"
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "接口诊断" }));
+
+    await waitFor(() =>
+      expect(companyApiFacade.inspectCanvas).toHaveBeenCalledWith("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x")
+    );
+    expect(await screen.findByText("接口诊断已捕获 2 个请求")).toBeInTheDocument();
+  });
+
   it("builds a local generation payload preview without submitting the company API", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
@@ -702,6 +723,68 @@ describe("App shell", () => {
         omnireference: true
       }
     });
+  });
+
+  it("passes provider video URLs into the canvas save flow after generation", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.generateVideo).mockResolvedValue({
+      taskId: "task-1",
+      videoUrl: "https://example.com/generated.mp4",
+      providerVideoUrl: "https://provider.example.com/generated.mp4",
+      persisted: true
+    });
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-video-node",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4",
+        providerVideoUrl: "https://provider.example.com/generated.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "镜头缓慢推进" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    await waitFor(() =>
+      expect(companyApiFacade.saveCanvasAsset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://example.com/generated.mp4",
+          providerVideoUrl: "https://provider.example.com/generated.mp4"
+        })
+      )
+    );
   });
 
   it("shows the real generation failure reason on the failed video card", async () => {

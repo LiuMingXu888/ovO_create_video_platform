@@ -1,11 +1,12 @@
 import { app, BrowserView, BrowserWindow, clipboard, ipcMain, session } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { summarizeCapture, type SanitizedApiSummary } from "./apiDiscovery.js";
+import { buildCapturedRequestBody, summarizeCapture, type RawApiCapture, type SanitizedApiSummary } from "./apiDiscovery.js";
 import {
   checkCompanySession,
   COMPANY_ORIGIN,
   COMPANY_SESSION_PARTITION,
+  normalizeCompanyWindowUrl,
   TARGET_CANVAS_URL,
   validateCompanyApiPath,
   type CompanySessionResult
@@ -21,6 +22,13 @@ export interface InspectCanvasResult {
   message?: string;
   summaries?: SanitizedApiSummary[];
   sanitizedMapPath?: string;
+  rawCapturePath?: string;
+}
+
+interface PendingCapture {
+  method: string;
+  url: string;
+  requestBody?: unknown;
 }
 
 export interface CompanyApiRequestOptions {
@@ -263,19 +271,6 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
   });
 }
 
-function normalizeCompanyWindowUrl(targetUrl: string) {
-  try {
-    const url = new URL(targetUrl);
-    if (url.protocol === "http:" || url.protocol === "https:") {
-      return url.toString();
-    }
-  } catch {
-    return COMPANY_ORIGIN;
-  }
-
-  return COMPANY_ORIGIN;
-}
-
 export async function checkSession(): Promise<CompanySessionResult> {
   return checkCompanySession(fetchWithCompanySession);
 }
@@ -442,25 +437,109 @@ export async function saveAssetsToDownloads(input: SaveAssetsInput) {
 export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
   const paths = getStoragePaths();
   await fs.mkdir(paths.capturesDir, { recursive: true });
-
-  const captures = [
-    {
-      method: "GET",
-      url: `${COMPANY_ORIGIN}/api/auth/me`
-    },
-    {
-      method: "GET",
-      url: `${COMPANY_ORIGIN}/api/projects/${encodeURIComponent(projectIdFromCanvasUrl(canvasUrl))}/snapshot`
+  const companySession = getCompanySession();
+  const captures: RawApiCapture[] = [];
+  const pending = new Map<number, PendingCapture>();
+  const initialUrl = normalizeCompanyWindowUrl(canvasUrl);
+  const rawCapturePath = path.join(paths.capturesDir, `capture-${createTimestampFolderName(new Date())}.json`);
+  const inspectWindow = new BrowserWindow({
+    width: 1400,
+    height: 950,
+    title: "ovO 接口诊断",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
     }
-  ].map(summarizeCapture);
+  });
+  const inspectView = new BrowserView({
+    webPreferences: {
+      partition: COMPANY_SESSION_PARTITION,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
 
-  await fs.writeFile(paths.sanitizedApiMapPath, JSON.stringify({ capturedAt: new Date().toISOString(), captures }, null, 2));
+  function resizeInspectView() {
+    if (inspectWindow.isDestroyed()) {
+      return;
+    }
+
+    const [width, height] = inspectWindow.getContentSize();
+    inspectView.setBounds({ x: 0, y: 0, width, height });
+  }
+
+  const requestListener = (details: Electron.OnBeforeRequestListenerDetails, callback: (response: Electron.CallbackResponse) => void) => {
+    if (isCompanyApiUrl(details.url)) {
+      const uploadData = details.uploadData?.find((item) => item.bytes)?.bytes;
+      pending.set(details.id, {
+        method: details.method,
+        url: details.url,
+        requestBody: buildCapturedRequestBody(undefined, uploadData)
+      });
+    }
+
+    callback({});
+  };
+
+  const responseListener = (details: Electron.OnCompletedListenerDetails) => {
+    const request = pending.get(details.id);
+    if (!request) {
+      return;
+    }
+
+    pending.delete(details.id);
+    const capture: RawApiCapture = {
+      method: request.method,
+      url: request.url,
+      status: details.statusCode,
+      requestBody: request.requestBody
+    };
+    captures.push(capture);
+    void persistCurrentCaptures();
+  };
+
+  companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, requestListener);
+  companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, responseListener);
+  inspectWindow.setBrowserView(inspectView);
+  inspectWindow.on("resize", resizeInspectView);
+  inspectWindow.on("maximize", resizeInspectView);
+  inspectWindow.on("unmaximize", resizeInspectView);
+  inspectWindow.on("closed", () => {
+    companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
+    companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
+  });
+  resizeInspectView();
+  inspectView.webContents.openDevTools({ mode: "detach" });
+
+  await inspectView.webContents.loadURL(initialUrl);
+  await waitForNetworkCapture();
+
+  const fallbackSnapshotUrl = `${COMPANY_ORIGIN}/api/projects/${encodeURIComponent(projectIdFromCanvasUrl(canvasUrl))}/snapshot`;
+  if (!captures.some((capture) => new URL(capture.url).pathname.endsWith("/snapshot"))) {
+    captures.push({
+      method: "GET",
+      url: fallbackSnapshotUrl,
+      status: undefined
+    });
+  }
+
+  await persistCurrentCaptures();
+  const summaries = captures.map(summarizeCapture);
 
   return {
     ok: true,
-    summaries: captures,
-    sanitizedMapPath: paths.sanitizedApiMapPath
+    summaries,
+    sanitizedMapPath: paths.sanitizedApiMapPath,
+    rawCapturePath
   };
+
+  async function persistCurrentCaptures() {
+    const capturedAt = new Date().toISOString();
+    await fs.writeFile(rawCapturePath, JSON.stringify({ capturedAt, captures }, null, 2));
+    await fs.writeFile(paths.sanitizedApiMapPath, JSON.stringify({ capturedAt, captures: captures.map(summarizeCapture) }, null, 2));
+  }
 }
 
 function projectIdFromCanvasUrl(canvasUrl: string) {
@@ -472,6 +551,19 @@ function projectIdFromCanvasUrl(canvasUrl: string) {
     throw new Error("画布地址无效");
   }
   return projectId;
+}
+
+function isCompanyApiUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.origin === COMPANY_ORIGIN && url.pathname.startsWith("/api/");
+  } catch {
+    return false;
+  }
+}
+
+async function waitForNetworkCapture() {
+  await new Promise((resolve) => setTimeout(resolve, 4000));
 }
 
 async function safeJson(response: Response) {

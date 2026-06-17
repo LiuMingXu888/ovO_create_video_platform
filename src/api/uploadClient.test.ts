@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { addAssetNodeToSnapshot, buildAssetUploadPayload, buildUploadFormData, getUploadPrefix, uploadCanvasAsset } from "./uploadClient";
+import {
+  addAssetNodeToSnapshot,
+  buildAssetUploadPayload,
+  buildUploadFormData,
+  createCompanyAudioNode,
+  createCompanyImageNode,
+  createCompanyVideoNode,
+  getUploadPrefix,
+  uploadCanvasAsset
+} from "./uploadClient";
 import type { ApiTransport } from "./transport";
 
 describe("uploadClient payload builders", () => {
@@ -32,6 +41,125 @@ describe("uploadClient payload builders", () => {
     });
   });
 
+  it("builds native company image nodes for uploaded files", () => {
+    expect(
+      createCompanyImageNode({
+        id: "asset-image",
+        name: "场景图",
+        kind: "image",
+        category: "scenes",
+        url: "https://example.com/scene.png",
+        sizeBytes: 12
+      })
+    ).toEqual({
+      id: "asset-image",
+      type: "image",
+      x: 0,
+      y: 0,
+      position: { x: 0, y: 0 },
+      data: {
+        id: "asset-image",
+        assetId: "asset-image",
+        name: "场景图",
+        label: "场景图",
+        type: "image",
+        kind: "image",
+        category: "scenes",
+        imageUrl: "https://example.com/scene.png",
+        assetUri: "https://example.com/scene.png",
+        assetStatus: "Active",
+        sizeBytes: 12
+      }
+    });
+  });
+
+  it("builds native company audio nodes for uploaded files", () => {
+    expect(
+      createCompanyAudioNode({
+        id: "asset-audio",
+        name: "旁白",
+        kind: "audio",
+        category: "audio",
+        url: "https://example.com/audio.mp3",
+        durationSeconds: 8,
+        sizeBytes: 12
+      })
+    ).toEqual({
+      id: "asset-audio",
+      type: "audio",
+      x: 0,
+      y: 0,
+      position: { x: 0, y: 0 },
+      data: {
+        id: "asset-audio",
+        assetId: "asset-audio",
+        name: "旁白",
+        label: "旁白",
+        type: "audio",
+        kind: "audio",
+        category: "audio",
+        audioUrl: "https://example.com/audio.mp3",
+        assetUri: "https://example.com/audio.mp3",
+        assetStatus: "Active",
+        duration: 8,
+        durationSeconds: 8,
+        sizeBytes: 12
+      }
+    });
+  });
+
+  it("builds native company video nodes for generated persisted videos", () => {
+    expect(
+      createCompanyVideoNode({
+        id: "asset-video",
+        name: "生成视频",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/video.mp4",
+        providerVideoUrl: "https://provider.example.com/video.mp4",
+        durationSeconds: 15,
+        sizeBytes: 12,
+        generationPrompt: "镜头推进",
+        generationReferences: [{ id: "ref-1", name: "图", kind: "image", url: "https://example.com/image.png", sizeBytes: 1, source: "asset" }]
+      })
+    ).toEqual({
+      id: "asset-video",
+      type: "video",
+      x: 0,
+      y: 0,
+      position: { x: 0, y: 0 },
+      data: {
+        id: "asset-video",
+        assetId: "asset-video",
+        name: "生成视频",
+        label: "生成视频",
+        type: "video",
+        kind: "video",
+        category: "video",
+        videoUrl: "https://example.com/video.mp4",
+        seedanceProviderUrl: "https://provider.example.com/video.mp4",
+        assetUri: "https://example.com/video.mp4",
+        assetStatus: "Active",
+        videoPersisted: true,
+        duration: 15,
+        durationSeconds: 15,
+        resolution: "720p",
+        generateAudio: true,
+        genTab: "allref",
+        model: "ep-20260319213857-htd7q",
+        modelName: "Seedance 2.0",
+        aspectRatio: "9:16",
+        sizeBytes: 12,
+        generationPrompt: "镜头推进",
+        prompt: "镜头推进",
+        generationReferences: [{ id: "ref-1", name: "图", kind: "image", url: "https://example.com/image.png", sizeBytes: 1, source: "asset" }],
+        referenceImages: ["https://example.com/image.png"],
+        referenceVideos: [],
+        referenceAudios: []
+      }
+    });
+  });
+
   it("adds default coordinates to uploaded asset nodes", () => {
     const snapshot = { snapshot: { nodes: [] } };
     const nextSnapshot = addAssetNodeToSnapshot(snapshot, {
@@ -48,7 +176,7 @@ describe("uploadClient payload builders", () => {
         nodes: [
           {
             id: "asset-audio",
-            type: "audio-node",
+            type: "audio",
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
@@ -56,10 +184,13 @@ describe("uploadClient payload builders", () => {
               id: "asset-audio",
               assetId: "asset-audio",
               name: "音频",
+              label: "音频",
               type: "audio",
               kind: "audio",
               category: "audio",
               audioUrl: "https://example.com/audio.mp3",
+              assetUri: "https://example.com/audio.mp3",
+              assetStatus: "Active",
               sizeBytes: 12
             }
           }
@@ -85,7 +216,7 @@ describe("uploadClient payload builders", () => {
         nodes: [
           {
             id: "asset-video",
-            type: "video-node",
+            type: "video",
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
@@ -93,10 +224,20 @@ describe("uploadClient payload builders", () => {
                 id: "asset-video",
                 assetId: "asset-video",
                 name: "视频",
+                label: "视频",
                 type: "video",
                 kind: "video",
                 category: "video",
                 videoUrl: "https://example.com/video.mp4",
+                assetUri: "https://example.com/video.mp4",
+                assetStatus: "Active",
+                videoPersisted: true,
+                resolution: "720p",
+                generateAudio: true,
+                genTab: "allref",
+                model: "ep-20260319213857-htd7q",
+                modelName: "Seedance 2.0",
+                aspectRatio: "9:16",
                 sizeBytes: 12
               }
             }
@@ -123,7 +264,7 @@ describe("uploadClient payload builders", () => {
         nodes: [
           {
             id: "asset-scene",
-            type: "image-node",
+            type: "image",
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
@@ -131,10 +272,13 @@ describe("uploadClient payload builders", () => {
               id: "asset-scene",
               assetId: "asset-scene",
               name: "场景图",
+              label: "场景图",
               type: "image",
               kind: "image",
               category: "scenes",
               imageUrl: "https://example.com/scene.png",
+              assetUri: "https://example.com/scene.png",
+              assetStatus: "Active",
               sizeBytes: 12
             }
           }
@@ -145,6 +289,7 @@ describe("uploadClient payload builders", () => {
 
   it("uploads a file and saves the project snapshot with a new node", async () => {
     const requests: Array<{ path: string; options?: unknown }> = [];
+    let savedSnapshot: unknown = { snapshot: { nodes: [] } };
     const transport: ApiTransport = {
       request: async (path, options) => {
         requests.push({ path, options });
@@ -156,7 +301,12 @@ describe("uploadClient payload builders", () => {
           } as never;
         }
 
-        return { ok: true } as never;
+        if (options && "method" in options && options.method === "PUT") {
+          savedSnapshot = options.body;
+          return { ok: true } as never;
+        }
+
+        return savedSnapshot as never;
       }
     };
     const file = new File(["data"], "uploaded.png", { type: "image/png" });
@@ -178,11 +328,13 @@ describe("uploadClient payload builders", () => {
       sizeBytes: 4
     });
     expect(requests[0].path).toBe("/api/upload-file");
-    expect(requests[1]).toMatchObject({
+    expect(requests[1]).toEqual({ path: "/api/projects/project-1/snapshot", options: undefined });
+    expect(requests[2]).toMatchObject({
       path: "/api/projects/project-1/snapshot",
       options: {
         method: "PUT"
       }
     });
+    expect(requests[3]).toEqual({ path: "/api/projects/project-1/snapshot", options: undefined });
   });
 });
