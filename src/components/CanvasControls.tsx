@@ -59,10 +59,6 @@ export function CanvasControls({
           <Plus size={15} />
           <span>新增画布</span>
         </button>
-        <button type="button" className="canvas-history-new" onClick={onCreateCompanyCanvas} disabled={loading}>
-          <Plus size={15} />
-          <span>新建公司画布</span>
-        </button>
         {canvasHistory.map((entry) => (
           <div key={`${entry.projectId ?? entry.url}-${entry.createdAt}`} className="canvas-history-item-row">
             <button

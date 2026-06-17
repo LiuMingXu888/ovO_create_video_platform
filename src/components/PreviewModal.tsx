@@ -22,31 +22,33 @@ export function PreviewModal({ asset, onClose, onPrevious, onNext, hasPrevious =
           <X size={20} />
         </button>
         <div className="preview-modal-header">
-          <button
-            type="button"
-            className="preview-nav-button"
-            onClick={onPrevious}
-            disabled={!hasPrevious}
-            title="查看上一个节点"
-            aria-label="查看上一个节点"
-          >
-            <ChevronLeft size={18} />
-          </button>
           <h2>{asset.name}</h2>
-          <button
-            type="button"
-            className="preview-nav-button"
-            onClick={onNext}
-            disabled={!hasNext}
-            title="查看下一个节点"
-            aria-label="查看下一个节点"
-          >
-            <ChevronRight size={18} />
-          </button>
+          <div className="preview-nav-group" aria-label="预览切换">
+            <button
+              type="button"
+              className="preview-nav-button"
+              onClick={onPrevious}
+              disabled={!hasPrevious}
+              title="查看上一个节点"
+              aria-label="查看上一个节点"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              className="preview-nav-button"
+              onClick={onNext}
+              disabled={!hasNext}
+              title="查看下一个节点"
+              aria-label="查看下一个节点"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
         <div className="preview-frame">
-          {asset.kind === "image" && <img src={asset.url} alt={asset.name} />}
-          {asset.kind === "video" && <video src={asset.url} controls playsInline />}
+          {asset.kind === "image" && <img className="preview-media" src={asset.url} alt={asset.name} />}
+          {asset.kind === "video" && <video className="preview-media" src={asset.url} controls playsInline title="完整视频预览" />}
           {asset.kind === "audio" && <audio src={asset.url} controls />}
         </div>
       </div>

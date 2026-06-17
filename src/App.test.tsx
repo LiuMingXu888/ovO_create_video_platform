@@ -644,32 +644,12 @@ describe("App shell", () => {
     expect(await screen.findByText("接口诊断已捕获 2 个请求")).toBeInTheDocument();
   });
 
-  it("creates a company canvas and loads its returned canvas URL", async () => {
-    vi.mocked(companyApiFacade.createCompanyCanvas).mockResolvedValue({
-      projectId: "new-project",
-      canvasUrl: "http://qijing.kjjhz.cn/canvas/new-project",
-      title: "未命名画布",
-      loadedAt: "2026-06-17T00:00:00.000Z"
-    });
-    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
-      project: {
-        projectId: "new-project",
-        canvasUrl: "http://qijing.kjjhz.cn/canvas/new-project",
-        title: "未命名画布",
-        loadedAt: "2026-06-17T00:00:00.000Z"
-      },
-      snapshot: { snapshot: { nodes: [] } },
-      assets: []
-    });
-
+  it("hides the company canvas creation entry while keeping local canvas creation available", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "新建公司画布" }));
-
-    await waitFor(() => expect(companyApiFacade.createCompanyCanvas).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(companyApiFacade.loadCanvasResources).toHaveBeenCalledWith("http://qijing.kjjhz.cn/canvas/new-project"));
-    expect(screen.getByDisplayValue("http://qijing.kjjhz.cn/canvas/new-project")).toBeInTheDocument();
-    expect(screen.getByText("已加载 0 个资源")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "新建公司画布" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增画布" })).toBeInTheDocument();
+    expect(companyApiFacade.createCompanyCanvas).not.toHaveBeenCalled();
   });
 
   it("logs out and clears loaded company canvas state", async () => {
@@ -1447,6 +1427,25 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "查看下一个节点" }));
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "男主秦扬人脸参考 预览");
+  });
+
+  it("keeps preview navigation buttons grouped next to each other in the modal header", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "放大预览 小区楼道" }));
+
+    const navGroup = screen.getByLabelText("预览切换");
+    expect(navGroup).toContainElement(screen.getByRole("button", { name: "查看上一个节点" }));
+    expect(navGroup).toContainElement(screen.getByRole("button", { name: "查看下一个节点" }));
+  });
+
+  it("marks preview videos for full containment inside the modal", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "放大预览 开场参考视频" }));
+
+    const previewVideo = screen.getByTitle("完整视频预览");
+    expect(previewVideo).toHaveClass("preview-media");
   });
 
   it("disables preview navigation at the edges", async () => {
