@@ -1,5 +1,13 @@
 import type { CanvasAsset } from "../types";
 
+const categoryLabels: Record<CanvasAsset["category"], string> = {
+  characters: "人物",
+  scenes: "场景",
+  props: "道具",
+  audio: "音频",
+  video: "视频"
+};
+
 export async function downloadAsset(asset: CanvasAsset) {
   const fileName = getDownloadFileName(asset);
 
@@ -34,7 +42,9 @@ export async function downloadAsset(asset: CanvasAsset) {
 export async function downloadAssets(assets: CanvasAsset[]) {
   const inputs = assets.map((asset) => ({
     url: asset.url,
-    fileName: getDownloadFileName(asset)
+    fileName: getDownloadFileName(asset),
+    category: asset.category,
+    categoryLabel: categoryLabels[asset.category]
   }));
 
   if (window.ovoDesktop?.file.saveAssets) {

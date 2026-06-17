@@ -555,6 +555,7 @@ button {
   color: #202734;
   font-size: 12px;
   font-weight: 650;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -906,15 +907,16 @@ button {
 }
 
 .preview-modal-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
   gap: 12px;
   margin-bottom: 16px;
-  padding: 0 42px;
+  padding: 0 52px;
 }
 
 .preview-modal h2 {
+  grid-column: 2;
   min-width: 0;
   max-width: min(560px, 100%);
   margin: 0;
@@ -930,8 +932,11 @@ button {
 .preview-nav-group {
   display: inline-flex;
   flex: 0 0 auto;
+  grid-column: 3;
   align-items: center;
+  justify-self: end;
   gap: 6px;
+  margin-right: 42px;
 }
 
 .modal-close {
@@ -980,11 +985,6 @@ button {
   object-fit: contain;
 }
 
-.preview-frame video.preview-media {
-  width: 100%;
-  height: 100%;
-}
-
 .preview-frame audio {
   width: min(760px, calc(100% - 32px));
 }
@@ -997,17 +997,15 @@ button {
   }
 
   .preview-modal-header {
-    flex-wrap: wrap;
-    padding: 0 38px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    padding: 0 42px;
   }
 
   .preview-modal h2 {
-    flex-basis: 100%;
-    order: 1;
     font-size: 17px;
   }
 
   .preview-nav-group {
-    order: 2;
+    margin-right: 36px;
   }
 }

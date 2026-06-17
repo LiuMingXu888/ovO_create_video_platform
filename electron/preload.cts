@@ -1,5 +1,12 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+type SaveAssetInput = {
+  url: string;
+  fileName: string;
+  category?: string;
+  categoryLabel?: string;
+};
+
 contextBridge.exposeInMainWorld("ovoDesktop", {
   version: "0.1.0",
   auth: {
@@ -26,6 +33,6 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
   },
   file: {
     saveAsset: (input: { url: string; fileName: string }) => ipcRenderer.invoke("ovo:file:save-asset", input),
-    saveAssets: (input: { assets: Array<{ url: string; fileName: string }> }) => ipcRenderer.invoke("ovo:file:save-assets", input)
+    saveAssets: (input: { assets: SaveAssetInput[] }) => ipcRenderer.invoke("ovo:file:save-assets", input)
   }
 });

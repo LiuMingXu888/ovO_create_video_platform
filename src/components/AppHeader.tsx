@@ -1,4 +1,4 @@
-import { Coins, Download, LogOut, MousePointer2, UserRound, X } from "lucide-react";
+import { Coins, Download, LogOut, MousePointer2, SquareCheck, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
 
 interface AppHeaderProps {
@@ -6,7 +6,9 @@ interface AppHeaderProps {
   project?: CanvasProject | null;
   selectionMode?: boolean;
   selectedCount?: number;
+  totalAssetCount?: number;
   onToggleSelectionMode?: () => void;
+  onSelectAllAssets?: () => void;
   onDownloadSelected?: () => void;
   onCancelSelectionMode?: () => void;
   onLogout?: () => void;
@@ -17,7 +19,9 @@ export function AppHeader({
   project = null,
   selectionMode = false,
   selectedCount = 0,
+  totalAssetCount = 0,
   onToggleSelectionMode,
+  onSelectAllAssets,
   onDownloadSelected,
   onCancelSelectionMode,
   onLogout
@@ -48,6 +52,16 @@ export function AppHeader({
       <div className="header-actions">
         {selectionMode ? (
           <>
+            <button
+              type="button"
+              className="header-tool-button"
+              aria-label="全选"
+              onClick={onSelectAllAssets}
+              disabled={totalAssetCount === 0}
+            >
+              <SquareCheck size={16} />
+              <span>全选</span>
+            </button>
             <button
               type="button"
               className="header-tool-button"

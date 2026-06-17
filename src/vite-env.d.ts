@@ -56,7 +56,14 @@ interface Window {
         path?: string;
         message?: string;
       }>;
-      saveAssets?: (input: { assets: Array<{ url: string; fileName: string }> }) => Promise<{
+      saveAssets?: (input: {
+        assets: Array<{
+          url: string;
+          fileName: string;
+          category?: "characters" | "scenes" | "props" | "audio" | "video";
+          categoryLabel?: string;
+        }>;
+      }) => Promise<{
         ok: boolean;
         directoryPath?: string;
         message?: string;

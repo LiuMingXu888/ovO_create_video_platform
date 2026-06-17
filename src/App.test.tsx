@@ -1437,6 +1437,7 @@ describe("App shell", () => {
     const navGroup = screen.getByLabelText("预览切换");
     expect(navGroup).toContainElement(screen.getByRole("button", { name: "查看上一个节点" }));
     expect(navGroup).toContainElement(screen.getByRole("button", { name: "查看下一个节点" }));
+    expect(navGroup).toHaveClass("preview-nav-group");
   });
 
   it("marks preview videos for full containment inside the modal", async () => {
@@ -1718,9 +1719,45 @@ describe("App shell", () => {
     await waitFor(() => expect(saveAssets).toHaveBeenCalledTimes(1));
     expect(saveAssets.mock.calls[0][0].assets[0]).toMatchObject({
       url: expect.stringContaining("images.unsplash.com"),
-      fileName: "小区楼道"
+      fileName: "小区楼道",
+      category: "characters",
+      categoryLabel: "人物"
     });
     expect(screen.getByText("已下载 1 个资源")).toBeInTheDocument();
+  });
+
+  it("selects all categories for batch desktop download from the header", async () => {
+    const saveAssets = vi.fn().mockResolvedValue({ ok: true, directoryPath: "/Users/mac/Downloads/2026-06-15-201500" });
+    Object.defineProperty(window, "ovoDesktop", {
+      configurable: true,
+      value: {
+        file: { saveAssets },
+        version: "0.1.0",
+        auth: {},
+        discovery: {},
+        api: {}
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "多选下载" }));
+    expect(screen.getByRole("button", { name: "全选" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "全选" }));
+    expect(screen.getByRole("button", { name: "下载选中 6" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "下载选中 6" }));
+
+    await waitFor(() => expect(saveAssets).toHaveBeenCalledTimes(1));
+    expect(saveAssets.mock.calls[0][0].assets).toHaveLength(6);
+    expect(saveAssets.mock.calls[0][0].assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fileName: "小区楼道", category: "characters", categoryLabel: "人物" }),
+        expect.objectContaining({ fileName: "紧张背景音乐.mp3", category: "audio", categoryLabel: "音频" }),
+        expect.objectContaining({ fileName: "开场参考视频.mp4", category: "video", categoryLabel: "视频" })
+      ])
+    );
   });
 });
 

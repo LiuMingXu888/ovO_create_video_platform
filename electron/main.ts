@@ -11,6 +11,7 @@ import {
   saveAssetsToDownloads,
   uploadCompanyFile
 } from "./companySession.js";
+import type { SaveAssetInput } from "./downloadPaths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,7 +57,7 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:company-api:request", (_event, pathname: string, options) => requestCompanyApi(pathname, options));
   ipcMain.handle("ovo:company-api:upload-file", (_event, pathname: string, input) => uploadCompanyFile(pathname, input));
   ipcMain.handle("ovo:file:save-asset", (_event, input: { url: string; fileName: string }) => saveAssetToDownloads(input));
-  ipcMain.handle("ovo:file:save-assets", (_event, input: { assets: Array<{ url: string; fileName: string }> }) =>
+  ipcMain.handle("ovo:file:save-assets", (_event, input: { assets: SaveAssetInput[] }) =>
     saveAssetsToDownloads(input)
   );
 

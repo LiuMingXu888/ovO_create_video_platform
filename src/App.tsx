@@ -600,6 +600,10 @@ export function App() {
     setSelectedAssetIds(new Set());
   }
 
+  function selectAllAssets() {
+    setSelectedAssetIds(new Set(assets.map((asset) => asset.id)));
+  }
+
   function changeAssetSelection(assetId: string, selected: boolean) {
     setSelectedAssetIds((current) => {
       const next = new Set(current);
@@ -1222,7 +1226,9 @@ export function App() {
         project={displayProject}
         selectionMode={selectionMode}
         selectedCount={selectedAssetIds.size}
+        totalAssetCount={assets.length}
         onToggleSelectionMode={toggleSelectionMode}
+        onSelectAllAssets={selectAllAssets}
         onCancelSelectionMode={cancelSelectionMode}
         onDownloadSelected={handleDownloadSelected}
         onLogout={handleLogout}

@@ -11,6 +11,7 @@ import {
   validateCompanyApiPath,
   type CompanySessionResult
 } from "./companySessionClient.js";
+import { createCategorizedDownloadPlan, sanitizePathPart, type SaveAssetInput } from "./downloadPaths.js";
 import { createStoragePaths } from "./storagePaths.js";
 
 const LOGIN_POLL_INTERVAL_MS = 2000;
@@ -50,11 +51,6 @@ export interface CompanyUploadInput {
   bytes: ArrayBuffer;
   prefix: string;
   projectId?: string;
-}
-
-export interface SaveAssetInput {
-  url: string;
-  fileName: string;
 }
 
 export interface SaveAssetsInput {
@@ -375,7 +371,7 @@ export async function uploadCompanyFile(pathname: string, input: CompanyUploadIn
 }
 
 export async function saveAssetToDownloads(input: SaveAssetInput) {
-  const fileName = sanitizeFileName(input.fileName);
+  const fileName = sanitizePathPart(input.fileName);
   const destinationPath = path.join(app.getPath("downloads"), fileName);
 
   try {
@@ -404,27 +400,32 @@ export async function saveAssetToDownloads(input: SaveAssetInput) {
 
 export async function saveAssetsToDownloads(input: SaveAssetsInput) {
   const directoryName = createTimestampFolderName(new Date());
-  const directoryPath = path.join(app.getPath("downloads"), directoryName);
+  const plan = createCategorizedDownloadPlan({
+    downloadsPath: app.getPath("downloads"),
+    timestampFolderName: directoryName,
+    assets: input.assets
+  });
 
   try {
-    await fs.mkdir(directoryPath, { recursive: true });
+    await fs.mkdir(plan.directoryPath, { recursive: true });
 
-    for (const asset of input.assets) {
-      const response = await fetchWithCompanySession(asset.url);
+    for (const item of plan.items) {
+      const response = await fetchWithCompanySession(item.url);
       if (!response.ok) {
         return {
           ok: false,
-          message: `下载 ${asset.fileName} 失败 (${response.status})`
+          message: `下载 ${item.fileName} 失败 (${response.status})`
         };
       }
 
       const bytes = Buffer.from(await response.arrayBuffer());
-      await fs.writeFile(path.join(directoryPath, sanitizeFileName(asset.fileName)), bytes);
+      await fs.mkdir(item.categoryDirectoryPath, { recursive: true });
+      await fs.writeFile(item.destinationPath, bytes);
     }
 
     return {
       ok: true,
-      directoryPath
+      directoryPath: plan.directoryPath
     };
   } catch (error) {
     return {
@@ -587,11 +588,6 @@ function getResponseMessage(data: unknown, status: number) {
   }
 
   return `请求失败 (${status})`;
-}
-
-function sanitizeFileName(fileName: string) {
-  const trimmed = fileName.trim() || "asset";
-  return trimmed.replace(/[/:*?"<>|]/g, "_");
 }
 
 function createTimestampFolderName(date: Date) {

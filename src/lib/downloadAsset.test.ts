@@ -60,7 +60,7 @@ describe("downloadAsset", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:download");
   });
 
-  it("uses the desktop bridge to save selected assets into one folder", async () => {
+  it("uses the desktop bridge to save selected assets with category folder metadata", async () => {
     const saveAssets = vi.fn().mockResolvedValue({ ok: true, directoryPath: "/Users/mac/Downloads/2026-06-15-201500" });
     vi.stubGlobal("window", {
       ovoDesktop: {
@@ -75,11 +75,21 @@ describe("downloadAsset", () => {
         kind: "image",
         category: "characters",
         url: "https://example.com/image.png"
+      },
+      {
+        id: "asset-2",
+        name: "开场参考视频.mp4",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/video.mp4"
       }
     ]);
 
     expect(saveAssets).toHaveBeenCalledWith({
-      assets: [{ url: "https://example.com/image.png", fileName: "素材.png" }]
+      assets: [
+        { url: "https://example.com/image.png", fileName: "素材.png", category: "characters", categoryLabel: "人物" },
+        { url: "https://example.com/video.mp4", fileName: "开场参考视频.mp4", category: "video", categoryLabel: "视频" }
+      ]
     });
   });
 });
