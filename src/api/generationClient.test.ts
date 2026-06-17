@@ -41,6 +41,9 @@ describe("buildGenerateVideoPayload", () => {
       resolution: "720p",
       duration: 15,
       generateAudio: true,
+      genTab: "allref",
+      referenceMode: "omnireference",
+      networkEnabled: true,
       referenceImages: ["https://example.com/image.png"],
       referenceVideos: ["https://example.com/video.mp4"],
       referenceAudios: ["https://example.com/audio.mp3"]

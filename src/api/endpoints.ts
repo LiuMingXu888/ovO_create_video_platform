@@ -16,5 +16,8 @@ export const endpoints = {
   genQueue: (projectId: string) => `/api/gen-queue?projectId=${encodeURIComponent(projectId)}`,
   persistTask: () => "/api/asset/persist-task",
   subtitleRemove: () => "/api/subtitle-remove",
-  subtitleRemoveTask: (taskId: string) => `/api/subtitle-remove/${encodeURIComponent(taskId)}`
+  subtitleRemoveTask: (taskId: string) => `/api/subtitle-remove/${encodeURIComponent(taskId)}`,
+  subtitleRemoveArk: () => "/api/subtitle-remove/ark",
+  subtitleRemoveArkTask: (taskId: string) => `/api/subtitle-remove/ark/${encodeURIComponent(taskId)}`,
+  projects: () => "/api/projects"
 };

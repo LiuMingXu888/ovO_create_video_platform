@@ -44,6 +44,9 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
     resolution: "720p",
     duration: settings.durationSeconds,
     generateAudio: true,
+    genTab: "allref",
+    referenceMode: settings.omnireference ? "omnireference" : "standard",
+    networkEnabled: true,
     referenceImages: getReferenceValues(input.references, "image"),
     referenceVideos: getReferenceValues(input.references, "video"),
     referenceAudios: getReferenceValues(input.references, "audio")

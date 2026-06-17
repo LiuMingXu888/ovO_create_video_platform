@@ -12,6 +12,9 @@ vi.mock("./services/companyApiFacade", () => ({
     saveCanvasAsset: vi.fn(),
     deleteCanvasAsset: vi.fn(),
     generateVideo: vi.fn(),
+    removeSubtitles: vi.fn(),
+    createCompanyCanvas: vi.fn(),
+    logout: vi.fn(),
     inspectCanvas: vi.fn()
   }
 }));
@@ -37,6 +40,9 @@ beforeEach(() => {
   vi.mocked(companyApiFacade.checkAuth).mockReset();
   vi.mocked(companyApiFacade.deleteCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.generateVideo).mockReset();
+  vi.mocked(companyApiFacade.removeSubtitles).mockReset();
+  vi.mocked(companyApiFacade.createCompanyCanvas).mockReset();
+  vi.mocked(companyApiFacade.logout).mockReset();
   vi.mocked(companyApiFacade.inspectCanvas).mockReset();
 });
 
@@ -313,6 +319,64 @@ describe("App shell", () => {
     expect(screen.getByText("已同步上传 1 个资源")).toBeInTheDocument();
   });
 
+  it("adds the selected image category prefix before uploading to a real company canvas", async () => {
+    const file = new File(["image"], "百家老宅.png", { type: "image/png" });
+    const originalSnapshot = { snapshot: { nodes: [] } };
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: originalSnapshot,
+      assets: []
+    });
+    vi.mocked(companyApiFacade.uploadCanvasAsset).mockResolvedValue({
+      ok: true,
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "uploaded-scene-node",
+              type: "image",
+              data: {
+                name: "场景-百家老宅",
+                imageUrl: "https://example.com/scene.png"
+              }
+            }
+          ]
+        }
+      },
+      asset: {
+        id: "uploaded-scene-node",
+        name: "场景-百家老宅",
+        kind: "image",
+        category: "scenes",
+        url: "https://example.com/scene.png"
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    const scenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    const scenesInput = scenesSection.querySelector("input") as HTMLInputElement;
+    fireEvent.change(scenesInput, { target: { files: [file] } });
+
+    expect(await screen.findByText("场景-百家老宅")).toBeInTheDocument();
+    expect(companyApiFacade.uploadCanvasAsset).toHaveBeenCalledWith({
+      projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      snapshot: originalSnapshot,
+      file,
+      name: "场景-百家老宅",
+      kind: "image",
+      category: "scenes"
+    });
+  });
+
   it("uploads local audio through the same canvas node flow and keeps it in the audio section", async () => {
     const file = new File(["audio"], "voice-over.mp3", { type: "audio/mpeg" });
     const originalSnapshot = { snapshot: { nodes: [] } };
@@ -335,7 +399,7 @@ describe("App shell", () => {
               id: "uploaded-audio-node",
               type: "audio-node",
               data: {
-                name: "voice-over",
+                name: "音频-voice-over",
                 kind: "audio",
                 category: "audio",
                 audioUrl: "https://example.com/voice-over.mp3",
@@ -347,7 +411,7 @@ describe("App shell", () => {
       },
       asset: {
         id: "uploaded-audio-node",
-        name: "voice-over",
+        name: "音频-voice-over",
         kind: "audio",
         category: "audio",
         url: "https://example.com/voice-over.mp3",
@@ -364,13 +428,13 @@ describe("App shell", () => {
     const audioInput = audioSection.querySelector("input") as HTMLInputElement;
     fireEvent.change(audioInput, { target: { files: [file] } });
 
-    expect(await screen.findByText("voice-over")).toBeInTheDocument();
-    expect(audioSection).toHaveTextContent("voice-over");
+    expect(await screen.findByText("音频-voice-over")).toBeInTheDocument();
+    expect(audioSection).toHaveTextContent("音频-voice-over");
     expect(companyApiFacade.uploadCanvasAsset).toHaveBeenCalledWith({
       projectId: "cmq6fwhft0bg5m2l5u78zby8x",
       snapshot: originalSnapshot,
       file,
-      name: "voice-over",
+      name: "音频-voice-over",
       kind: "audio",
       category: "audio"
     });
@@ -580,6 +644,70 @@ describe("App shell", () => {
     expect(await screen.findByText("接口诊断已捕获 2 个请求")).toBeInTheDocument();
   });
 
+  it("creates a company canvas and loads its returned canvas URL", async () => {
+    vi.mocked(companyApiFacade.createCompanyCanvas).mockResolvedValue({
+      projectId: "new-project",
+      canvasUrl: "http://qijing.kjjhz.cn/canvas/new-project",
+      title: "未命名画布",
+      loadedAt: "2026-06-17T00:00:00.000Z"
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "new-project",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/new-project",
+        title: "未命名画布",
+        loadedAt: "2026-06-17T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "新建公司画布" }));
+
+    await waitFor(() => expect(companyApiFacade.createCompanyCanvas).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(companyApiFacade.loadCanvasResources).toHaveBeenCalledWith("http://qijing.kjjhz.cn/canvas/new-project"));
+    expect(screen.getByDisplayValue("http://qijing.kjjhz.cn/canvas/new-project")).toBeInTheDocument();
+    expect(screen.getByText("已加载 0 个资源")).toBeInTheDocument();
+  });
+
+  it("logs out and clears loaded company canvas state", async () => {
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "人物-接口图片",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.logout).mockResolvedValue({
+      status: "unauthenticated",
+      message: "已退出登录"
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("人物-接口图片");
+    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
+
+    await waitFor(() => expect(companyApiFacade.logout).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("人物-接口图片")).not.toBeInTheDocument();
+    expect(screen.getByText("小区楼道")).toBeInTheDocument();
+    expect(screen.getAllByText("已退出登录").length).toBeGreaterThan(0);
+  });
+
   it("builds a local generation payload preview without submitting the company API", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
@@ -787,6 +915,133 @@ describe("App shell", () => {
     );
   });
 
+  it("clears the prompt and selected references after submitting a real generation", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "人物-小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.generateVideo).mockResolvedValue({
+      taskId: "task-1",
+      videoUrl: "https://example.com/generated.mp4"
+    });
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-video-node",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("人物-小区楼道");
+    fireEvent.click(screen.getByRole("button", { name: "加入提示词 人物-小区楼道" }));
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "镜头缓慢推进" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+
+    await waitFor(() => expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue(""));
+    expect(referenceChips()).toHaveLength(0);
+  });
+
+  it("creates a subtitle-removal placeholder and replaces it with the returned video", async () => {
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "video-1",
+          name: "生成视频 1",
+          kind: "video",
+          category: "video",
+          url: "https://example.com/video.mp4",
+          providerVideoUrl: "https://provider.example.com/video.mp4"
+        }
+      ]
+    });
+    let resolveRemoval: (value: Awaited<ReturnType<typeof companyApiFacade.removeSubtitles>>) => void = () => undefined;
+    vi.mocked(companyApiFacade.removeSubtitles).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRemoval = resolve;
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("生成视频 1");
+    fireEvent.click(screen.getByRole("button", { name: "去除字幕 生成视频 1" }));
+
+    expect(await screen.findByText("去字幕-生成视频 1")).toBeInTheDocument();
+    expect(screen.getByText("去字幕中")).toBeInTheDocument();
+    expect(companyApiFacade.removeSubtitles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        sourceAsset: expect.objectContaining({
+          id: "video-1",
+          providerVideoUrl: "https://provider.example.com/video.mp4"
+        }),
+        placeholderAsset: expect.objectContaining({
+          name: "去字幕-生成视频 1",
+          status: "generating",
+          statusLabel: "去字幕中"
+        })
+      })
+    );
+    const placeholder = vi.mocked(companyApiFacade.removeSubtitles).mock.calls[0][0].placeholderAsset;
+    resolveRemoval({
+      ok: true,
+      asset: {
+        id: placeholder.id,
+        name: placeholder.name,
+        kind: "video",
+        category: "video",
+        url: "https://example.com/no-subtitles.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      result: {
+        taskId: "subtitle-task-1",
+        videoUrl: "https://example.com/no-subtitles.mp4",
+        route: "ark"
+      }
+    });
+
+    await waitFor(() => {
+      const video = screen.getByText("去字幕-生成视频 1").closest("article")?.querySelector("video") as HTMLVideoElement;
+      expect(video).toHaveAttribute("src", "https://example.com/no-subtitles.mp4");
+    });
+    expect(screen.queryByText("去字幕中")).not.toBeInTheDocument();
+  });
+
   it("shows the real generation failure reason on the failed video card", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
@@ -867,11 +1122,7 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
 
     expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
-
-    fireEvent.click(referenceChips()[0]);
-    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
-      target: { value: "" }
-    });
+    expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("");
     expect(referenceChips()).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "复用生成 生成视频 1" }));
@@ -1178,10 +1429,169 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "设为场景图片 小区楼道" }));
 
     const sceneSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
-    expect(sceneSection).toHaveTextContent("小区楼道");
-    expect(screen.getByRole("button", { name: "设为人物图片 小区楼道" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "设为道具图片 小区楼道" })).toBeInTheDocument();
+    expect(sceneSection).toHaveTextContent("场景-小区楼道");
+    expect(screen.getByRole("button", { name: "设为人物图片 场景-小区楼道" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "设为道具图片 场景-小区楼道" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "设为场景图片 开场参考视频" })).not.toBeInTheDocument();
+  });
+
+  it("navigates preview assets in the configured category order", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "放大预览 小区楼道" }));
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "小区楼道 预览");
+    expect(screen.getByRole("button", { name: "查看下一个节点" })).not.toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看下一个节点" }));
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "高铁站 预览");
+
+    fireEvent.click(screen.getByRole("button", { name: "查看下一个节点" }));
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "男主秦扬人脸参考 预览");
+  });
+
+  it("disables preview navigation at the edges", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "放大预览 开场参考视频" }));
+    expect(screen.getByRole("button", { name: "查看下一个节点" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "查看上一个节点" })).not.toBeDisabled();
+  });
+
+  it("renames category prefixes through the company snapshot when converting real image assets", async () => {
+    const originalSnapshot = {
+      snapshot: {
+        nodes: [
+          {
+            id: "node-image",
+            type: "image",
+            data: {
+              id: "node-image",
+              assetId: "node-image",
+              name: "人物-苏晚晴",
+              imageUrl: "https://example.com/image.png"
+            }
+          }
+        ]
+      }
+    };
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: originalSnapshot,
+      assets: [
+        {
+          id: "node-image",
+          name: "人物-苏晚晴",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.renameCanvasAsset).mockResolvedValue({
+      ok: true,
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "node-image",
+              type: "image",
+              data: {
+                name: "道具-苏晚晴",
+                imageUrl: "https://example.com/image.png"
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("人物-苏晚晴");
+    fireEvent.click(screen.getByRole("button", { name: "设为道具图片 人物-苏晚晴" }));
+
+    expect(await screen.findByText("道具-苏晚晴")).toBeInTheDocument();
+    expect(companyApiFacade.renameCanvasAsset).toHaveBeenCalledWith({
+      projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      snapshot: originalSnapshot,
+      assetId: "node-image",
+      name: "道具-苏晚晴"
+    });
+  });
+
+  it("renames category prefixes through the company snapshot when dragging real image assets between sections", async () => {
+    const originalSnapshot = {
+      snapshot: {
+        nodes: [
+          {
+            id: "node-image",
+            type: "image",
+            data: {
+              id: "node-image",
+              assetId: "node-image",
+              name: "人物-苏晚晴",
+              imageUrl: "https://example.com/image.png"
+            }
+          }
+        ]
+      }
+    };
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: originalSnapshot,
+      assets: [
+        {
+          id: "node-image",
+          name: "人物-苏晚晴",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    vi.mocked(companyApiFacade.renameCanvasAsset).mockResolvedValue({
+      ok: true,
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "node-image",
+              type: "image",
+              data: {
+                name: "场景-苏晚晴",
+                imageUrl: "https://example.com/image.png"
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("人物-苏晚晴");
+    fireEvent.dragStart(screen.getByText("人物-苏晚晴").closest("article") as HTMLElement);
+    fireEvent.drop(screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement);
+
+    expect(await screen.findByText("场景-苏晚晴")).toBeInTheDocument();
+    expect(companyApiFacade.renameCanvasAsset).toHaveBeenCalledWith({
+      projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+      snapshot: originalSnapshot,
+      assetId: "node-image",
+      name: "场景-苏晚晴"
+    });
   });
 
   it("plays only one media asset globally and resets ended media to the beginning", async () => {

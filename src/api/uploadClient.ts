@@ -88,7 +88,12 @@ export function addAssetNodeToSnapshot(snapshot: unknown, asset: CanvasAsset) {
   const cloned = structuredClone(snapshot);
   const snapshotBody = getSnapshotBody(cloned);
   const nodes = Array.isArray(snapshotBody.nodes) ? [...snapshotBody.nodes] : [];
-  snapshotBody.nodes = [...nodes, createAssetNode(asset)];
+  const nextNode = createAssetNode(asset);
+  const existingIndex = nodes.findIndex((node) => matchesAssetNode(node, asset.id));
+  snapshotBody.nodes =
+    existingIndex >= 0
+      ? nodes.map((node, index) => (index === existingIndex ? nextNode : node))
+      : [...nodes, nextNode];
   return cloned;
 }
 
@@ -174,6 +179,14 @@ function createNodeId(kind: AssetKind) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function matchesAssetNode(value: unknown, assetId: string) {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return value.id === assetId || value.assetId === assetId || (isRecord(value.data) && (value.data.id === assetId || value.data.assetId === assetId));
 }
 
 function baseNode(asset: CanvasAsset, fields: Record<string, unknown>): CompanyNode {

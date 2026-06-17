@@ -18,6 +18,7 @@ import {
 import { downloadAsset, downloadAssets } from "./lib/downloadAsset";
 import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
 import { getCategoryForAssetName } from "./lib/assetCategory";
+import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
 import type {
@@ -118,6 +119,14 @@ function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): As
   }
 
   return category;
+}
+
+function getPrefixedAssetNameForCategory(name: string, kind: AssetKind, category: AssetCategory) {
+  if ((kind === "image" && imageCategories.includes(category)) || kind === "audio") {
+    return replaceAssetCategoryPrefix(name, category);
+  }
+
+  return name;
 }
 
 function revokeObjectUrl(url: string | undefined) {
@@ -280,6 +289,15 @@ export function App() {
     );
   }, [assets, defaultAssetOrder, sortModes]);
 
+  const previewAssets = useMemo(
+    () =>
+      sectionDefinitions.flatMap((section) =>
+        assetsByCategory[section.id].filter((asset) => asset.status !== "generating" && asset.status !== "failed")
+      ),
+    [assetsByCategory]
+  );
+  const previewIndex = previewAsset ? previewAssets.findIndex((asset) => asset.id === previewAsset.id) : -1;
+
   function toggleSection(category: AssetCategory) {
     setExpandedSections((current) =>
       current.includes(category) ? current.filter((item) => item !== category) : [...current, category]
@@ -357,6 +375,55 @@ export function App() {
     setCanvasNotice(undefined);
   }
 
+  async function createCompanyCanvasSession() {
+    setCanvasLoading(true);
+    setCanvasError(undefined);
+    setCanvasNotice(undefined);
+
+    try {
+      const nextProject = await companyApiFacade.createCompanyCanvas();
+      setCanvasUrl(nextProject.canvasUrl);
+      setCanvasName(nextProject.title ?? "未命名画布");
+      setProject(nextProject);
+      setCanvasSnapshot(null);
+      setAssets([]);
+      setDefaultAssetOrder(createAssetOrder([]));
+      setCanvasHistory((current) =>
+        upsertCanvasHistoryEntry(current, {
+          url: nextProject.canvasUrl,
+          project: nextProject,
+          name: nextProject.title ?? "未命名画布",
+          layout: createCanvasAssetLayout([])
+        })
+      );
+      setCanvasNotice("已新建公司画布");
+      await loadCanvasFromUrl(nextProject.canvasUrl);
+    } catch (error) {
+      try {
+        const result = await companyApiFacade.inspectCanvas("http://qijing.kjjhz.cn/projects");
+        setCanvasNotice(`已打开公司新建流程并捕获 ${result.summaries?.length ?? 0} 个请求，请在内置浏览器完成新建后复制画布地址`);
+      } catch {
+        setCanvasError(error instanceof Error ? error.message : "新建公司画布失败");
+      }
+    } finally {
+      setCanvasLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    setAuthState({ status: "checking" });
+    const nextState = await companyApiFacade.logout();
+    setAuthState(nextState);
+    setProject(null);
+    setCanvasSnapshot(null);
+    setAssets(sampleAssets);
+    setDefaultAssetOrder(createAssetOrder(sampleAssets));
+    setPrompt("");
+    setReferences([]);
+    setReferenceIssues([]);
+    setCanvasNotice("已退出登录");
+  }
+
   function insertAsset(asset: CanvasAsset) {
     const reference = createReferenceFromAsset(asset);
 
@@ -409,9 +476,85 @@ export function App() {
       sizeBytes: 0,
       createdAt: new Date().toISOString(),
       status: "generating" as const,
+      statusLabel: "生成中",
       generationPrompt: prompt,
       generationReferences: references.map(cloneReferenceForReuse)
     };
+  }
+
+  function createSubtitlePlaceholder(asset: CanvasAsset): CanvasAsset {
+    return {
+      id: createId("subtitle-video"),
+      name: `去字幕-${asset.name}`,
+      kind: "video",
+      category: "video",
+      url: "",
+      thumbnailUrl: asset.thumbnailUrl,
+      durationSeconds: asset.durationSeconds,
+      sizeBytes: 0,
+      createdAt: new Date().toISOString(),
+      status: "generating",
+      statusLabel: "去字幕中",
+      generationPrompt: asset.generationPrompt,
+      generationReferences: asset.generationReferences
+    };
+  }
+
+  async function handleRemoveSubtitles(asset: CanvasAsset) {
+    if (asset.kind !== "video") {
+      return;
+    }
+
+    if (!project || !canvasSnapshot) {
+      setGenerateStatus(`请先加载公司画布后再去字幕：${asset.name}`);
+      return;
+    }
+
+    const placeholder = createSubtitlePlaceholder(asset);
+    const assetsWithPlaceholder = [...assets, placeholder];
+    setAssets(assetsWithPlaceholder);
+    setDefaultAssetOrder((current) => ({
+      ...current,
+      video: [...current.video, placeholder.id]
+    }));
+    persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
+    setGenerateStatus(`去字幕中：${placeholder.name}`);
+
+    try {
+      const result = await companyApiFacade.removeSubtitles({
+        projectId: project.projectId,
+        sourceAsset: asset,
+        placeholderAsset: placeholder
+      });
+
+      if (!mounted.current) {
+        return;
+      }
+
+      const completedAssets = assetsWithPlaceholder.map((item) => (item.id === placeholder.id ? result.asset : item));
+      setCanvasSnapshot(result.snapshot);
+      setAssets(completedAssets);
+      persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
+      setGenerateStatus(`已完成去字幕：${placeholder.name}`);
+    } catch (error) {
+      if (!mounted.current) {
+        return;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : "去字幕失败";
+      setAssets((current) =>
+        current.map((item) =>
+          item.id === placeholder.id
+            ? {
+                ...item,
+                status: "failed" as const,
+                errorMessage
+              }
+            : item
+        )
+      );
+      setGenerateStatus(errorMessage);
+    }
   }
 
   function handleAssetAction(asset: CanvasAsset, action: AssetAction) {
@@ -431,7 +574,7 @@ export function App() {
     }
 
     if (action === "remove-subtitles") {
-      setGenerateStatus(`已为「${asset.name}」创建去字幕请求预览，未提交公司接口`);
+      void handleRemoveSubtitles(asset);
       return;
     }
 
@@ -612,18 +755,22 @@ export function App() {
   }
 
   async function handleLoadCanvas() {
+    await loadCanvasFromUrl(canvasUrl);
+  }
+
+  async function loadCanvasFromUrl(targetCanvasUrl: string) {
     setCanvasLoading(true);
     setCanvasError(undefined);
     setCanvasNotice(undefined);
 
     try {
-      if (isSharedCanvasUrl(canvasUrl)) {
-        await handleOpenLogin(canvasUrl);
+      if (isSharedCanvasUrl(targetCanvasUrl)) {
+        await handleOpenLogin(targetCanvasUrl);
         setCanvasNotice("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载");
         return;
       }
 
-      const result = await companyApiFacade.loadCanvasResources(canvasUrl);
+      const result = await companyApiFacade.loadCanvasResources(targetCanvasUrl);
       const historyEntry = canvasHistory.find((entry) => entry.url === result.project.canvasUrl || entry.projectId === result.project.projectId);
       const nextAssets = applyCanvasAssetLayout(result.assets, historyEntry?.layout);
       const nextCanvasName = historyEntry?.name ?? result.project.title ?? "未命名画布";
@@ -669,19 +816,9 @@ export function App() {
       return;
     }
 
-    setAssets((current) => {
-      const nextAssets = current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category } : asset));
-      setDefaultAssetOrder(createAssetOrder(nextAssets));
-      setCanvasHistory((history) =>
-        updateCanvasHistoryLayout(history, {
-          url: getCanvasUrlFromProject(project) || canvasUrl,
-          project,
-          assets: nextAssets,
-          fallbackName: canvasName
-        })
-      );
-      return nextAssets;
-    });
+    if (draggedAsset.category !== category) {
+      void changeAssetCategory(draggedAsset.id, category);
+    }
     setDraggedAsset(null);
   }
 
@@ -708,19 +845,25 @@ export function App() {
     }
   }
 
-  function changeAssetCategory(assetId: string, category: AssetCategory) {
-    setAssets((current) => {
-      const nextAssets = current.map((asset) => (asset.id === assetId && asset.kind === "image" ? { ...asset, category } : asset));
-      setCanvasHistory((history) =>
-        updateCanvasHistoryLayout(history, {
-          url: getCanvasUrlFromProject(project) || canvasUrl,
-          project,
-          assets: nextAssets,
-          fallbackName: canvasName
-        })
-      );
-      return nextAssets;
-    });
+  async function changeAssetCategory(assetId: string, category: AssetCategory) {
+    const targetAsset = assets.find((asset) => asset.id === assetId);
+    if (!targetAsset || targetAsset.kind !== "image") {
+      return;
+    }
+
+    const nextName = replaceAssetCategoryPrefix(targetAsset.name, category);
+    const nextAsset = { ...targetAsset, name: nextName, category };
+    const nextAssets = assets.map((asset) => (asset.id === assetId ? nextAsset : asset));
+    setAssets(nextAssets);
+    setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name: nextName } : item)));
+    setCanvasHistory((history) =>
+      updateCanvasHistoryLayout(history, {
+        url: getCanvasUrlFromProject(project) || canvasUrl,
+        project,
+        assets: nextAssets,
+        fallbackName: canvasName
+      })
+    );
     setDefaultAssetOrder((current) => {
       const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
         (order, section) => {
@@ -733,6 +876,23 @@ export function App() {
       nextOrder[category] = [...nextOrder[category], assetId];
       return nextOrder;
     });
+
+    if (!project || !canvasSnapshot) {
+      return;
+    }
+
+    try {
+      const result = await companyApiFacade.renameCanvasAsset({
+        projectId: project.projectId,
+        snapshot: canvasSnapshot,
+        assetId,
+        name: nextName
+      });
+      setCanvasSnapshot(result.snapshot);
+      setCanvasNotice(`已同步分类：${nextName}`);
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "分类同步失败");
+    }
   }
 
   function changeSortMode(category: AssetCategory, mode: SortMode) {
@@ -745,19 +905,7 @@ export function App() {
     }
 
     if (draggedAsset.kind === "image" && draggedAsset.category !== targetAsset.category && imageCategories.includes(targetAsset.category)) {
-      setAssets((current) => {
-        const nextAssets = current.map((asset) => (asset.id === draggedAsset.id ? { ...asset, category: targetAsset.category } : asset));
-        setDefaultAssetOrder(createAssetOrder(nextAssets));
-        setCanvasHistory((history) =>
-          updateCanvasHistoryLayout(history, {
-            url: getCanvasUrlFromProject(project) || canvasUrl,
-            project,
-            assets: nextAssets,
-            fallbackName: canvasName
-          })
-        );
-        return nextAssets;
-      });
+      void changeAssetCategory(draggedAsset.id, targetAsset.category);
       setDraggedAsset(null);
       return;
     }
@@ -812,13 +960,15 @@ export function App() {
 
         for (const input of uploadInputs) {
           const assetCategory = input.kind === "image" ? getCategoryForAssetName(input.kind, input.name, category) : category;
+          const uploadCategory = getAssetCategoryForUpload(assetCategory, input.kind);
+          const uploadName = getPrefixedAssetNameForCategory(input.name, input.kind, uploadCategory);
           const result = await companyApiFacade.uploadCanvasAsset({
             projectId: project.projectId,
             snapshot: nextSnapshot,
             file: input.file,
-            name: input.name,
+            name: uploadName,
             kind: input.kind,
-            category: getAssetCategoryForUpload(assetCategory, input.kind)
+            category: uploadCategory
           });
 
           nextSnapshot = result.snapshot;
@@ -848,14 +998,15 @@ export function App() {
 
     const createdAssets: CanvasAsset[] = uploadInputs.map(({ file, kind, name }) => {
       const assetCategory = kind === "image" ? getCategoryForAssetName(kind, name) : category;
+      const uploadCategory = getAssetCategoryForUpload(assetCategory, kind);
       const url = URL.createObjectURL(file);
       assetObjectUrls.current.add(url);
 
       return {
         id: createId("local-asset"),
-        name,
+        name: getPrefixedAssetNameForCategory(name, kind, uploadCategory),
         kind,
-        category: getAssetCategoryForUpload(assetCategory, kind),
+        category: uploadCategory,
         url,
         sizeBytes: file.size,
         createdAt: new Date().toISOString(),
@@ -966,6 +1117,8 @@ export function App() {
       return;
     }
 
+    const submittedReferences = references;
+    const savedReferences = references.map(cloneReferenceForReuse);
     const generatedAsset: CanvasAsset = project
       ? createGeneratedVideoPlaceholder()
       : {
@@ -983,6 +1136,9 @@ export function App() {
       ...current,
       video: [...current.video, generatedAsset.id]
     }));
+    setPrompt("");
+    setReferences([]);
+    setReferenceIssues([]);
 
     if (project) {
       setGenerateStatus(`正在生成真实视频：${generatedAsset.name}`);
@@ -991,7 +1147,7 @@ export function App() {
         const result = await companyApiFacade.generateVideo({
           projectId: project.projectId,
           prompt: promptText,
-          references,
+          references: submittedReferences,
           settings: generationSettings
         });
 
@@ -1010,7 +1166,7 @@ export function App() {
           providerVideoUrl: result.providerVideoUrl,
           durationSeconds: generatedAsset.durationSeconds,
           generationPrompt: promptText,
-          generationReferences: references.map(cloneReferenceForReuse)
+          generationReferences: savedReferences
         });
 
         const completedAsset = {
@@ -1069,6 +1225,7 @@ export function App() {
         onToggleSelectionMode={toggleSelectionMode}
         onCancelSelectionMode={cancelSelectionMode}
         onDownloadSelected={handleDownloadSelected}
+        onLogout={handleLogout}
       />
 
       <CanvasControls
@@ -1085,6 +1242,7 @@ export function App() {
         onSelectCanvasHistory={selectCanvasHistory}
         onDeleteCanvasHistory={deleteCanvasHistory}
         onNewCanvas={createNewCanvasSession}
+        onCreateCompanyCanvas={createCompanyCanvasSession}
         onOpenLogin={handleOpenLogin}
         onCheckAuth={handleCheckAuth}
         onLoadCanvas={handleLoadCanvas}
@@ -1131,7 +1289,22 @@ export function App() {
         onGenerationSettingsChange={setGenerationSettings}
       />
 
-      <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
+      <PreviewModal
+        asset={previewAsset}
+        onClose={() => setPreviewAsset(null)}
+        hasPrevious={previewIndex > 0}
+        hasNext={previewIndex >= 0 && previewIndex < previewAssets.length - 1}
+        onPrevious={() => {
+          if (previewIndex > 0) {
+            setPreviewAsset(previewAssets[previewIndex - 1]);
+          }
+        }}
+        onNext={() => {
+          if (previewIndex >= 0 && previewIndex < previewAssets.length - 1) {
+            setPreviewAsset(previewAssets[previewIndex + 1]);
+          }
+        }}
+      />
     </main>
   );
 }

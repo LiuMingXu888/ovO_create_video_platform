@@ -516,8 +516,11 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   await inspectView.webContents.loadURL(initialUrl);
   await waitForNetworkCapture();
 
-  const fallbackSnapshotUrl = `${COMPANY_ORIGIN}/api/projects/${encodeURIComponent(projectIdFromCanvasUrl(canvasUrl))}/snapshot`;
-  if (!captures.some((capture) => new URL(capture.url).pathname.endsWith("/snapshot"))) {
+  const fallbackProjectId = projectIdFromCanvasUrl(canvasUrl);
+  const fallbackSnapshotUrl = fallbackProjectId
+    ? `${COMPANY_ORIGIN}/api/projects/${encodeURIComponent(fallbackProjectId)}/snapshot`
+    : undefined;
+  if (fallbackSnapshotUrl && !captures.some((capture) => new URL(capture.url).pathname.endsWith("/snapshot"))) {
     captures.push({
       method: "GET",
       url: fallbackSnapshotUrl,
@@ -543,14 +546,14 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
 }
 
 function projectIdFromCanvasUrl(canvasUrl: string) {
-  const url = new URL(canvasUrl);
-  const parts = url.pathname.split("/").filter(Boolean);
-  const canvasIndex = parts.indexOf("canvas");
-  const projectId = canvasIndex >= 0 ? parts[canvasIndex + 1] : undefined;
-  if (!projectId) {
-    throw new Error("画布地址无效");
+  try {
+    const url = new URL(canvasUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const canvasIndex = parts.indexOf("canvas");
+    return canvasIndex >= 0 ? parts[canvasIndex + 1] : undefined;
+  } catch {
+    return undefined;
   }
-  return projectId;
 }
 
 function isCompanyApiUrl(value: string) {

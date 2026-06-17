@@ -16,6 +16,7 @@ interface CanvasControlsProps {
   onSelectCanvasHistory: (entry: CanvasHistoryEntry) => void;
   onDeleteCanvasHistory: (entry: CanvasHistoryEntry) => void;
   onNewCanvas: () => void;
+  onCreateCompanyCanvas: () => void;
   onOpenLogin: (canvasUrl?: string) => void;
   onCheckAuth: () => void;
   onLoadCanvas: () => void;
@@ -36,6 +37,7 @@ export function CanvasControls({
   onSelectCanvasHistory,
   onDeleteCanvasHistory,
   onNewCanvas,
+  onCreateCompanyCanvas,
   onOpenLogin,
   onCheckAuth,
   onLoadCanvas,
@@ -56,6 +58,10 @@ export function CanvasControls({
         <button type="button" className="canvas-history-new" onClick={onNewCanvas} disabled={loading}>
           <Plus size={15} />
           <span>新增画布</span>
+        </button>
+        <button type="button" className="canvas-history-new" onClick={onCreateCompanyCanvas} disabled={loading}>
+          <Plus size={15} />
+          <span>新建公司画布</span>
         </button>
         {canvasHistory.map((entry) => (
           <div key={`${entry.projectId ?? entry.url}-${entry.createdAt}`} className="canvas-history-item-row">

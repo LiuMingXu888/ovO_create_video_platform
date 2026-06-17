@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { mockSnapshotResponse } from "../api/mockFixtures";
 import type { ApiTransport } from "../api/transport";
-import { loadCanvasResources, saveCanvasAsset } from "./canvasLoader";
+import { loadCanvasResources, removeCanvasAssetSubtitles, saveCanvasAsset } from "./canvasLoader";
 
 describe("loadCanvasResources", () => {
   it("loads and normalizes resources for a valid canvas URL", async () => {
@@ -18,11 +18,54 @@ describe("loadCanvasResources", () => {
         title: "测试项目"
       },
       assets: [
-        { name: "男主秦扬人脸参考", category: "characters" },
-        { name: "紧张背景音乐", category: "audio" },
+        { name: "人物-男主秦扬人脸参考", category: "characters" },
+        { name: "音频-紧张背景音乐", category: "audio" },
         { name: "开场参考视频", category: "video" }
       ]
     });
+  });
+
+  it("syncs missing default prefixes back to the loaded snapshot", async () => {
+    const requests: Array<{ path: string; options?: unknown }> = [];
+    const transport: ApiTransport = {
+      request: vi.fn(async (path, options) => {
+        requests.push({ path, options });
+        return {
+          snapshot: {
+            nodes: [
+              {
+                id: "image-1",
+                type: "image",
+                data: {
+                  id: "image-1",
+                  assetId: "image-1",
+                  name: "苏晚晴",
+                  imageUrl: "https://example.com/su.png"
+                }
+              },
+              {
+                id: "audio-1",
+                type: "audio",
+                data: {
+                  id: "audio-1",
+                  assetId: "audio-1",
+                  name: "旁白",
+                  audioUrl: "https://example.com/voice.mp3"
+                }
+              }
+            ]
+          }
+        } as never;
+      })
+    };
+
+    const result = await loadCanvasResources(transport, "http://qijing.kjjhz.cn/canvas/project-1");
+
+    expect(result.assets).toEqual([
+      expect.objectContaining({ id: "image-1", name: "人物-苏晚晴", category: "characters" }),
+      expect.objectContaining({ id: "audio-1", name: "音频-旁白", category: "audio" })
+    ]);
+    expect(requests.filter((request) => isPutRequest(request.options))).toHaveLength(2);
   });
 
   it("returns a readable error for invalid canvas URLs", async () => {
@@ -109,4 +152,112 @@ describe("loadCanvasResources", () => {
     expect(requests[1]).toMatchObject({ path: "/api/projects/project-1/snapshot", options: { method: "PUT" } });
     expect(requests[2]).toEqual({ path: "/api/projects/project-1/snapshot", options: undefined });
   });
+
+  it("saves a subtitle-removal placeholder before polling and then updates the same node", async () => {
+    const requests: Array<{ path: string; options?: unknown }> = [];
+    let savedSnapshot: unknown = { snapshot: { nodes: [] } };
+    const transport: ApiTransport = {
+      request: async (path: string, options?: { method?: string; body?: unknown }) => {
+        requests.push({ path, options });
+
+        if (path === "/api/subtitle-remove/ark") {
+          return { taskId: "subtitle-task-1" } as never;
+        }
+
+        if (path === "/api/subtitle-remove/ark/subtitle-task-1") {
+          return {
+            status: "succeeded",
+            videoUrl: "https://example.com/no-subtitles.mp4",
+            providerVideoUrl: "https://provider.example.com/no-subtitles.mp4"
+          } as never;
+        }
+
+        if (options?.method === "PUT") {
+          savedSnapshot = options.body;
+          return { ok: true } as never;
+        }
+
+        return savedSnapshot as never;
+      }
+    };
+
+    await expect(
+      removeCanvasAssetSubtitles(transport, {
+        projectId: "project-1",
+        sourceAsset: {
+          id: "video-1",
+          name: "生成视频 1",
+          kind: "video",
+          category: "video",
+          url: "https://example.com/video.mp4",
+          providerVideoUrl: "https://provider.example.com/video.mp4"
+        },
+        placeholderAsset: {
+          id: "subtitle-video-1",
+          name: "去字幕-生成视频 1",
+          kind: "video",
+          category: "video",
+          url: "",
+          status: "generating",
+          statusLabel: "去字幕中"
+        }
+      })
+    ).resolves.toMatchObject({
+      asset: {
+        id: "subtitle-video-1",
+        url: "https://example.com/no-subtitles.mp4",
+        providerVideoUrl: "https://provider.example.com/no-subtitles.mp4",
+        status: "ready"
+      }
+    });
+    expect(requests.map((request) => request.path)).toEqual([
+      "/api/projects/project-1/snapshot",
+      "/api/projects/project-1/snapshot",
+      "/api/projects/project-1/snapshot",
+      "/api/subtitle-remove/ark",
+      "/api/subtitle-remove/ark/subtitle-task-1",
+      "/api/projects/project-1/snapshot",
+      "/api/projects/project-1/snapshot",
+      "/api/projects/project-1/snapshot"
+    ]);
+    const putRequests = requests.filter((request) => isPutRequest(request.options));
+    expect(putRequests[0]).toMatchObject({
+      options: {
+        body: {
+          snapshot: {
+            nodes: [
+              {
+                id: "subtitle-video-1",
+                data: {
+                  status: "generating",
+                  videoUrl: ""
+                }
+              }
+            ]
+          }
+        }
+      }
+    });
+    expect(putRequests[1]).toMatchObject({
+      options: {
+        body: {
+          snapshot: {
+            nodes: [
+              {
+                id: "subtitle-video-1",
+                data: {
+                  status: "ready",
+                  videoUrl: "https://example.com/no-subtitles.mp4"
+                }
+              }
+            ]
+          }
+        }
+      }
+    });
+  });
 });
+
+function isPutRequest(options: unknown): options is { method: "PUT"; body?: unknown } {
+  return typeof options === "object" && options !== null && "method" in options && options.method === "PUT";
+}

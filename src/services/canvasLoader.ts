@@ -7,7 +7,9 @@ import {
 } from "../api/canvasClient";
 import { addAssetNodeToSnapshot } from "../api/uploadClient";
 import type { ApiTransport } from "../api/transport";
+import { removeSubtitles, type SubtitleRemovalResult } from "../api/subtitleClient";
 import { normalizeSnapshotAssets } from "../lib/assetNormalizer";
+import { ensureDefaultAssetPrefix } from "../lib/assetNamePrefix";
 import { parseCanvasUrl } from "../lib/canvasUrl";
 import type { AssetCategory, AssetKind, CanvasAsset, CanvasProject } from "../types";
 
@@ -25,6 +27,7 @@ export async function loadCanvasResources(transport: ApiTransport, canvasUrl: st
 
   const snapshot = await loadProjectSnapshot(transport, parsed.projectId);
   const title = getSnapshotTitle(snapshot);
+  const normalized = await normalizeAndSyncAssetPrefixes(transport, parsed.projectId, snapshot);
 
   return {
     project: {
@@ -33,9 +36,34 @@ export async function loadCanvasResources(transport: ApiTransport, canvasUrl: st
       title,
       loadedAt: new Date().toISOString()
     },
-    assets: normalizeSnapshotAssets(snapshot),
-    snapshot
+    assets: normalized.assets,
+    snapshot: normalized.snapshot
   };
+}
+
+export function normalizeLoadedAssetsWithPrefixes(assets: CanvasAsset[]) {
+  return assets.map((asset) => ensureDefaultAssetPrefix(asset));
+}
+
+async function normalizeAndSyncAssetPrefixes(transport: ApiTransport, projectId: string, snapshot: unknown) {
+  const rawAssets = normalizeSnapshotAssets(snapshot);
+  let nextSnapshot = snapshot;
+  const assets: CanvasAsset[] = [];
+
+  for (const rawAsset of rawAssets) {
+    const normalized = ensureDefaultAssetPrefix(rawAsset);
+    assets.push(stripRenameMarker(normalized));
+
+    if (normalized.renamed) {
+      const renamed = renameAssetInSnapshot(nextSnapshot, rawAsset.id, normalized.name);
+      if (renamed.updated) {
+        await saveProjectSnapshot(transport, projectId, renamed.snapshot);
+        nextSnapshot = renamed.snapshot;
+      }
+    }
+  }
+
+  return { assets, snapshot: nextSnapshot };
 }
 
 export async function renameCanvasAsset(
@@ -114,6 +142,34 @@ export async function saveCanvasAsset(
   };
 }
 
+export async function removeCanvasAssetSubtitles(
+  transport: ApiTransport,
+  input: {
+    projectId: string;
+    sourceAsset: CanvasAsset;
+    placeholderAsset: CanvasAsset;
+    generationPrompt?: string;
+    generationReferences?: CanvasAsset["generationReferences"];
+  }
+) {
+  const latestSnapshot = await loadProjectSnapshot(transport, input.projectId);
+  const placeholderSnapshot = addAssetNodeToSnapshot(latestSnapshot, input.placeholderAsset);
+  await saveProjectSnapshotAndVerify(transport, input.projectId, placeholderSnapshot, input.placeholderAsset.id);
+
+  const result = await removeSubtitles(transport, input.sourceAsset, { intervalMs: 1500, maxAttempts: 1400 });
+  const completedAsset = createSubtitleRemovedAsset(input.placeholderAsset, result);
+  const completionLatestSnapshot = await loadProjectSnapshot(transport, input.projectId);
+  const completedSnapshot = addAssetNodeToSnapshot(completionLatestSnapshot, completedAsset);
+  const verifiedSnapshot = await saveProjectSnapshotAndVerify(transport, input.projectId, completedSnapshot, completedAsset.id);
+
+  return {
+    ok: true,
+    asset: completedAsset,
+    snapshot: verifiedSnapshot,
+    result
+  };
+}
+
 function getSnapshotTitle(snapshot: unknown) {
   if (typeof snapshot === "object" && snapshot !== null && "title" in snapshot && typeof snapshot.title === "string") {
     return snapshot.title;
@@ -129,4 +185,18 @@ function createNodeId(kind: AssetKind) {
       : Math.random().toString(36).slice(2);
 
   return `saved-${kind}-${randomPart}`;
+}
+
+function createSubtitleRemovedAsset(placeholderAsset: CanvasAsset, result: SubtitleRemovalResult): CanvasAsset {
+  return {
+    ...placeholderAsset,
+    url: result.videoUrl,
+    providerVideoUrl: result.providerVideoUrl,
+    status: "ready"
+  };
+}
+
+function stripRenameMarker(asset: CanvasAsset & { renamed?: boolean }): CanvasAsset {
+  const { renamed: _renamed, ...cleanAsset } = asset;
+  return cleanAsset;
 }

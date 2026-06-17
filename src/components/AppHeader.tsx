@@ -1,4 +1,4 @@
-import { Coins, Download, MousePointer2, UserRound, X } from "lucide-react";
+import { Coins, Download, LogOut, MousePointer2, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
 
 interface AppHeaderProps {
@@ -9,6 +9,7 @@ interface AppHeaderProps {
   onToggleSelectionMode?: () => void;
   onDownloadSelected?: () => void;
   onCancelSelectionMode?: () => void;
+  onLogout?: () => void;
 }
 
 export function AppHeader({
@@ -18,7 +19,8 @@ export function AppHeader({
   selectedCount = 0,
   onToggleSelectionMode,
   onDownloadSelected,
-  onCancelSelectionMode
+  onCancelSelectionMode,
+  onLogout
 }: AppHeaderProps) {
   const accountLabel =
     authState.status === "authenticated"
@@ -74,6 +76,17 @@ export function AppHeader({
         <button type="button" className="account-button" title="账户">
           <UserRound size={18} />
           <span>{accountLabel}</span>
+        </button>
+        <button
+          type="button"
+          className="header-tool-button"
+          aria-label="退出登录"
+          title="退出登录"
+          onClick={onLogout}
+          disabled={authState.status === "checking"}
+        >
+          <LogOut size={16} />
+          <span>退出登录</span>
         </button>
       </div>
     </header>

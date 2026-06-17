@@ -1,11 +1,12 @@
 import { checkAuth } from "../api/authClient";
 import { DesktopApiTransport } from "../api/desktopTransport";
 import { generateVideo as generateVideoWithTransport } from "../api/generationClient";
+import { createCompanyCanvas as createCompanyCanvasWithTransport } from "../api/projectClient";
 import { FetchApiTransport } from "../api/transport";
 import { uploadCanvasAsset as uploadCanvasAssetWithTransport } from "../api/uploadClient";
 import { extractCreditBalance } from "../lib/credits";
-import { deleteCanvasAsset, loadCanvasResources, renameCanvasAsset, saveCanvasAsset } from "./canvasLoader";
-import type { AssetCategory, AssetKind, AuthState, AuthUser, GenerationSettings, ReferenceItem } from "../types";
+import { deleteCanvasAsset, loadCanvasResources, removeCanvasAssetSubtitles, renameCanvasAsset, saveCanvasAsset } from "./canvasLoader";
+import type { AssetCategory, AssetKind, AuthState, AuthUser, CanvasAsset, GenerationSettings, ReferenceItem } from "../types";
 
 const transport = new FetchApiTransport();
 const desktopTransport = new DesktopApiTransport();
@@ -71,12 +72,26 @@ export const companyApiFacade = {
     generationPrompt?: string;
     generationReferences?: ReferenceItem[];
   }) => saveCanvasAsset(window.ovoDesktop ? desktopTransport : transport, input),
+  removeSubtitles: (input: {
+    projectId: string;
+    sourceAsset: CanvasAsset;
+    placeholderAsset: CanvasAsset;
+  }) => removeCanvasAssetSubtitles(window.ovoDesktop ? desktopTransport : transport, input),
   generateVideo: (input: {
     projectId: string;
     prompt: string;
     references: ReferenceItem[];
     settings: GenerationSettings;
   }) => generateVideoWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
+  createCompanyCanvas: () => createCompanyCanvasWithTransport(window.ovoDesktop ? desktopTransport : transport),
+  logout: async () => {
+    if (!window.ovoDesktop) {
+      return { status: "unauthenticated", message: "已退出登录" } satisfies AuthState;
+    }
+
+    const result = await window.ovoDesktop.auth.clearSession();
+    return { status: "unauthenticated", message: result.message ?? "已退出登录" } satisfies AuthState;
+  },
   inspectCanvas: async (canvasUrl: string) => {
     if (!window.ovoDesktop) {
       throw new Error("请在 Electron 桌面端使用接口诊断");

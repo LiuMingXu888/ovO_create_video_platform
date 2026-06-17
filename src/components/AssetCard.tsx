@@ -138,8 +138,12 @@ export function AssetCard({
       )}
       <div className="asset-media">
         {asset.kind === "image" && <img src={asset.thumbnailUrl ?? asset.url} alt={asset.name} />}
-        {asset.kind === "video" && isGenerating && <div className="video-generating">生成中</div>}
-        {asset.kind === "video" && isFailed && <div className="video-generating video-failed">{asset.errorMessage ?? "生成失败"}</div>}
+        {asset.kind === "video" && isGenerating && (
+          <div className="video-generating">{asset.statusLabel ?? "生成中"}</div>
+        )}
+        {asset.kind === "video" && isFailed && (
+          <div className="video-generating video-failed">{asset.errorMessage ?? asset.statusLabel ?? "生成失败"}</div>
+        )}
         {asset.kind === "video" && !isGenerating && !isFailed && (
           <video
             ref={setMediaElement}

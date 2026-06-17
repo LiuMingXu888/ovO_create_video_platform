@@ -894,20 +894,35 @@ button {
 
 .preview-modal {
   position: relative;
-  width: min(1040px, calc(100vw - 64px));
-  max-height: calc(100vh - 64px);
-  overflow: auto;
+  display: grid;
+  width: min(70vw, calc(100vw - 32px));
+  height: min(90vh, calc(100vh - 32px));
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   border-radius: 8px;
   background: #ffffff;
   padding: 22px;
 }
 
-.preview-modal h2 {
+.preview-modal-header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
   padding-right: 42px;
-  margin: 0 0 16px;
+}
+
+.preview-modal h2 {
+  min-width: 0;
+  margin: 0;
   color: #202734;
   font-size: 20px;
   letter-spacing: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-close {
@@ -919,10 +934,29 @@ button {
   border-radius: 8px;
 }
 
+.preview-nav-button {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7d4cc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2c3442;
+  cursor: pointer;
+}
+
+.preview-nav-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
 .preview-frame {
   display: grid;
-  min-height: min(620px, calc(100vh - 190px));
+  min-height: 0;
   place-items: center;
+  overflow: hidden;
   border-radius: 8px;
   background: #f1f2ed;
 }
@@ -930,7 +964,8 @@ button {
 .preview-frame img,
 .preview-frame video {
   max-width: 100%;
-  max-height: calc(100vh - 210px);
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .preview-frame audio {

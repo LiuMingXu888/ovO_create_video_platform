@@ -11,6 +11,9 @@ describe("endpoints", () => {
     expect(endpoints.persistTask()).toBe("/api/asset/persist-task");
     expect(endpoints.subtitleRemove()).toBe("/api/subtitle-remove");
     expect(endpoints.subtitleRemoveTask("task-2")).toBe("/api/subtitle-remove/task-2");
+    expect(endpoints.subtitleRemoveArk()).toBe("/api/subtitle-remove/ark");
+    expect(endpoints.subtitleRemoveArkTask("task-2")).toBe("/api/subtitle-remove/ark/task-2");
+    expect(endpoints.projects()).toBe("/api/projects");
   });
 
   it("prefixes API paths with a base origin", () => {
