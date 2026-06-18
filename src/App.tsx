@@ -1146,7 +1146,7 @@ export function App() {
 
     if (project) {
       const startTime = Date.now();
-      const GENERATION_TIMEOUT_MS = 15 * 60 * 1000; // 15分钟超时
+      const GENERATION_TIMEOUT_MS = 40 * 60 * 1000; // 40分钟超时
       let progressInterval: NodeJS.Timeout | undefined;
 
       // 显示生成进度
@@ -1168,12 +1168,12 @@ export function App() {
               ? {
                   ...asset,
                   status: "failed" as const,
-                  errorMessage: "生成超时（超过15分钟），请检查网络或重试"
+                  errorMessage: "生成超时（超过40分钟），请检查网络或重试"
                 }
               : asset
           )
         );
-        setGenerateStatus("生成超时（超过15分钟），请检查网络或重试");
+        setGenerateStatus("生成超时（超过40分钟），请检查网络或重试");
       }, GENERATION_TIMEOUT_MS);
 
       setGenerateStatus(`正在生成真实视频：${generatedAsset.name}（已等待 0分0秒）`);
