@@ -113,8 +113,8 @@ function getReferenceValues(references: ReferenceItem[], kind: ReferenceItem["ki
 
 interface GenerateVideoResponse {
   taskId?: string;
-  queueTaskId?: unknown;
-  _genTaskId?: unknown;
+  queueTaskId?: string;
+  _genTaskId?: string;
 }
 
 export interface GenerateVideoResult {
@@ -153,9 +153,18 @@ export async function generateVideo(
     throw new Error("生成接口未返回任务 ID");
   }
 
+  // 对于画布生成，使用 queueTaskId 来轮询队列
+  const queueTaskId = submitResult.queueTaskId ?? submitResult.taskId;
+  console.log("[视频生成] 使用的轮询ID:", {
+    taskId: submitResult.taskId,
+    queueTaskId: submitResult.queueTaskId,
+    _genTaskId: submitResult._genTaskId,
+    "实际用于轮询": queueTaskId
+  });
+
   const pollResult =
     input.projectId && input.nodeId
-      ? await pollCanvasQueueUntilComplete(transport, input.projectId, input.nodeId, submitResult.taskId, options)
+      ? await pollCanvasQueueUntilComplete(transport, input.projectId, input.nodeId, queueTaskId, options)
       : await pollTaskUntilComplete(transport, endpoints.generateVideoTask(submitResult.taskId), options);
   const persistResult = await persistTaskIfNeeded(transport, submitResult.taskId, pollResult);
   const videoUrl =
