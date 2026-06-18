@@ -15,7 +15,7 @@
 - **客户端逻辑正确**：`pollCanvasQueueUntilComplete` 只在 `succeeded`/`failed` 终止，否则按 `intervalMs=1500ms` 重试至 `maxAttempts=1400`（约 35 分钟）后抛"任务轮询超时"。没有让它卡住的客户端 bug。
 - **payload 正确**：9:16 / 720p / 2 图 / 2 音 / 1 视频 / omnireference / generateAudio / networkEnabled，全部符合预期。
 
-**初步结论**：卡点在服务端 `qijing.kjjhz.cn` —— 队列任务没有从 `polling` 推进。
+**已确诊结论**：卡点不是前端用错任务 ID，也不是解析不到成功结果；该任务后来在服务端成功了，但实际耗时超过当前前端轮询窗口。客户端需要延长默认轮询窗口，并在超时时暴露最后一次队列诊断信息。
 
 ## 3. 根因假设（需原始响应确诊）
 
@@ -29,6 +29,17 @@
 - `providerTaskId` 为空 → provider 没建起来（指向假设 1 或 2）。
 - `errorMessage` 有内容 → 直接读错误。
 - `providerTaskId` 非空但长时间无 `resultUrl` → provider 在跑，可能是真慢或 provider 侧失败未回写。
+
+2026-06-18 通过 9333 DevTools 端口查询旧任务后确认：
+
+- `status=succeeded`
+- `providerTaskId=cgt-20260618170109-fhb5x`
+- `resultUrl` 已返回 OSS 视频地址
+- `createdAt=2026-06-18T08:15:45.397Z`
+- `startedAt=2026-06-18T09:01:03.553Z`
+- `completedAt=2026-06-18T09:11:22.020Z`
+
+折算本地时间，该任务约 16:15 创建、17:01 开始、17:11 完成，超过原先 `1400 * 1500ms = 35 分钟` 的前端轮询窗口。
 
 ## 4. 诊断机制
 
@@ -48,7 +59,7 @@ await window.ovoDesktop.api.request('/api/gen-queue?projectId=cmq6fwhft0bg5m2l5u
 
 仅修客户端能控的点，不盲改：
 
-- **超时与状态反馈**：长时间 `polling` 时给用户可见的进度/诊断信息（含 `providerTaskId` 是否存在），超时文案区分"服务端未推进"与"网络/登录失效"。
+- **超时与状态反馈**：将默认轮询窗口扩到 90 分钟；长时间 `polling` 后若仍超时，错误信息包含最后一次队列状态（`status`、`providerTaskId`、`resultUrl`、`errorMessage`、`startedAt`、`completedAt`），区分"服务端仍在排队/生成"与"网络/登录失效"。
 - **跨用户引用校验**（若确诊为假设 1）：提交前校验所有 reference URL 的用户前缀是否一致/属于当前账号，不一致时告警或阻断，避免提交注定失败的任务。
 - **模型 ID 配置化**（若确诊为假设 2）：把硬编码 endpoint 提到配置，便于切换/排查。
 - **origin 统一**（若确诊为假设 3）：统一 http/https，消除两条通道差异。
@@ -57,7 +68,9 @@ await window.ovoDesktop.api.request('/api/gen-queue?projectId=cmq6fwhft0bg5m2l5u
 
 ## 7. 复现验证（场景）
 
-接 devtools 驱动画布 `http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x`：右击新增节点，传本地 `/Users/mac/Downloads/2026-06-18-164734` 的 2 图（陆瑜婉后期、男主西装革履）、2 音频（白景言-男主、江晚-女主）、1 视频（1-1.mp4），输入"安检拦截"提示词，配置 9:16 / 720p / seedance 高清 / 全能参考 / 有声音 / 联网，触发生成并观察是否走出 `polling`。
+接 devtools 驱动画布 `http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x`：右击新增节点，传本地 `/Users/mac/Downloads/2026-06-18-164734` 的 2 图、2 音频、1 视频（文件名仅作素材识别，不影响角色设定），输入"安检拦截"提示词，配置 9:16 / 720p / Seedance 2.0 高清 / 全能参考 / 有声音 / 联网，触发生成并观察是否走出 `polling`。
+
+优先级：先抓 `/api/gen-queue` 原始响应定性根因，再决定是否修改客户端；真实画布生成用于验证和补充证据，不作为盲目等待的第一步。
 
 ## 8. 交付
 

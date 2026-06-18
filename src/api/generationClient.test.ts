@@ -99,8 +99,14 @@ describe("generateVideo", () => {
   it("uses a longer default polling window for real Seedance tasks", async () => {
     expect(DEFAULT_GENERATION_POLL_OPTIONS).toEqual({
       intervalMs: 1500,
-      maxAttempts: 1400
+      maxAttempts: 3600
     });
+  });
+
+  it("covers delayed queue starts that finish after about an hour", async () => {
+    const totalPollingMs = DEFAULT_GENERATION_POLL_OPTIONS.intervalMs * DEFAULT_GENERATION_POLL_OPTIONS.maxAttempts;
+
+    expect(totalPollingMs).toBeGreaterThanOrEqual(90 * 60 * 1000);
   });
 
   it("throws a login-expired error when submitting generation is unauthorized", async () => {
@@ -202,6 +208,37 @@ describe("generateVideo", () => {
     });
     expect(transport.request).toHaveBeenNthCalledWith(2, "/api/gen-queue?projectId=project-1&taskId=queue-task-1");
     expect(transport.request).toHaveBeenNthCalledWith(3, "/api/gen-queue?projectId=project-1&taskId=queue-task-1");
+  });
+
+  it("includes the last canvas queue diagnostics when polling times out", async () => {
+    const transport: ApiTransport = {
+      request: vi.fn()
+        .mockResolvedValueOnce({ taskId: "provider-task-1", queueTaskId: "queue-task-1" })
+        .mockResolvedValue({
+          tasks: [
+            {
+              id: "queue-task-1",
+              nodeId: "video-node-1",
+              status: "polling",
+              providerTaskId: "provider-task-1",
+              resultUrl: null,
+              errorMessage: null,
+              startedAt: "2026-06-18T09:01:03.553Z",
+              completedAt: null
+            }
+          ]
+        })
+    };
+
+    await expect(
+      generateVideo(
+        transport,
+        { projectId: "project-1", nodeId: "video-node-1", prompt: "生成一段视频", references: refs },
+        { intervalMs: 0, maxAttempts: 1 }
+      )
+    ).rejects.toThrow(
+      "任务轮询超时：status=polling, providerTaskId=provider-task-1, resultUrl=empty, errorMessage=empty, startedAt=2026-06-18T09:01:03.553Z, completedAt=empty"
+    );
   });
 
   it("persists an unpersisted generated task before returning the final URL", async () => {

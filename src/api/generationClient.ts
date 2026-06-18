@@ -2,7 +2,7 @@ import type { GenerationSettings, ReferenceItem } from "../types";
 import { endpoints } from "./endpoints";
 import type { ApiTransport } from "./transport";
 
-export const DEFAULT_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 1400 };
+export const DEFAULT_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 3600 };
 
 interface BuildGenerateVideoPayloadInput {
   projectId?: string;
@@ -126,6 +126,7 @@ export interface GenerateVideoResult {
 
 interface GenerateVideoPollResponse {
   status?: string;
+  providerTaskId?: string;
   videoUrl?: string;
   providerVideoUrl?: string;
   seedanceProviderUrl?: string;
@@ -134,6 +135,8 @@ interface GenerateVideoPollResponse {
   persisted?: boolean;
   errorMessage?: string;
   error?: unknown;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 interface PersistTaskResponse {
@@ -270,12 +273,14 @@ async function pollCanvasQueueUntilComplete(
 ): Promise<GenerateVideoPollResponse> {
   console.log("[轮询开始] projectId:", projectId, "nodeId:", nodeId, "taskId:", taskId);
   console.log("[轮询配置] maxAttempts:", options.maxAttempts, "intervalMs:", options.intervalMs);
+  let lastTaskResult: GenerateVideoPollResponse | undefined;
 
   for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
     const queueResult = await requestQueueStatus(transport, projectId, taskId);
     console.log(`[轮询尝试 ${attempt + 1}/${options.maxAttempts}] 队列响应:`, queueResult);
 
     const taskResult = findQueueTask(queueResult, taskId, nodeId);
+    lastTaskResult = taskResult ?? lastTaskResult;
     console.log(`[轮询尝试 ${attempt + 1}/${options.maxAttempts}] 找到的任务:`, taskResult);
 
     if (taskResult?.status === "failed") {
@@ -300,7 +305,7 @@ async function pollCanvasQueueUntilComplete(
   }
 
   console.error("[轮询超时] 已尝试", options.maxAttempts, "次，任务仍未完成");
-  throw new Error("任务轮询超时");
+  throw new Error(`任务轮询超时：${formatQueueDiagnostics(lastTaskResult)}`);
 }
 
 async function requestQueueStatus(transport: ApiTransport, projectId: string, taskId?: string) {
@@ -369,6 +374,7 @@ function matchesQueueTask(value: Record<string, unknown>, taskId: string, nodeId
 function normalizeQueueTask(value: Record<string, unknown>): GenerateVideoPollResponse {
   return {
     status: stringValue(value.status),
+    providerTaskId: stringValue(value.providerTaskId),
     videoUrl: stringValue(value.videoUrl),
     providerVideoUrl: stringValue(value.providerVideoUrl),
     seedanceProviderUrl: stringValue(value.seedanceProviderUrl),
@@ -376,8 +382,25 @@ function normalizeQueueTask(value: Record<string, unknown>): GenerateVideoPollRe
     resultUrl: stringValue(value.resultUrl),
     persisted: typeof value.persisted === "boolean" ? value.persisted : undefined,
     errorMessage: stringValue(value.errorMessage),
-    error: value.error
+    error: value.error,
+    startedAt: stringValue(value.startedAt),
+    completedAt: stringValue(value.completedAt)
   };
+}
+
+function formatQueueDiagnostics(taskResult: GenerateVideoPollResponse | undefined) {
+  if (!taskResult) {
+    return "status=unknown, providerTaskId=empty, resultUrl=empty, errorMessage=empty, startedAt=empty, completedAt=empty";
+  }
+
+  return [
+    `status=${taskResult.status ?? "unknown"}`,
+    `providerTaskId=${taskResult.providerTaskId ?? "empty"}`,
+    `resultUrl=${taskResult.resultUrl ?? "empty"}`,
+    `errorMessage=${taskResult.errorMessage ?? "empty"}`,
+    `startedAt=${taskResult.startedAt ?? "empty"}`,
+    `completedAt=${taskResult.completedAt ?? "empty"}`
+  ].join(", ");
 }
 
 function extractTaskId(value: unknown): string | undefined {
