@@ -11,7 +11,7 @@ const launcher = createLauncher({
   cwd: repoRoot,
   env: process.env,
   port: 5173,
-  debugPort: process.env.OVO_DEBUG_PORT ? Number(process.env.OVO_DEBUG_PORT) : 9222
+  debugPort: process.env.OVO_DEBUG_PORT ? Number(process.env.OVO_DEBUG_PORT) : 9333
 });
 
 try {

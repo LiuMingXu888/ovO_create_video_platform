@@ -42,7 +42,7 @@ await window.ovoDesktop.api.request('/api/gen-queue?projectId=cmq6fwhft0bg5m2l5u
 
 ## 5. 接入：调试端口
 
-当前运行的 app 未带 `--remote-debugging-port`，无法 attach devtools。已改 `scripts/launcherCore.mjs`：`createLauncher` 新增 `debugPort` 入参（默认从 `OVO_DEBUG_PORT` 读），有值则给 Electron 启动加 `--remote-debugging-port=<port>`。`launch-mac.mjs` 默认传 `9222`。用户 `npm run launch:mac` 重启即开调试端口（启动时会自动 `git pull origin feature/ui-shell` 拉最新代码）。已补单测并通过。
+当前运行的 app 未带 `--remote-debugging-port`，无法 attach devtools。已改 `scripts/launcherCore.mjs`：`createLauncher` 新增 `debugPort` 入参（默认从 `OVO_DEBUG_PORT` 读），有值则给 Electron 启动加 `--remote-debugging-port=<port>`。`launch-mac.mjs` 默认传 `9333`（9222 常被本机 Chrome 占用，故避开）。用户 `npm run launch:mac` 重启即开调试端口（启动时会自动 `git pull origin feature/ui-shell` 拉最新代码）。已补单测并通过。
 
 ## 6. 修复范围（确诊后对症）
 
