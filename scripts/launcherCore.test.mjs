@@ -45,6 +45,38 @@ describe("Mac launcher core", () => {
     ]);
     expect(viteProcess.killedWith).toEqual(["SIGTERM"]);
   });
+
+  it("passes --remote-debugging-port to Electron when debugPort is set", async () => {
+    const calls = [];
+    const electronProcess = createFakeProcess();
+    const launcher = createLauncher({
+      cwd: "/repo",
+      env: { PATH: "/bin" },
+      port: 5173,
+      debugPort: 9222,
+      spawnProcess(command, args, options) {
+        calls.push({ command, args, cwd: options.cwd });
+        if (command === "npm" && args.join(" ") === "run dev") {
+          return createFakeProcess();
+        }
+        if (command.includes("Contents/MacOS/Electron")) {
+          return electronProcess;
+        }
+        return createFakeProcess();
+      },
+      runCommand: vi.fn(async () => undefined),
+      waitForPort: vi.fn(async () => undefined),
+      log: vi.fn()
+    });
+
+    const launchPromise = launcher.launch();
+    await waitUntil(() => calls.some((call) => call.command.includes("Contents/MacOS/Electron")));
+    electronProcess.emit("exit", 0);
+    await launchPromise;
+
+    const electronCall = calls.find((call) => call.command.includes("Contents/MacOS/Electron"));
+    expect(electronCall.args).toEqual(["/repo", "--remote-debugging-port=9222"]);
+  });
 });
 
 function createFakeProcess() {

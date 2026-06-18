@@ -6,6 +6,7 @@ export function createLauncher({
   cwd,
   env = process.env,
   port = 5173,
+  debugPort = env.OVO_DEBUG_PORT ? Number(env.OVO_DEBUG_PORT) : undefined,
   spawnProcess = spawn,
   runCommand = defaultRunCommand,
   waitForPort = defaultWaitForPort,
@@ -62,7 +63,12 @@ export function createLauncher({
       VITE_DEV_SERVER_URL: `http://127.0.0.1:${port}`
     };
     const electronBinary = path.join(cwd, "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
-    const electronProcess = spawnTracked(electronBinary, [cwd], { cwd, env: electronEnv, stdio: "inherit" });
+    const electronArgs = [cwd];
+    if (debugPort) {
+      electronArgs.push(`--remote-debugging-port=${debugPort}`);
+      log(`已启用远程调试端口 ${debugPort}`);
+    }
+    const electronProcess = spawnTracked(electronBinary, electronArgs, { cwd, env: electronEnv, stdio: "inherit" });
 
     const exitCode = await waitForExit(electronProcess);
     cleanupChildren();
