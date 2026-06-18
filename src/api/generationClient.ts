@@ -259,16 +259,30 @@ async function pollCanvasQueueUntilComplete(
   taskId: string,
   options: PollOptions
 ): Promise<GenerateVideoPollResponse> {
+  console.log("[轮询开始] projectId:", projectId, "nodeId:", nodeId, "taskId:", taskId);
+  console.log("[轮询配置] maxAttempts:", options.maxAttempts, "intervalMs:", options.intervalMs);
+
   for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
     const queueResult = await requestQueueStatus(transport, projectId, taskId);
+    console.log(`[轮询尝试 ${attempt + 1}/${options.maxAttempts}] 队列响应:`, queueResult);
+
     const taskResult = findQueueTask(queueResult, taskId, nodeId);
+    console.log(`[轮询尝试 ${attempt + 1}/${options.maxAttempts}] 找到的任务:`, taskResult);
 
     if (taskResult?.status === "failed") {
+      console.error("[轮询失败] 任务状态为failed:", taskResult);
       throw new Error(taskResult.errorMessage ?? getPollErrorMessage(taskResult.error) ?? "视频生成失败");
     }
 
     if (taskResult?.status === "succeeded") {
+      console.log("[轮询成功] 任务完成:", taskResult);
       return taskResult;
+    }
+
+    if (taskResult?.status) {
+      console.log(`[轮询进行中] 任务状态: ${taskResult.status}, 等待${options.intervalMs}ms后重试`);
+    } else {
+      console.warn(`[轮询警告] 未找到任务状态，可能任务还未在队列中`);
     }
 
     if (options.intervalMs > 0) {
@@ -276,6 +290,7 @@ async function pollCanvasQueueUntilComplete(
     }
   }
 
+  console.error("[轮询超时] 已尝试", options.maxAttempts, "次，任务仍未完成");
   throw new Error("任务轮询超时");
 }
 
@@ -292,7 +307,10 @@ async function requestQueueStatus(transport: ApiTransport, projectId: string, ta
 }
 
 function findQueueTask(value: unknown, taskId: string, nodeId: string): GenerateVideoPollResponse | undefined {
+  console.log("[查找任务] 在响应中查找 taskId:", taskId, "nodeId:", nodeId);
+
   if (Array.isArray(value)) {
+    console.log("[查找任务] 响应是数组，长度:", value.length);
     for (const item of value) {
       const found = findQueueTask(item, taskId, nodeId);
       if (found) {
@@ -303,20 +321,28 @@ function findQueueTask(value: unknown, taskId: string, nodeId: string): Generate
   }
 
   if (!isRecord(value)) {
+    console.log("[查找任务] 响应不是对象，跳过");
     return undefined;
   }
 
+  console.log("[查找任务] 检查对象，keys:", Object.keys(value));
+
   if (matchesQueueTask(value, taskId, nodeId)) {
+    console.log("[查找任务] ✅ 找到匹配的任务!");
     return normalizeQueueTask(value);
   }
 
   for (const key of ["items", "tasks", "data", "result"]) {
-    const found = findQueueTask(value[key], taskId, nodeId);
-    if (found) {
-      return found;
+    if (key in value) {
+      console.log(`[查找任务] 在嵌套字段 "${key}" 中查找`);
+      const found = findQueueTask(value[key], taskId, nodeId);
+      if (found) {
+        return found;
+      }
     }
   }
 
+  console.log("[查找任务] ❌ 未找到匹配的任务");
   return undefined;
 }
 
