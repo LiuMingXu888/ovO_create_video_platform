@@ -43,8 +43,9 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
   };
   const params = buildCompanyGenerateVideoParams(input, settings);
 
+  let payload: any;
   if (input.projectId && input.nodeId) {
-    return {
+    payload = {
       ...params,
       ratio: settings.aspectRatio,
       _meta: {
@@ -62,9 +63,26 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
         aspectRatio: settings.aspectRatio
       }
     };
+  } else {
+    payload = params;
   }
 
-  return params;
+  // 详细的调试日志
+  console.log("[视频生成] Payload详情：", {
+    "UI选择的比例": settings.aspectRatio,
+    "payload.aspectRatio": payload.aspectRatio,
+    "payload.ratio": payload.ratio,
+    "payload.task?.aspectRatio": payload.task?.aspectRatio,
+    "参考图片数量": payload.referenceImages?.length ?? 0,
+    "参考视频数量": payload.referenceVideos?.length ?? 0,
+    "参考音频数量": payload.referenceAudios?.length ?? 0,
+    "参考图片URLs": payload.referenceImages,
+    "参考视频URLs": payload.referenceVideos,
+    "参考音频URLs": payload.referenceAudios,
+    "完整payload": payload
+  });
+
+  return payload;
 }
 
 function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, settings: GenerationSettings) {
@@ -209,10 +227,18 @@ export async function pollTaskUntilComplete(
 
 async function requestGenerateVideo(transport: ApiTransport, input: BuildGenerateVideoPayloadInput) {
   try {
+    const payload = buildCompanyGenerateVideoPayload(input);
+    console.log("[视频生成] 发送请求到:", endpoints.generateVideo());
+    console.log("[视频生成] 请求方法: POST");
+    console.log("[视频生成] 请求Body:", JSON.stringify(payload, null, 2));
+
     const result = await transport.request<GenerateVideoResponse>(endpoints.generateVideo(), {
       method: "POST",
-      body: buildCompanyGenerateVideoPayload(input)
+      body: payload
     });
+
+    console.log("[视频生成] 服务器响应:", result);
+
     return {
       ...result,
       taskId: result.taskId ?? extractTaskId(result.queueTaskId) ?? extractTaskId(result._genTaskId) ?? extractTaskId(result)

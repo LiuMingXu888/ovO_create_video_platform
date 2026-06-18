@@ -1145,7 +1145,38 @@ export function App() {
     setReferenceIssues([]);
 
     if (project) {
-      setGenerateStatus(`正在生成真实视频：${generatedAsset.name}`);
+      const startTime = Date.now();
+      const GENERATION_TIMEOUT_MS = 15 * 60 * 1000; // 15分钟超时
+      let progressInterval: NodeJS.Timeout | undefined;
+
+      // 显示生成进度
+      progressInterval = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsedSeconds / 60);
+        const seconds = elapsedSeconds % 60;
+        setGenerateStatus(
+          `正在生成真实视频：${generatedAsset.name}（已等待 ${minutes}分${seconds}秒）`
+        );
+      }, 1000);
+
+      // 设置超时检测
+      const timeoutId = setTimeout(() => {
+        clearInterval(progressInterval);
+        setAssets((current) =>
+          current.map((asset) =>
+            asset.id === generatedAsset.id
+              ? {
+                  ...asset,
+                  status: "failed" as const,
+                  errorMessage: "生成超时（超过15分钟），请检查网络或重试"
+                }
+              : asset
+          )
+        );
+        setGenerateStatus("生成超时（超过15分钟），请检查网络或重试");
+      }, GENERATION_TIMEOUT_MS);
+
+      setGenerateStatus(`正在生成真实视频：${generatedAsset.name}（已等待 0分0秒）`);
 
       try {
         const result = await companyApiFacade.generateVideo({
@@ -1155,6 +1186,10 @@ export function App() {
           references: submittedReferences,
           settings: generationSettings
         });
+
+        // 清除超时和进度更新
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
 
         if (!mounted.current) {
           return;
@@ -1189,11 +1224,16 @@ export function App() {
         setGenerateStatus(`已生成真实视频：${generatedAsset.name}`);
         await refreshAuthState();
       } catch (error) {
+        // 清除超时和进度更新
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
+
         if (!mounted.current) {
           return;
         }
 
         const errorMessage = error instanceof Error ? error.message : "视频生成失败";
+        console.error("[视频生成] 错误:", error);
         setAssets((current) =>
           current.map((asset) =>
             asset.id === generatedAsset.id
