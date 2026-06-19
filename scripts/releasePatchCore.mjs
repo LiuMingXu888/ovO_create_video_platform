@@ -5,6 +5,20 @@ export const GITEE_REPO = "ov-o_create_video_platform";
 export const GITEE_REMOTE_URL = "git@gitee.com:siberian-aries/ov-o_create_video_platform.git";
 
 const GITEE_API_BASE = `https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}`;
+const RELEASE_FLAGS = new Set(["--dry-run", "--skip-build"]);
+
+export function parseReleaseArgs(args) {
+  for (const arg of args) {
+    if (!RELEASE_FLAGS.has(arg)) {
+      throw new Error(`未知发布参数：${arg}`);
+    }
+  }
+
+  return {
+    dryRun: args.includes("--dry-run"),
+    skipBuild: args.includes("--skip-build"),
+  };
+}
 
 export function bumpPatchVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
@@ -35,21 +49,31 @@ export function validateMainNotBehindGiteeMain({ behindCount }) {
 }
 
 export function validateGiteeOnlyRemote(remoteOutput) {
-  const giteePushLine = remoteOutput
+  const lines = remoteOutput
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line.startsWith("gitee\t") && line.endsWith(" (push)"));
+    .map((line) => line.trim());
+  const giteeFetchLine = lines.find((line) => line.startsWith("gitee\t") && line.endsWith(" (fetch)"));
+  const giteePushLine = lines.find((line) => line.startsWith("gitee\t") && line.endsWith(" (push)"));
+
+  if (!giteeFetchLine) {
+    throw new Error("缺少 gitee fetch remote");
+  }
 
   if (!giteePushLine) {
     throw new Error("缺少 gitee push remote");
   }
 
-  const remoteUrl = giteePushLine.replace(/^gitee\s+/, "").replace(/\s+\(push\)$/, "");
-  if (remoteUrl !== GITEE_REMOTE_URL) {
-    throw new Error(`gitee push remote 不正确：${remoteUrl}`);
+  const fetchUrl = giteeFetchLine.replace(/^gitee\s+/, "").replace(/\s+\(fetch\)$/, "");
+  const pushUrl = giteePushLine.replace(/^gitee\s+/, "").replace(/\s+\(push\)$/, "");
+  if (fetchUrl !== GITEE_REMOTE_URL) {
+    throw new Error(`gitee fetch remote 不正确：${fetchUrl}`);
   }
 
-  return remoteUrl;
+  if (pushUrl !== GITEE_REMOTE_URL) {
+    throw new Error(`gitee push remote 不正确：${pushUrl}`);
+  }
+
+  return pushUrl;
 }
 
 export function giteeApiPath(pathname) {
@@ -159,6 +183,7 @@ export function getReleaseCommandPlan({ dryRun, skipBuild, version }) {
   if (dryRun) {
     return {
       commands: readCommands,
+      validateArtifacts: false,
       message: createDryRunMessage(version),
     };
   }
@@ -186,8 +211,13 @@ export function getReleaseCommandPlan({ dryRun, skipBuild, version }) {
 
   return {
     commands,
+    validateArtifacts: true,
     message: createDryRunMessage(version),
   };
+}
+
+export function getUploadAssetOrder(assets) {
+  return [assets.installer, assets.latestYml];
 }
 
 function createDryRunMessage(version) {

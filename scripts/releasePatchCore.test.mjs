@@ -7,6 +7,8 @@ import {
   getReleaseCommandPlan,
   giteeApiPath,
   GITEE_REMOTE_URL,
+  getUploadAssetOrder,
+  parseReleaseArgs,
   validateLatestYmlForVersion,
   validateNoExistingRelease,
   validateReleaseBranch,
@@ -16,6 +18,13 @@ import {
 } from "./releasePatchCore.mjs";
 
 describe("releasePatchCore", () => {
+  it("parses only known release flags", () => {
+    expect(parseReleaseArgs(["--dry-run"])).toEqual({ dryRun: true, skipBuild: false });
+    expect(parseReleaseArgs(["--dry-run", "--skip-build"])).toEqual({ dryRun: true, skipBuild: true });
+    expect(parseReleaseArgs(["--skip-build"])).toEqual({ dryRun: false, skipBuild: true });
+    expect(() => parseReleaseArgs(["--dryrun"])).toThrow("未知发布参数：--dryrun");
+  });
+
   it("bumps patch versions", () => {
     expect(bumpPatchVersion("0.1.0")).toBe("0.1.1");
     expect(bumpPatchVersion("1.2.9")).toBe("1.2.10");
@@ -42,13 +51,34 @@ describe("releasePatchCore", () => {
     expect(validateGiteeOnlyRemote(remoteOutput)).toBe(GITEE_REMOTE_URL);
   });
 
+  it("requires exact gitee fetch and push remotes", () => {
+    const wrongFetchRemoteOutput = [
+      "gitee\thttps://gitee.com/siberian-aries/ov-o_create_video_platform.git (fetch)",
+      "gitee\tgit@gitee.com:siberian-aries/ov-o_create_video_platform.git (push)",
+    ].join("\n");
+
+    expect(() => validateGiteeOnlyRemote(wrongFetchRemoteOutput)).toThrow("gitee fetch remote 不正确");
+
+    const exactRemoteOutput = [
+      "gitee\tgit@gitee.com:siberian-aries/ov-o_create_video_platform.git (fetch)",
+      "gitee\tgit@gitee.com:siberian-aries/ov-o_create_video_platform.git (push)",
+    ].join("\n");
+
+    expect(validateGiteeOnlyRemote(exactRemoteOutput)).toBe(GITEE_REMOTE_URL);
+  });
+
   it("rejects missing or wrong gitee push remotes", () => {
     expect(() =>
-      validateGiteeOnlyRemote("origin\thttps://github.com/LiuMingXu888/ovO_create_video_platform.git (push)"),
+      validateGiteeOnlyRemote("gitee\tgit@gitee.com:siberian-aries/ov-o_create_video_platform.git (fetch)"),
     ).toThrow("缺少 gitee push remote");
 
     expect(() =>
-      validateGiteeOnlyRemote("gitee\tgit@gitee.com:siberian-aries/wrong.git (push)"),
+      validateGiteeOnlyRemote(
+        [
+          "gitee\tgit@gitee.com:siberian-aries/ov-o_create_video_platform.git (fetch)",
+          "gitee\tgit@gitee.com:siberian-aries/wrong.git (push)",
+        ].join("\n"),
+      ),
     ).toThrow("gitee push remote 不正确");
   });
 
@@ -176,5 +206,30 @@ describe("releasePatchCore", () => {
     expect(executableCommands).not.toContain("git tag v0.1.1");
     expect(executableCommands).not.toContain("git push gitee HEAD:main");
     expect(plan.message).toContain("push gitee HEAD:main and v0.1.1");
+  });
+
+  it("keeps dry-run plans read-only with or without skip-build", () => {
+    for (const skipBuild of [false, true]) {
+      const plan = getReleaseCommandPlan({ dryRun: true, skipBuild, version: "0.1.1" });
+      const executableCommands = plan.commands.map((command) => command.join(" "));
+
+      expect(executableCommands).toEqual([
+        "git status --short",
+        "git remote -v",
+        "git branch --show-current",
+      ]);
+      expect(executableCommands).not.toContain("npm run dist:win:installer");
+      expect(plan.validateArtifacts).toBe(false);
+      expect(plan.message).toContain("push gitee HEAD:main and v0.1.1");
+    }
+  });
+
+  it("uploads installer before latest.yml", () => {
+    expect(
+      getUploadAssetOrder({
+        installer: "release/windows/ovO-0.1.1-x64-setup.exe",
+        latestYml: "release/windows/latest.yml",
+      }),
+    ).toEqual(["release/windows/ovO-0.1.1-x64-setup.exe", "release/windows/latest.yml"]);
   });
 });

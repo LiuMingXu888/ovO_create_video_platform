@@ -9,7 +9,9 @@ import {
   createDryRunPlan,
   findReleaseAssets,
   getReleaseCommandPlan,
+  getUploadAssetOrder,
   giteeApiPath,
+  parseReleaseArgs,
   validateLatestYmlForVersion,
   validateMainNotBehindGiteeMain,
   validateNoExistingRelease,
@@ -18,9 +20,7 @@ import {
   validateGiteeOnlyRemote,
 } from "./releasePatchCore.mjs";
 
-const args = new Set(process.argv.slice(2));
-const dryRun = args.has("--dry-run");
-const skipBuild = args.has("--skip-build");
+const { dryRun, skipBuild } = parseReleaseArgs(process.argv.slice(2));
 
 function run(commandParts, options = {}) {
   const [command, ...args] = commandParts;
@@ -72,7 +72,7 @@ async function createGiteeRelease({ token, version, assets }) {
   const release = await releaseResponse.json();
   const uploadUrl = giteeApiPath(`/releases/${release.id}/attach_files`);
 
-  for (const assetPath of [assets.latestYml, assets.installer]) {
+  for (const assetPath of getUploadAssetOrder(assets)) {
     const form = new FormData();
     form.append("access_token", token);
     form.append("file", new Blob([readFileSync(assetPath)]), basename(assetPath));
@@ -83,7 +83,9 @@ async function createGiteeRelease({ token, version, assets }) {
     });
 
     if (!uploadResponse.ok) {
-      throw new Error(`上传 Gitee Release 附件失败：${assetPath}：${uploadResponse.status} ${await uploadResponse.text()}`);
+      throw new Error(
+        `上传 Gitee Release 附件失败：${assetPath}：${uploadResponse.status} ${await uploadResponse.text()}。Release 已创建，重新运行前请先清理 Gitee Release 附件或删除该 Release。`,
+      );
     }
   }
 }
@@ -110,11 +112,6 @@ async function main() {
   }
 
   if (dryRun) {
-    if (!skipBuild) {
-      const assets = findReleaseAssets(listReleasePaths(), nextVersion);
-      validateLatestYmlForVersion(readFileSync(assets.latestYml, "utf8"), nextVersion);
-    }
-
     console.log(await createDryRunPlan({ version: nextVersion }));
     return;
   }
