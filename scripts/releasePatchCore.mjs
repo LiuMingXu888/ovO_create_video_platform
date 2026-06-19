@@ -87,7 +87,11 @@ export function validateLatestYmlForVersion(content, version) {
     throw new Error("latest.yml 格式不正确");
   }
 
-  if (latest.version !== undefined && String(latest.version) !== version) {
+  if (latest.version === undefined) {
+    throw new Error("latest.yml 缺少目标版本");
+  }
+
+  if (String(latest.version) !== version) {
     throw new Error("latest.yml version 不匹配");
   }
 

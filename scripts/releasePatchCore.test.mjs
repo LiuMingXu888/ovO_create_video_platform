@@ -69,12 +69,16 @@ describe("releasePatchCore", () => {
 
   it("validates latest.yml references the target installer", () => {
     expect(() => validateLatestYmlForVersion("version: 0.1.2\npath: ovO-0.1.2-x64-setup.exe\n", "0.1.2")).not.toThrow();
-    expect(() => validateLatestYmlForVersion("path: ovO-0.1.1-x64-setup.exe\n", "0.1.2")).toThrow(
+    expect(() => validateLatestYmlForVersion("version: 0.1.2\npath: ovO-0.1.1-x64-setup.exe\n", "0.1.2")).toThrow(
       "latest.yml 未引用目标安装包",
     );
   });
 
   it("rejects stale or comment-only latest.yml installer references", () => {
+    expect(() => validateLatestYmlForVersion("path: ovO-0.1.2-x64-setup.exe\n", "0.1.2")).toThrow(
+      "latest.yml 缺少目标版本",
+    );
+
     expect(() =>
       validateLatestYmlForVersion("version: 0.1.1\npath: ovO-0.1.2-x64-setup.exe\n", "0.1.2"),
     ).toThrow("latest.yml version 不匹配");
