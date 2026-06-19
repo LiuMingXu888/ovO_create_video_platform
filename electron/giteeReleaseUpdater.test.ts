@@ -29,6 +29,12 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
   });
 }
 
+type FetchInput = Parameters<typeof fetch>[0];
+
+function fetchInputHref(input: FetchInput) {
+  return input instanceof Request ? input.url : String(input);
+}
+
 describe("Gitee release updater", () => {
   it("compares patch versions numerically", () => {
     expect(compareSemver("0.1.2", "0.1.10")).toBeLessThan(0);
@@ -61,7 +67,8 @@ describe("Gitee release updater", () => {
   });
 
   it("returns latest when Gitee has no newer release", async () => {
-    const fetcher = vi.fn(async (url: string) => {
+    const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {
+      const url = fetchInputHref(input);
       expect(url).toContain(`/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/latest`);
       return jsonResponse({ id: 5, tag_name: "v0.1.0", name: "v0.1.0" });
     });
@@ -83,7 +90,8 @@ describe("Gitee release updater", () => {
 
   it("clears stale available update state when a later check finds no update", async () => {
     let latestVersion = "v0.1.2";
-    const fetcher = vi.fn(async (url: string) => {
+    const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {
+      const url = fetchInputHref(input);
       if (url.includes("/releases/latest")) {
         return jsonResponse({ id: 7, tag_name: latestVersion, name: latestVersion });
       }
@@ -130,7 +138,8 @@ describe("Gitee release updater", () => {
   });
 
   it("returns available update info with Gitee attachment download URLs", async () => {
-    const fetcher = vi.fn(async (url: string) => {
+    const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {
+      const url = fetchInputHref(input);
       if (url.includes("/releases/latest")) {
         return jsonResponse({ id: 7, tag_name: "v0.1.2", name: "v0.1.2" });
       }
@@ -175,7 +184,8 @@ describe("Gitee release updater", () => {
   });
 
   it("normalizes missing update package errors", async () => {
-    const fetcher = vi.fn(async (url: string) => {
+    const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {
+      const url = fetchInputHref(input);
       if (url.includes("/releases/latest")) {
         return jsonResponse({ id: 7, tag_name: "v0.1.2", name: "v0.1.2" });
       }
@@ -216,7 +226,8 @@ describe("Gitee release updater", () => {
   it("downloads the installer and reports progress", async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ovo-updater-test-"));
     const progress: number[] = [];
-    const fetcher = vi.fn(async (url: string) => {
+    const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {
+      const url = fetchInputHref(input);
       if (url.includes("/releases/latest")) {
         return jsonResponse({ id: 7, tag_name: "v0.1.2", name: "v0.1.2" });
       }
@@ -272,7 +283,7 @@ describe("Gitee release updater", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ovo-updater-install-test-"));
     const openPath = vi.fn(async () => "");
     const quit = vi.fn();
-    const fetcher = vi.fn(async () => {
+    const fetcher: typeof fetch = vi.fn(async () => {
       return new Response(
         new ReadableStream({
           start(controller) {
