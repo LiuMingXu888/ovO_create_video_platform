@@ -23,4 +23,16 @@ describe("Electron preload build contract", () => {
     expect(builtPreload).not.toContain("export ");
     expect(builtPreload).toContain('require("electron")');
   });
+
+  it("exposes a sandbox-safe updater bridge", () => {
+    const preloadSource = fs.readFileSync(path.join(process.cwd(), "electron/preload.cts"), "utf8");
+
+    expect(preloadSource).toContain("updater:");
+    expect(preloadSource).toContain("getCurrentVersion");
+    expect(preloadSource).toContain('ipcRenderer.invoke("ovo:updater:get-current-version")');
+    expect(preloadSource).toContain('ipcRenderer.invoke("ovo:updater:check-for-updates")');
+    expect(preloadSource).toContain('ipcRenderer.invoke("ovo:updater:download-update")');
+    expect(preloadSource).toContain('ipcRenderer.invoke("ovo:updater:install-update")');
+    expect(preloadSource).toContain('ipcRenderer.on("ovo:updater:progress"');
+  });
 });

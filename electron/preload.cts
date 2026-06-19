@@ -9,6 +9,19 @@ type SaveAssetInput = {
 
 contextBridge.exposeInMainWorld("ovoDesktop", {
   version: "0.1.0",
+  updater: {
+    getCurrentVersion: () => ipcRenderer.invoke("ovo:updater:get-current-version"),
+    checkForUpdates: () => ipcRenderer.invoke("ovo:updater:check-for-updates"),
+    downloadUpdate: () => ipcRenderer.invoke("ovo:updater:download-update"),
+    installUpdate: () => ipcRenderer.invoke("ovo:updater:install-update"),
+    onProgress: (listener: (progress: { percent: number; transferred: number; total?: number }) => void) => {
+      const handler = (_event: unknown, progress: { percent: number; transferred: number; total?: number }) => {
+        listener(progress);
+      };
+      ipcRenderer.on("ovo:updater:progress", handler);
+      return () => ipcRenderer.removeListener("ovo:updater:progress", handler);
+    }
+  },
   auth: {
     openLoginWindow: (targetUrl?: string) => ipcRenderer.invoke("ovo:auth:open-login-window", targetUrl),
     checkSession: () => ipcRenderer.invoke("ovo:auth:check-session"),

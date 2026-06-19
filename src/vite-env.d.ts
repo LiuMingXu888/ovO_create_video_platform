@@ -1,6 +1,59 @@
+type OvoUpdateProgress = {
+  percent: number;
+  transferred: number;
+  total?: number;
+};
+
+type OvoUpdateInfo = {
+  releaseId: number;
+  tagName: string;
+  version: string;
+  installerName: string;
+  installerUrl: string;
+  latestYmlUrl: string;
+  filePath?: string;
+};
+
+type OvoUpdateCheckResult =
+  | {
+      ok: true;
+      status: "latest";
+      currentVersion: string;
+      latestVersion: string;
+      message: string;
+    }
+  | {
+      ok: true;
+      status: "available";
+      currentVersion: string;
+      latestVersion: string;
+      update: OvoUpdateInfo;
+      message: string;
+    }
+  | {
+      ok: false;
+      status: "unsupported" | "error";
+      currentVersion: string;
+      message: string;
+    };
+
+type OvoUpdateDownloadResult = {
+  ok: boolean;
+  status: "downloaded" | "error";
+  filePath?: string;
+  message: string;
+};
+
 interface Window {
   ovoDesktop?: {
     version: string;
+    updater?: {
+      getCurrentVersion: () => Promise<string>;
+      checkForUpdates: () => Promise<OvoUpdateCheckResult>;
+      downloadUpdate: () => Promise<OvoUpdateDownloadResult>;
+      installUpdate: () => Promise<{ ok: boolean; message: string }>;
+      onProgress: (listener: (progress: OvoUpdateProgress) => void) => () => void;
+    };
     auth: {
       openLoginWindow: (targetUrl?: string) => Promise<{ ok: boolean; message?: string; user?: unknown }>;
       checkSession: () => Promise<{ ok: boolean; message?: string; user?: unknown }>;

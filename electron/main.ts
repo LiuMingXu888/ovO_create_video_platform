@@ -12,6 +12,7 @@ import {
   uploadCompanyFile
 } from "./companySession.js";
 import type { SaveAssetInput } from "./downloadPaths.js";
+import { createGiteeReleaseUpdater } from "./giteeReleaseUpdater.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,19 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:file:save-assets", (_event, input: { assets: SaveAssetInput[] }) =>
     saveAssetsToDownloads(input)
   );
+
+  const updater = createGiteeReleaseUpdater({
+    onProgress: (progress) => {
+      for (const browserWindow of BrowserWindow.getAllWindows()) {
+        browserWindow.webContents.send("ovo:updater:progress", progress);
+      }
+    }
+  });
+
+  ipcMain.handle("ovo:updater:get-current-version", () => app.getVersion());
+  ipcMain.handle("ovo:updater:check-for-updates", () => updater.checkForUpdates());
+  ipcMain.handle("ovo:updater:download-update", () => updater.downloadUpdate());
+  ipcMain.handle("ovo:updater:install-update", () => updater.installUpdate());
 
   createMainWindow();
 

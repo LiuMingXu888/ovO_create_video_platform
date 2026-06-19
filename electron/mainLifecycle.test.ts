@@ -20,4 +20,14 @@ describe("Electron main lifecycle", () => {
     expect(source).toContain("icon: appIconPath");
     expect(source).toContain("app.dock?.setIcon(appIconPath)");
   });
+
+  it("registers manual updater IPC handlers", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "electron/main.ts"), "utf8");
+
+    expect(source).toContain('ipcMain.handle("ovo:updater:get-current-version"');
+    expect(source).toContain('ipcMain.handle("ovo:updater:check-for-updates"');
+    expect(source).toContain('ipcMain.handle("ovo:updater:download-update"');
+    expect(source).toContain('ipcMain.handle("ovo:updater:install-update"');
+    expect(source).toContain("createGiteeReleaseUpdater");
+  });
 });
