@@ -8,7 +8,7 @@ type SaveAssetInput = {
 };
 
 contextBridge.exposeInMainWorld("ovoDesktop", {
-  version: "0.1.0",
+  version: "0.1.1",
   updater: {
     getCurrentVersion: () => ipcRenderer.invoke("ovo:updater:get-current-version"),
     checkForUpdates: () => ipcRenderer.invoke("ovo:updater:check-for-updates"),

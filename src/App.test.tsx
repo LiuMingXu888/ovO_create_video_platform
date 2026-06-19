@@ -1808,8 +1808,8 @@ describe("App shell", () => {
 
     expect(await screen.findByText("v0.1.7")).toBeInTheDocument();
     const headerText = document.querySelector(".header-actions")?.textContent ?? "";
-    expect(headerText.indexOf("--")).toBeLessThan(headerText.indexOf("更新"));
-    expect(headerText.indexOf("更新")).toBeLessThan(headerText.indexOf("未登录"));
+    expect(headerText.indexOf("--")).toBeLessThan(headerText.indexOf("更新版本"));
+    expect(headerText.indexOf("更新版本")).toBeLessThan(headerText.indexOf("未登录"));
   });
 
   it("checks Gitee updates manually and switches to download state", async () => {

@@ -80,7 +80,7 @@ export function manualUpdateReducer(state: ManualUpdateState, action: ManualUpda
 export function getManualUpdateButtonLabel(state: ManualUpdateState) {
   switch (state.phase) {
     case "idle":
-      return "更新";
+      return "更新版本";
     case "checking":
       return "检查中...";
     case "available":

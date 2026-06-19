@@ -4,7 +4,7 @@ import { getManualUpdateButtonLabel, manualUpdateReducer, type ManualUpdateState
 describe("manual update state", () => {
   it("labels every visible updater phase", () => {
     const states: Array<[ManualUpdateState, string]> = [
-      [{ phase: "idle" }, "更新"],
+      [{ phase: "idle" }, "更新版本"],
       [{ phase: "checking" }, "检查中..."],
       [{ phase: "available", latestVersion: "0.1.2", message: "发现新版本 v0.1.2" }, "下载更新"],
       [{ phase: "downloading", percent: 45 }, "45%"],

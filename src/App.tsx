@@ -257,7 +257,7 @@ export function App() {
   const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
-  const [appVersion, setAppVersion] = useState(() => window.ovoDesktop?.version ?? "0.1.0");
+  const [appVersion, setAppVersion] = useState(() => window.ovoDesktop?.version ?? "0.1.1");
   const [updateState, dispatchUpdate] = useReducer(
     manualUpdateReducer,
     { phase: "idle" } satisfies ManualUpdateState

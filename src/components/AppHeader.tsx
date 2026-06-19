@@ -24,7 +24,7 @@ export function AppHeader({
   selectionMode = false,
   selectedCount = 0,
   totalAssetCount = 0,
-  appVersion = "0.1.0",
+  appVersion = "0.1.1",
   updateState = { phase: "idle" },
   onToggleSelectionMode,
   onSelectAllAssets,
