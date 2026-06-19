@@ -20,6 +20,18 @@ export function validateCleanStatus(status) {
   }
 }
 
+export function validateReleaseBranch(branchName) {
+  if (branchName.trim() !== "main") {
+    throw new Error("发布必须在 main 分支执行");
+  }
+}
+
+export function validateMainNotBehindGiteeMain({ behindCount }) {
+  if (Number(behindCount) > 0) {
+    throw new Error("本地 main 落后于 gitee/main");
+  }
+}
+
 export function validateGiteeOnlyRemote(remoteOutput) {
   const giteePushLine = remoteOutput
     .split(/\r?\n/)
@@ -64,11 +76,59 @@ export function findReleaseAssets(paths, version) {
   return { installer, latestYml };
 }
 
-export async function createDryRunPlan({ version }) {
+export function validateLatestYmlForVersion(content, version) {
+  const { installer } = expectedReleaseAssets(version);
+  const installerName = installer.split("/").at(-1);
+
+  if (!content.includes(installerName)) {
+    throw new Error("latest.yml 未引用目标安装包");
+  }
+}
+
+export function validateNoExistingRelease({ version, localTagsOutput, remoteTagsOutput, releases }) {
+  const tag = `v${version}`;
+  const localTags = localTagsOutput
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (localTags.includes(tag)) {
+    throw new Error(`本地 tag 已存在：${tag}`);
+  }
+
+  const hasRemoteTag = remoteTagsOutput
+    .split(/\r?\n/)
+    .some((line) => line.trim().endsWith(`refs/tags/${tag}`) || line.trim().endsWith(`refs/tags/${tag}^{}`));
+
+  if (hasRemoteTag) {
+    throw new Error(`Gitee tag 已存在：${tag}`);
+  }
+
+  if (releases.some((release) => release?.tag_name === tag)) {
+    throw new Error(`Gitee Release 已存在：${tag}`);
+  }
+}
+
+export function createDryRunCommandPlan({ version }) {
+  return {
+    commands: [
+      ["git", "status", "--short"],
+      ["git", "remote", "-v"],
+      ["git", "branch", "--show-current"],
+    ],
+    message: createDryRunMessage(version),
+  };
+}
+
+function createDryRunMessage(version) {
   const assets = expectedReleaseAssets(version);
   return [
     `dry-run: would release v${version}`,
     `push gitee main and v${version}`,
     `upload ${assets.latestYml} plus ${assets.installer}`,
   ].join(", and ");
+}
+
+export async function createDryRunPlan({ version }) {
+  return createDryRunMessage(version);
 }

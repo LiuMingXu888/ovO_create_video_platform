@@ -6,10 +6,14 @@ import { basename, join } from "node:path";
 
 import {
   bumpPatchVersion,
+  createDryRunCommandPlan,
   createDryRunPlan,
-  expectedReleaseAssets,
   findReleaseAssets,
   giteeApiPath,
+  validateLatestYmlForVersion,
+  validateMainNotBehindGiteeMain,
+  validateNoExistingRelease,
+  validateReleaseBranch,
   validateCleanStatus,
   validateGiteeOnlyRemote,
 } from "./releasePatchCore.mjs";
@@ -32,6 +36,15 @@ function listReleasePaths() {
   } catch {
     return [];
   }
+}
+
+async function listGiteeReleases(token) {
+  const response = await fetch(`${giteeApiPath("/releases")}?access_token=${encodeURIComponent(token)}&per_page=100`);
+  if (!response.ok) {
+    throw new Error(`查询 Gitee Release 失败：${response.status} ${await response.text()}`);
+  }
+
+  return response.json();
 }
 
 async function createGiteeRelease({ token, version, assets }) {
@@ -77,21 +90,29 @@ async function createGiteeRelease({ token, version, assets }) {
 async function main() {
   const status = run("git", ["status", "--short"]);
   const remoteOutput = run("git", ["remote", "-v"]);
+  const currentBranch = run("git", ["branch", "--show-current"]).trim();
   validateGiteeOnlyRemote(remoteOutput);
 
   if (!dryRun) {
     validateCleanStatus(status);
+    validateReleaseBranch(currentBranch);
   } else if (status.trim()) {
     console.log("dry-run: 当前工作区有未提交变更；真实发布前必须清理工作区。");
   }
 
+  if (dryRun && currentBranch !== "main") {
+    console.log("dry-run: 真实发布必须在 main 分支执行。");
+  }
+
   const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
   const nextVersion = bumpPatchVersion(packageJson.version);
-  const expectedAssets = expectedReleaseAssets(nextVersion);
 
   if (dryRun) {
+    createDryRunCommandPlan({ version: nextVersion });
+
     if (!skipBuild) {
-      findReleaseAssets(listReleasePaths(), nextVersion);
+      const assets = findReleaseAssets(listReleasePaths(), nextVersion);
+      validateLatestYmlForVersion(readFileSync(assets.latestYml, "utf8"), nextVersion);
     }
 
     console.log(await createDryRunPlan({ version: nextVersion }));
@@ -103,6 +124,15 @@ async function main() {
     throw new Error("缺少 GITEE_ACCESS_TOKEN");
   }
 
+  run("git", ["fetch", "gitee", "main", "--tags"], { stdio: "inherit" });
+  const behindCount = run("git", ["rev-list", "--count", "HEAD..gitee/main"]).trim();
+  validateMainNotBehindGiteeMain({ behindCount });
+
+  const localTagsOutput = run("git", ["tag", "--list", `v${nextVersion}`]);
+  const remoteTagsOutput = run("git", ["ls-remote", "--tags", "gitee", `v${nextVersion}`]);
+  const releases = await listGiteeReleases(token);
+  validateNoExistingRelease({ version: nextVersion, localTagsOutput, remoteTagsOutput, releases });
+
   run("npm", ["version", nextVersion, "--no-git-tag-version"], { stdio: "inherit" });
 
   if (!skipBuild) {
@@ -110,11 +140,12 @@ async function main() {
   }
 
   const assets = findReleaseAssets(listReleasePaths(), nextVersion);
+  validateLatestYmlForVersion(readFileSync(assets.latestYml, "utf8"), nextVersion);
 
   run("git", ["add", "package.json", "package-lock.json"], { stdio: "inherit" });
   run("git", ["commit", "-m", `chore: release v${nextVersion}`], { stdio: "inherit" });
   run("git", ["tag", `v${nextVersion}`], { stdio: "inherit" });
-  run("git", ["push", "gitee", "main"], { stdio: "inherit" });
+  run("git", ["push", "gitee", "HEAD:main"], { stdio: "inherit" });
   run("git", ["push", "gitee", `v${nextVersion}`], { stdio: "inherit" });
 
   await createGiteeRelease({ token, version: nextVersion, assets });
