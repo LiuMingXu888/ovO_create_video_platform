@@ -44,7 +44,9 @@ describe("buildGenerateVideoPayload", () => {
       genTab: "allref",
       referenceMode: "omnireference",
       networkEnabled: true,
+      webSearch: true,
       referenceImages: ["https://example.com/image.png"],
+      referenceImageLabels: ["图"],
       referenceVideos: ["https://example.com/video.mp4"],
       referenceAudios: ["https://example.com/audio.mp3"]
     });
@@ -74,7 +76,9 @@ describe("buildGenerateVideoPayload", () => {
       genTab: "allref",
       referenceMode: "omnireference",
       networkEnabled: true,
+      webSearch: true,
       referenceImages: ["https://example.com/image.png"],
+      referenceImageLabels: ["图"],
       referenceVideos: ["https://example.com/video.mp4"],
       referenceAudios: ["https://example.com/audio.mp3"],
       _meta: {
@@ -92,6 +96,18 @@ describe("buildGenerateVideoPayload", () => {
         aspectRatio: "9:16"
       }
     });
+  });
+
+  it("mirrors the web client web-search field and reference image labels", () => {
+    const payload = buildCompanyGenerateVideoPayload({ prompt: "生成一段视频", references: refs }) as Record<
+      string,
+      unknown
+    >;
+    // The web client sends `webSearch` (not `networkEnabled`) for the 联网/全网搜索 toggle.
+    // Sending only `networkEnabled` can leave web search silently disabled server-side.
+    expect(payload.webSearch).toBe(true);
+    // The web client sends labels parallel to referenceImages to improve multi-reference prompting.
+    expect(payload.referenceImageLabels).toEqual(["图"]);
   });
 });
 

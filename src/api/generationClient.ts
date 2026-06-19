@@ -95,8 +95,13 @@ function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, 
     generateAudio: true,
     genTab: "allref",
     referenceMode: settings.omnireference ? "omnireference" : "standard",
+    // 网页版用 webSearch 字段开联网/全网搜索；app 历史只发 networkEnabled，可能导致联网静默失效。
+    // 两个都发以对齐网页并兼容服务端任一字段名。
     networkEnabled: true,
+    webSearch: true,
     referenceImages: getReferenceValues(input.references, "image"),
+    // 与 referenceImages 等长的标签数组，对齐网页版，提升多参考图的提示词指代质量。
+    referenceImageLabels: getReferenceLabels(input.references, "image"),
     referenceVideos: getReferenceValues(input.references, "video"),
     referenceAudios: getReferenceValues(input.references, "audio")
   };
@@ -109,6 +114,10 @@ function getTaskLabel(prompt: string) {
 
 function getReferenceValues(references: ReferenceItem[], kind: ReferenceItem["kind"]) {
   return references.filter((item) => item.kind === kind).map((item) => item.url ?? item.previewUrl ?? item.name);
+}
+
+function getReferenceLabels(references: ReferenceItem[], kind: ReferenceItem["kind"]) {
+  return references.filter((item) => item.kind === kind).map((item) => item.name);
 }
 
 interface GenerateVideoResponse {
