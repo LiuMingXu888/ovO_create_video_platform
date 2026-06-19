@@ -1,3 +1,5 @@
+import yaml from "js-yaml";
+
 export const GITEE_OWNER = "siberian-aries";
 export const GITEE_REPO = "ov-o_create_video_platform";
 export const GITEE_REMOTE_URL = "git@gitee.com:siberian-aries/ov-o_create_video_platform.git";
@@ -79,8 +81,38 @@ export function findReleaseAssets(paths, version) {
 export function validateLatestYmlForVersion(content, version) {
   const { installer } = expectedReleaseAssets(version);
   const installerName = installer.split("/").at(-1);
+  const latest = yaml.load(content);
 
-  if (!content.includes(installerName)) {
+  if (!latest || typeof latest !== "object" || Array.isArray(latest)) {
+    throw new Error("latest.yml 格式不正确");
+  }
+
+  if (latest.version !== undefined && String(latest.version) !== version) {
+    throw new Error("latest.yml version 不匹配");
+  }
+
+  const candidatePaths = [];
+  if (typeof latest.path === "string") {
+    candidatePaths.push(latest.path);
+  }
+
+  if (Array.isArray(latest.files)) {
+    for (const file of latest.files) {
+      if (!file || typeof file !== "object") {
+        continue;
+      }
+
+      if (typeof file.url === "string") {
+        candidatePaths.push(file.url);
+      }
+
+      if (typeof file.path === "string") {
+        candidatePaths.push(file.path);
+      }
+    }
+  }
+
+  if (!candidatePaths.some((path) => path === installerName || path.endsWith(`/${installerName}`))) {
     throw new Error("latest.yml 未引用目标安装包");
   }
 }
@@ -110,12 +142,46 @@ export function validateNoExistingRelease({ version, localTagsOutput, remoteTags
 }
 
 export function createDryRunCommandPlan({ version }) {
+  return getReleaseCommandPlan({ dryRun: true, skipBuild: true, version });
+}
+
+export function getReleaseCommandPlan({ dryRun, skipBuild, version }) {
+  const readCommands = [
+    ["git", "status", "--short"],
+    ["git", "remote", "-v"],
+    ["git", "branch", "--show-current"],
+  ];
+
+  if (dryRun) {
+    return {
+      commands: readCommands,
+      message: createDryRunMessage(version),
+    };
+  }
+
+  const commands = [
+    ...readCommands,
+    ["git", "fetch", "gitee", "main:refs/remotes/gitee/main"],
+    ["git", "rev-list", "--count", "HEAD..refs/remotes/gitee/main"],
+    ["git", "tag", "--list", `v${version}`],
+    ["git", "ls-remote", "--tags", "gitee", `v${version}`],
+    ["npm", "version", version, "--no-git-tag-version"],
+  ];
+
+  if (!skipBuild) {
+    commands.push(["npm", "run", "dist:win:installer"]);
+  }
+
+  commands.push(
+    ["git", "add", "package.json", "package-lock.json"],
+    ["git", "commit", "-m", `chore: release v${version}`],
+    ["git", "tag", `v${version}`],
+    ["git", "push", "gitee", "HEAD:main"],
+    ["git", "push", "gitee", `v${version}`],
+  );
+
   return {
-    commands: [
-      ["git", "status", "--short"],
-      ["git", "remote", "-v"],
-      ["git", "branch", "--show-current"],
-    ],
+    commands,
     message: createDryRunMessage(version),
   };
 }
@@ -124,7 +190,7 @@ function createDryRunMessage(version) {
   const assets = expectedReleaseAssets(version);
   return [
     `dry-run: would release v${version}`,
-    `push gitee main and v${version}`,
+    `push gitee HEAD:main and v${version}`,
     `upload ${assets.latestYml} plus ${assets.installer}`,
   ].join(", and ");
 }

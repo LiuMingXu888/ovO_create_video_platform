@@ -6,9 +6,9 @@ import { basename, join } from "node:path";
 
 import {
   bumpPatchVersion,
-  createDryRunCommandPlan,
   createDryRunPlan,
   findReleaseAssets,
+  getReleaseCommandPlan,
   giteeApiPath,
   validateLatestYmlForVersion,
   validateMainNotBehindGiteeMain,
@@ -22,7 +22,8 @@ const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const skipBuild = args.has("--skip-build");
 
-function run(command, args, options = {}) {
+function run(commandParts, options = {}) {
+  const [command, ...args] = commandParts;
   return execFileSync(command, args, {
     encoding: "utf8",
     stdio: options.stdio ?? ["ignore", "pipe", "pipe"],
@@ -88,9 +89,13 @@ async function createGiteeRelease({ token, version, assets }) {
 }
 
 async function main() {
-  const status = run("git", ["status", "--short"]);
-  const remoteOutput = run("git", ["remote", "-v"]);
-  const currentBranch = run("git", ["branch", "--show-current"]).trim();
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+  const nextVersion = bumpPatchVersion(packageJson.version);
+  const commandPlan = getReleaseCommandPlan({ dryRun, skipBuild, version: nextVersion });
+  const [statusCommand, remoteCommand, branchCommand] = commandPlan.commands;
+  const status = run(statusCommand);
+  const remoteOutput = run(remoteCommand);
+  const currentBranch = run(branchCommand).trim();
   validateGiteeOnlyRemote(remoteOutput);
 
   if (!dryRun) {
@@ -104,12 +109,7 @@ async function main() {
     console.log("dry-run: 真实发布必须在 main 分支执行。");
   }
 
-  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
-  const nextVersion = bumpPatchVersion(packageJson.version);
-
   if (dryRun) {
-    createDryRunCommandPlan({ version: nextVersion });
-
     if (!skipBuild) {
       const assets = findReleaseAssets(listReleasePaths(), nextVersion);
       validateLatestYmlForVersion(readFileSync(assets.latestYml, "utf8"), nextVersion);
@@ -124,29 +124,31 @@ async function main() {
     throw new Error("缺少 GITEE_ACCESS_TOKEN");
   }
 
-  run("git", ["fetch", "gitee", "main", "--tags"], { stdio: "inherit" });
-  const behindCount = run("git", ["rev-list", "--count", "HEAD..gitee/main"]).trim();
+  const commands = Object.fromEntries(commandPlan.commands.map((command) => [command.join(" "), command]));
+
+  run(commands["git fetch gitee main:refs/remotes/gitee/main"], { stdio: "inherit" });
+  const behindCount = run(commands["git rev-list --count HEAD..refs/remotes/gitee/main"]).trim();
   validateMainNotBehindGiteeMain({ behindCount });
 
-  const localTagsOutput = run("git", ["tag", "--list", `v${nextVersion}`]);
-  const remoteTagsOutput = run("git", ["ls-remote", "--tags", "gitee", `v${nextVersion}`]);
+  const localTagsOutput = run(commands[`git tag --list v${nextVersion}`]);
+  const remoteTagsOutput = run(commands[`git ls-remote --tags gitee v${nextVersion}`]);
   const releases = await listGiteeReleases(token);
   validateNoExistingRelease({ version: nextVersion, localTagsOutput, remoteTagsOutput, releases });
 
-  run("npm", ["version", nextVersion, "--no-git-tag-version"], { stdio: "inherit" });
+  run(commands[`npm version ${nextVersion} --no-git-tag-version`], { stdio: "inherit" });
 
   if (!skipBuild) {
-    run("npm", ["run", "dist:win:installer"], { stdio: "inherit" });
+    run(commands["npm run dist:win:installer"], { stdio: "inherit" });
   }
 
   const assets = findReleaseAssets(listReleasePaths(), nextVersion);
   validateLatestYmlForVersion(readFileSync(assets.latestYml, "utf8"), nextVersion);
 
-  run("git", ["add", "package.json", "package-lock.json"], { stdio: "inherit" });
-  run("git", ["commit", "-m", `chore: release v${nextVersion}`], { stdio: "inherit" });
-  run("git", ["tag", `v${nextVersion}`], { stdio: "inherit" });
-  run("git", ["push", "gitee", "HEAD:main"], { stdio: "inherit" });
-  run("git", ["push", "gitee", `v${nextVersion}`], { stdio: "inherit" });
+  run(commands["git add package.json package-lock.json"], { stdio: "inherit" });
+  run(commands[`git commit -m chore: release v${nextVersion}`], { stdio: "inherit" });
+  run(commands[`git tag v${nextVersion}`], { stdio: "inherit" });
+  run(commands["git push gitee HEAD:main"], { stdio: "inherit" });
+  run(commands[`git push gitee v${nextVersion}`], { stdio: "inherit" });
 
   await createGiteeRelease({ token, version: nextVersion, assets });
   console.log(`released v${nextVersion} to gitee`);
