@@ -1860,6 +1860,98 @@ describe("App shell", () => {
     expect(await screen.findByRole("button", { name: "手动更新" })).toHaveTextContent("下载更新");
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
+
+  it("shows 更新失败 when the manual Gitee check rejects", async () => {
+    const checkForUpdates = vi.fn(async () => {
+      throw new Error("IPC check failed");
+    });
+    window.ovoDesktop = {
+      version: "0.1.1",
+      updater: {
+        getCurrentVersion: vi.fn(async () => "0.1.1"),
+        checkForUpdates,
+        downloadUpdate: vi.fn(),
+        installUpdate: vi.fn(),
+        onProgress: vi.fn(() => () => undefined)
+      },
+      auth: {
+        openLoginWindow: vi.fn(),
+        checkSession: vi.fn(),
+        clearSession: vi.fn()
+      },
+      discovery: {
+        inspectCanvas: vi.fn()
+      },
+      api: {
+        request: vi.fn(),
+        uploadFile: vi.fn()
+      },
+      file: {
+        saveAsset: vi.fn()
+      }
+    };
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "手动更新" }));
+
+    expect(await screen.findByRole("button", { name: "手动更新" })).toHaveTextContent("更新失败");
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows 更新失败 when the manual Gitee download rejects", async () => {
+    const checkForUpdates = vi.fn(async () => ({
+      ok: true as const,
+      status: "available" as const,
+      currentVersion: "0.1.1",
+      latestVersion: "0.1.2",
+      message: "发现新版本 v0.1.2",
+      update: {
+        releaseId: 7,
+        tagName: "v0.1.2",
+        version: "0.1.2",
+        installerName: "ovO-0.1.2-x64-setup.exe",
+        installerUrl: "https://gitee.com/setup.exe",
+        latestYmlUrl: "https://gitee.com/latest.yml"
+      }
+    }));
+    const downloadUpdate = vi.fn(async () => {
+      throw new Error("IPC download failed");
+    });
+    window.ovoDesktop = {
+      version: "0.1.1",
+      updater: {
+        getCurrentVersion: vi.fn(async () => "0.1.1"),
+        checkForUpdates,
+        downloadUpdate,
+        installUpdate: vi.fn(),
+        onProgress: vi.fn(() => () => undefined)
+      },
+      auth: {
+        openLoginWindow: vi.fn(),
+        checkSession: vi.fn(),
+        clearSession: vi.fn()
+      },
+      discovery: {
+        inspectCanvas: vi.fn()
+      },
+      api: {
+        request: vi.fn(),
+        uploadFile: vi.fn()
+      },
+      file: {
+        saveAsset: vi.fn()
+      }
+    };
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "手动更新" }));
+    expect(await screen.findByRole("button", { name: "手动更新" })).toHaveTextContent("下载更新");
+
+    fireEvent.click(screen.getByRole("button", { name: "手动更新" }));
+
+    expect(await screen.findByRole("button", { name: "手动更新" })).toHaveTextContent("更新失败");
+    expect(downloadUpdate).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("PromptDock", () => {

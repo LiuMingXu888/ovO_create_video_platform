@@ -43,6 +43,7 @@ const defaultSortModes: Record<AssetCategory, SortMode> = {
   audio: "default",
   video: "generated-desc"
 };
+const manualUpdateBridgeErrorMessage = "更新失败，请稍后重试";
 
 interface ReferenceIssue {
   id: string;
@@ -283,11 +284,13 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
-    void window.ovoDesktop?.updater?.getCurrentVersion().then((version) => {
-      if (!cancelled) {
-        setAppVersion(version);
-      }
-    });
+    void window.ovoDesktop?.updater?.getCurrentVersion()
+      .then((version) => {
+        if (!cancelled) {
+          setAppVersion(version);
+        }
+      })
+      .catch(() => undefined);
 
     const unsubscribe = window.ovoDesktop?.updater?.onProgress((progress) => {
       dispatchUpdate({ type: "download-progress", percent: progress.percent });
@@ -459,29 +462,33 @@ export function App() {
       return;
     }
 
-    if (updateState.phase === "available") {
-      dispatchUpdate({ type: "start-download" });
-      const result = await updater.downloadUpdate();
-      if (result.ok && result.filePath) {
-        dispatchUpdate({ type: "downloaded", filePath: result.filePath, message: result.message });
+    try {
+      if (updateState.phase === "available") {
+        dispatchUpdate({ type: "start-download" });
+        const result = await updater.downloadUpdate();
+        if (result.ok && result.filePath) {
+          dispatchUpdate({ type: "downloaded", filePath: result.filePath, message: result.message });
+          return;
+        }
+
+        dispatchUpdate({ type: "install-error", message: result.message });
         return;
       }
 
-      dispatchUpdate({ type: "install-error", message: result.message });
-      return;
-    }
-
-    if (updateState.phase === "downloaded") {
-      const result = await updater.installUpdate();
-      if (!result.ok) {
-        dispatchUpdate({ type: "install-error", message: result.message });
+      if (updateState.phase === "downloaded") {
+        const result = await updater.installUpdate();
+        if (!result.ok) {
+          dispatchUpdate({ type: "install-error", message: result.message });
+        }
+        return;
       }
-      return;
-    }
 
-    dispatchUpdate({ type: "start-check" });
-    const result = await updater.checkForUpdates();
-    dispatchUpdate({ type: "check-result", result });
+      dispatchUpdate({ type: "start-check" });
+      const result = await updater.checkForUpdates();
+      dispatchUpdate({ type: "check-result", result });
+    } catch {
+      dispatchUpdate({ type: "install-error", message: manualUpdateBridgeErrorMessage });
+    }
   }
 
   function insertAsset(asset: CanvasAsset) {
