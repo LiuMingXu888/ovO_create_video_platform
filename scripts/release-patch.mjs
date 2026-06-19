@@ -144,8 +144,7 @@ async function main() {
   run(commands["git add package.json package-lock.json"], { stdio: "inherit" });
   run(commands[`git commit -m chore: release v${nextVersion}`], { stdio: "inherit" });
   run(commands[`git tag v${nextVersion}`], { stdio: "inherit" });
-  run(commands["git push gitee HEAD:main"], { stdio: "inherit" });
-  run(commands[`git push gitee v${nextVersion}`], { stdio: "inherit" });
+  run(commands[`git push --atomic gitee HEAD:main v${nextVersion}`], { stdio: "inherit" });
 
   await createGiteeRelease({ token, version: nextVersion, assets });
   console.log(`released v${nextVersion} to gitee`);

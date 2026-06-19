@@ -17,6 +17,16 @@ import {
   createDryRunPlan,
 } from "./releasePatchCore.mjs";
 
+const validLatestYml = [
+  "version: 0.1.2",
+  "path: ovO-0.1.2-x64-setup.exe",
+  "sha512: top-level-sha512",
+  "files:",
+  "  - url: ovO-0.1.2-x64-setup.exe",
+  "    sha512: file-sha512",
+  "    size: 12345",
+].join("\n");
+
 describe("releasePatchCore", () => {
   it("parses only known release flags", () => {
     expect(parseReleaseArgs(["--dry-run"])).toEqual({ dryRun: true, skipBuild: false });
@@ -98,8 +108,20 @@ describe("releasePatchCore", () => {
   });
 
   it("validates latest.yml references the target installer", () => {
-    expect(() => validateLatestYmlForVersion("version: 0.1.2\npath: ovO-0.1.2-x64-setup.exe\n", "0.1.2")).not.toThrow();
-    expect(() => validateLatestYmlForVersion("version: 0.1.2\npath: ovO-0.1.1-x64-setup.exe\n", "0.1.2")).toThrow(
+    expect(() => validateLatestYmlForVersion(validLatestYml, "0.1.2")).not.toThrow();
+    expect(() =>
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "path: ovO-0.1.1-x64-setup.exe",
+          "sha512: top-level-sha512",
+          "files:",
+          "  - url: ovO-0.1.2-x64-setup.exe",
+          "    sha512: file-sha512",
+        ].join("\n"),
+        "0.1.2",
+      ),
+    ).toThrow(
       "latest.yml 未引用目标安装包",
     );
   });
@@ -110,12 +132,109 @@ describe("releasePatchCore", () => {
     );
 
     expect(() =>
-      validateLatestYmlForVersion("version: 0.1.1\npath: ovO-0.1.2-x64-setup.exe\n", "0.1.2"),
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.1",
+          "path: ovO-0.1.2-x64-setup.exe",
+          "sha512: top-level-sha512",
+          "files:",
+          "  - url: ovO-0.1.2-x64-setup.exe",
+          "    sha512: file-sha512",
+        ].join("\n"),
+        "0.1.2",
+      ),
     ).toThrow("latest.yml version 不匹配");
 
     expect(() =>
-      validateLatestYmlForVersion("version: 0.1.2\n# ovO-0.1.2-x64-setup.exe\npath: other.exe\n", "0.1.2"),
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "# ovO-0.1.2-x64-setup.exe",
+          "path: other.exe",
+          "sha512: top-level-sha512",
+          "files:",
+          "  - url: other.exe",
+          "    sha512: file-sha512",
+        ].join("\n"),
+        "0.1.2",
+      ),
     ).toThrow("latest.yml 未引用目标安装包");
+  });
+
+  it("rejects latest.yml missing top-level sha512", () => {
+    expect(() =>
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "path: ovO-0.1.2-x64-setup.exe",
+          "files:",
+          "  - url: ovO-0.1.2-x64-setup.exe",
+          "    sha512: file-sha512",
+        ].join("\n"),
+        "0.1.2",
+      ),
+    ).toThrow("latest.yml 缺少 sha512");
+  });
+
+  it("rejects latest.yml missing files array", () => {
+    expect(() =>
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "path: ovO-0.1.2-x64-setup.exe",
+          "sha512: top-level-sha512",
+        ].join("\n"),
+        "0.1.2",
+      ),
+    ).toThrow("latest.yml 缺少 files");
+  });
+
+  it("rejects latest.yml without a matching file entry", () => {
+    expect(() =>
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "path: ovO-0.1.2-x64-setup.exe",
+          "sha512: top-level-sha512",
+          "files:",
+          "  - url: other.exe",
+          "    sha512: file-sha512",
+        ].join("\n"),
+        "0.1.2",
+      ),
+    ).toThrow("latest.yml files 未引用目标安装包");
+  });
+
+  it("rejects latest.yml matching file entries without sha512", () => {
+    expect(() =>
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "path: ovO-0.1.2-x64-setup.exe",
+          "sha512: top-level-sha512",
+          "files:",
+          "  - url: ovO-0.1.2-x64-setup.exe",
+        ].join("\n"),
+        "0.1.2",
+      ),
+    ).toThrow("latest.yml file sha512 不正确");
+  });
+
+  it("rejects latest.yml matching file entries with non-positive size", () => {
+    expect(() =>
+      validateLatestYmlForVersion(
+        [
+          "version: 0.1.2",
+          "path: ovO-0.1.2-x64-setup.exe",
+          "sha512: top-level-sha512",
+          "files:",
+          "  - url: ovO-0.1.2-x64-setup.exe",
+          "    sha512: file-sha512",
+          "    size: 0",
+        ].join("\n"),
+        "0.1.2",
+      ),
+    ).toThrow("latest.yml file size 不正确");
   });
 
   it("rejects existing local tag, remote tag, or gitee release before mutation", () => {
@@ -186,7 +305,9 @@ describe("releasePatchCore", () => {
     expect(executableCommands).toContain("git fetch gitee main:refs/remotes/gitee/main");
     expect(executableCommands).toContain("git rev-list --count HEAD..refs/remotes/gitee/main");
     expect(executableCommands).toContain("git ls-remote --tags gitee v0.1.1");
-    expect(executableCommands).toContain("git push gitee HEAD:main");
+    expect(executableCommands).toContain("git push --atomic gitee HEAD:main v0.1.1");
+    expect(executableCommands).not.toContain("git push gitee HEAD:main");
+    expect(executableCommands).not.toContain("git push gitee v0.1.1");
     expect(executableCommands).not.toContain("git fetch gitee main --tags");
   });
 

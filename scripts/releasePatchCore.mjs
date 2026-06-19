@@ -119,29 +119,36 @@ export function validateLatestYmlForVersion(content, version) {
     throw new Error("latest.yml version 不匹配");
   }
 
-  const candidatePaths = [];
-  if (typeof latest.path === "string") {
-    candidatePaths.push(latest.path);
-  }
-
-  if (Array.isArray(latest.files)) {
-    for (const file of latest.files) {
-      if (!file || typeof file !== "object") {
-        continue;
-      }
-
-      if (typeof file.url === "string") {
-        candidatePaths.push(file.url);
-      }
-
-      if (typeof file.path === "string") {
-        candidatePaths.push(file.path);
-      }
-    }
-  }
-
-  if (!candidatePaths.some((path) => path === installerName || path.endsWith(`/${installerName}`))) {
+  if (latest.path !== installerName) {
     throw new Error("latest.yml 未引用目标安装包");
+  }
+
+  if (typeof latest.sha512 !== "string" || !latest.sha512.trim()) {
+    throw new Error("latest.yml 缺少 sha512");
+  }
+
+  if (!Array.isArray(latest.files) || latest.files.length === 0) {
+    throw new Error("latest.yml 缺少 files");
+  }
+
+  const matchingFile = latest.files.find((file) => {
+    if (!file || typeof file !== "object") {
+      return false;
+    }
+
+    return file.url === installerName || file.path === installerName;
+  });
+
+  if (!matchingFile) {
+    throw new Error("latest.yml files 未引用目标安装包");
+  }
+
+  if (typeof matchingFile.sha512 !== "string" || !matchingFile.sha512.trim()) {
+    throw new Error("latest.yml file sha512 不正确");
+  }
+
+  if (matchingFile.size !== undefined && (typeof matchingFile.size !== "number" || matchingFile.size <= 0)) {
+    throw new Error("latest.yml file size 不正确");
   }
 }
 
@@ -205,8 +212,7 @@ export function getReleaseCommandPlan({ dryRun, skipBuild, version }) {
     ["git", "add", "package.json", "package-lock.json"],
     ["git", "commit", "-m", `chore: release v${version}`],
     ["git", "tag", `v${version}`],
-    ["git", "push", "gitee", "HEAD:main"],
-    ["git", "push", "gitee", `v${version}`],
+    ["git", "push", "--atomic", "gitee", "HEAD:main", `v${version}`],
   );
 
   return {
