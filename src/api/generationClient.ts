@@ -176,7 +176,7 @@ export async function generateVideo(
 
   const pollResult =
     input.projectId && input.nodeId
-      ? await pollCanvasQueueUntilComplete(transport, input.projectId, input.nodeId, queueTaskId, options)
+      ? await pollCanvasQueueUntilComplete(transport, input.projectId, input.nodeId, queueTaskId, options, submitResult.taskId)
       : await pollTaskUntilComplete(transport, endpoints.generateVideoTask(submitResult.taskId), options);
   const persistResult = await persistTaskIfNeeded(transport, submitResult.taskId, pollResult);
   const videoUrl =
@@ -278,9 +278,10 @@ async function pollCanvasQueueUntilComplete(
   projectId: string,
   nodeId: string,
   taskId: string,
-  options: PollOptions
+  options: PollOptions,
+  providerTaskId?: string
 ): Promise<GenerateVideoPollResponse> {
-  console.log("[轮询开始] projectId:", projectId, "nodeId:", nodeId, "taskId:", taskId);
+  console.log("[轮询开始] projectId:", projectId, "nodeId:", nodeId, "taskId:", taskId, "providerTaskId:", providerTaskId);
   console.log("[轮询配置] maxAttempts:", options.maxAttempts, "intervalMs:", options.intervalMs);
   let lastTaskResult: GenerateVideoPollResponse | undefined;
 
@@ -302,6 +303,15 @@ async function pollCanvasQueueUntilComplete(
       return taskResult;
     }
 
+    // 加速器：画布队列(/api/gen-queue)对 canvas-mode 任务可能滞后约45分钟才 reconcile，
+    // 但视频本身通常几分钟就好，并已能在单任务端点(/api/generate-video/{taskId})取到。
+    // 网页版同时轮询这两个端点；这里也补查单任务端点，任一 succeeded 即返回，避免空等。
+    const accelerated = await requestProviderTaskStatus(transport, providerTaskId);
+    if (accelerated?.status === "succeeded" && hasAnyVideoUrl(accelerated)) {
+      console.log("[轮询成功] 单任务端点已完成(队列仍滞后):", accelerated);
+      return accelerated;
+    }
+
     if (taskResult?.status) {
       console.log(`[轮询进行中] 任务状态: ${taskResult.status}, 等待${options.intervalMs}ms后重试`);
     } else {
@@ -315,6 +325,29 @@ async function pollCanvasQueueUntilComplete(
 
   console.error("[轮询超时] 已尝试", options.maxAttempts, "次，任务仍未完成");
   throw new Error(`任务轮询超时：${formatQueueDiagnostics(lastTaskResult)}`);
+}
+
+// 查询单任务端点；任何错误(含任务过期 410)都吞掉返回 undefined —— 它只是加速器，
+// 队列(/api/gen-queue)仍是失败与最终状态的权威来源。
+async function requestProviderTaskStatus(
+  transport: ApiTransport,
+  providerTaskId?: string
+): Promise<GenerateVideoPollResponse | undefined> {
+  if (!providerTaskId) {
+    return undefined;
+  }
+
+  try {
+    return await transport.request<GenerateVideoPollResponse>(endpoints.generateVideoTask(providerTaskId));
+  } catch {
+    return undefined;
+  }
+}
+
+function hasAnyVideoUrl(result: GenerateVideoPollResponse) {
+  return Boolean(
+    result.videoUrl ?? result.outputUrl ?? result.resultUrl ?? result.providerVideoUrl ?? result.seedanceProviderUrl
+  );
 }
 
 async function requestQueueStatus(transport: ApiTransport, projectId: string, taskId?: string) {

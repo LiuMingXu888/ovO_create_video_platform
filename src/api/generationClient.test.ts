@@ -137,13 +137,17 @@ describe("generateVideo", () => {
   });
 
   it("submits a generation task and returns the first completed video URL", async () => {
-    const transport: ApiTransport = {
-      request: vi.fn()
-        .mockResolvedValueOnce({ taskId: "task-1" })
-        .mockResolvedValueOnce({
-          items: [{ taskId: "task-1", nodeId: "video-node-1", status: "running" }]
-        })
-        .mockResolvedValueOnce({
+    let genQueueCalls = 0;
+    const request = vi.fn((path: string): Promise<any> => {
+      if (path === "/api/generate-video") {
+        return Promise.resolve({ taskId: "task-1" });
+      }
+      if (path.startsWith("/api/gen-queue")) {
+        genQueueCalls += 1;
+        if (genQueueCalls === 1) {
+          return Promise.resolve({ items: [{ taskId: "task-1", nodeId: "video-node-1", status: "running" }] });
+        }
+        return Promise.resolve({
           items: [
             {
               taskId: "task-1",
@@ -153,8 +157,15 @@ describe("generateVideo", () => {
               providerVideoUrl: "https://provider.example.com/generated.mp4"
             }
           ]
-        })
-    };
+        });
+      }
+      // single-task accelerator endpoint keeps lagging in this scenario
+      if (path.startsWith("/api/generate-video/")) {
+        return Promise.resolve({ status: "polling" });
+      }
+      return Promise.reject(new Error(`unexpected path ${path}`));
+    });
+    const transport: ApiTransport = { request };
 
     await expect(
       generateVideo(
@@ -189,14 +200,51 @@ describe("generateVideo", () => {
     expect(transport.request).toHaveBeenNthCalledWith(2, "/api/gen-queue?projectId=project-1&taskId=task-1");
   });
 
+  it("returns as soon as the single-task endpoint reports success while the canvas queue lags", async () => {
+    // Canvas-mode tasks: the video is ready on /api/generate-video/{taskId} in minutes, but the
+    // canvas queue (/api/gen-queue) can lag ~45min before reconciling. The web client polls both;
+    // we must too, returning on whichever reports success first.
+    const request = vi.fn((path: string): Promise<any> => {
+      if (path === "/api/generate-video") {
+        return Promise.resolve({ taskId: "cgt-provider-1", queueTaskId: "queue-1" });
+      }
+      if (path.startsWith("/api/gen-queue")) {
+        return Promise.resolve({ tasks: [{ id: "queue-1", nodeId: "video-node-1", status: "polling" }] });
+      }
+      if (path === "/api/generate-video/cgt-provider-1") {
+        return Promise.resolve({ status: "succeeded", videoUrl: "https://example.com/fast.mp4", persisted: true });
+      }
+      return Promise.reject(new Error(`unexpected path ${path}`));
+    });
+    const transport: ApiTransport = { request };
+
+    await expect(
+      generateVideo(
+        transport,
+        { projectId: "project-1", nodeId: "video-node-1", prompt: "生成一段视频", references: refs },
+        { intervalMs: 0, maxAttempts: 5 }
+      )
+    ).resolves.toEqual({
+      taskId: "cgt-provider-1",
+      videoUrl: "https://example.com/fast.mp4",
+      providerVideoUrl: undefined,
+      persisted: true
+    });
+    expect(transport.request).toHaveBeenCalledWith("/api/generate-video/cgt-provider-1");
+  });
+
   it("polls the canvas generation queue for queued canvas video tasks", async () => {
-    const transport: ApiTransport = {
-      request: vi.fn()
-        .mockResolvedValueOnce({ tasks: [{ taskId: "queue-task-1", nodeId: "video-node-1" }] })
-        .mockResolvedValueOnce({
-          items: [{ taskId: "queue-task-1", nodeId: "video-node-1", status: "running" }]
-        })
-        .mockResolvedValueOnce({
+    let genQueueCalls = 0;
+    const request = vi.fn((path: string): Promise<any> => {
+      if (path === "/api/generate-video") {
+        return Promise.resolve({ tasks: [{ taskId: "queue-task-1", nodeId: "video-node-1" }] });
+      }
+      if (path.startsWith("/api/gen-queue")) {
+        genQueueCalls += 1;
+        if (genQueueCalls === 1) {
+          return Promise.resolve({ items: [{ taskId: "queue-task-1", nodeId: "video-node-1", status: "running" }] });
+        }
+        return Promise.resolve({
           items: [
             {
               taskId: "queue-task-1",
@@ -207,8 +255,14 @@ describe("generateVideo", () => {
               persisted: true
             }
           ]
-        })
-    };
+        });
+      }
+      if (path.startsWith("/api/generate-video/")) {
+        return Promise.resolve({ status: "polling" });
+      }
+      return Promise.reject(new Error(`unexpected path ${path}`));
+    });
+    const transport: ApiTransport = { request };
 
     await expect(
       generateVideo(
@@ -222,8 +276,7 @@ describe("generateVideo", () => {
       providerVideoUrl: "https://provider.example.com/generated-queue.mp4",
       persisted: true
     });
-    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/gen-queue?projectId=project-1&taskId=queue-task-1");
-    expect(transport.request).toHaveBeenNthCalledWith(3, "/api/gen-queue?projectId=project-1&taskId=queue-task-1");
+    expect(transport.request).toHaveBeenCalledWith("/api/gen-queue?projectId=project-1&taskId=queue-task-1");
   });
 
   it("includes the last canvas queue diagnostics when polling times out", async () => {
