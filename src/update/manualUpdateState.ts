@@ -40,7 +40,7 @@ export type ManualUpdateAction =
   | { type: "install-error"; message: string }
   | { type: "reset" };
 
-export function manualUpdateReducer(_state: ManualUpdateState, action: ManualUpdateAction): ManualUpdateState {
+export function manualUpdateReducer(state: ManualUpdateState, action: ManualUpdateAction): ManualUpdateState {
   switch (action.type) {
     case "start-check":
       return { phase: "checking" };
@@ -63,6 +63,10 @@ export function manualUpdateReducer(_state: ManualUpdateState, action: ManualUpd
     case "start-download":
       return { phase: "downloading", percent: 0 };
     case "download-progress":
+      if (state.phase !== "downloading") {
+        return state;
+      }
+
       return { phase: "downloading", percent: action.percent };
     case "downloaded":
       return { phase: "downloaded", filePath: action.filePath, message: action.message };

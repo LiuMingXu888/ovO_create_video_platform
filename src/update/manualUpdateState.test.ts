@@ -48,4 +48,12 @@ describe("manual update state", () => {
       message: "发现新版本 v0.1.2"
     });
   });
+
+  it("ignores stale progress after the manual update leaves downloading", () => {
+    const state: ManualUpdateState = { phase: "error", message: "更新失败，请稍后重试" };
+
+    const next = manualUpdateReducer(state, { type: "download-progress", percent: 67 });
+
+    expect(next).toBe(state);
+  });
 });
