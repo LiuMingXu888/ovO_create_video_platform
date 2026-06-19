@@ -47,6 +47,21 @@ Observed page asset inventory:
 
 The current Chrome execution environment allowed reading page structure, page assets, and front-end bundles. It did not allow direct `fetch` or `XMLHttpRequest` from the read-only page scope, so full response-body probing still needs a later implementation/debug pass using Playwright or app-side request code.
 
+## Electron Login State Fix Plan
+
+Current issue: the Electron login window can open the company site, but the app checks `/api/auth/me` with Node's global `fetch`. That fetch does not share cookies with the Chromium login window, so a successful login inside Electron is still reported as invalid by the app.
+
+Root cause: the login window and auth-check request are using different session stores.
+
+Implementation plan:
+
+1. Create one named persistent Electron partition for company auth, for example `persist:ovo-company-session`.
+2. Open the company login window with that partition.
+3. Run `/api/auth/me` checks through the same Electron session instead of Node global `fetch`.
+4. Poll briefly after opening the login window, so the app can return logged-in status as soon as the company login completes.
+5. Clear cookies, storage data, cache, and local auth files when the user clears the session.
+6. Add an explicit renderer action for opening the company login window, while keeping the existing check-login action as a manual refresh.
+
 ## Confirmed API Endpoints From Page And Bundles
 
 ### User And Session
@@ -366,3 +381,258 @@ This slice has no company API side effects and can be reviewed visually before c
 3. All sections are expanded by default.
 4. Clicking a card plus action inserts the resource name into the prompt area.
 5. Upload, video generation, and subtitle-removal tests may consume credits after explicit user approval for that test pass.
+
+## Real Flow Verification Result
+
+Date: 2026-06-15
+
+This pass used the user's existing logged-in Chrome session on:
+
+`http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x`
+
+The user explicitly approved spending credits to test the real upload, generation, and subtitle-removal flow. The notes below contain only endpoint paths, status codes, and field shapes. Cookies, tokens, raw response bodies, signed media URLs, generated video URLs, and private project payloads were not committed.
+
+### Electron Fetch Auth
+
+Browser-side same-origin requests work with normal browser-managed credentials:
+
+- `GET /api/auth/me` returned `200`.
+- `GET /api/projects/{projectId}/snapshot` returned `200`.
+- `GET /api/gen-queue?projectId={projectId}` returned `200`.
+- `GET /api/projects/{projectId}` returned `200`.
+
+For Electron-side fetch, the app needs to preserve the browser session in Electron's own session partition or Playwright storage state. The request headers that matter for JSON calls are ordinary:
+
+- `accept: application/json`
+- `content-type: application/json` for JSON `POST`
+- browser-managed cookies/session credentials
+
+No bearer token was observed as necessary from the renderer-side request pattern.
+
+### Snapshot Resource Coverage
+
+`GET /api/projects/{projectId}/snapshot` is sufficient for the target canvas' resource read path.
+
+Observed sanitized shape:
+
+```json
+{
+  "snapshot": {
+    "nodes": "array",
+    "edges": "array",
+    "episodes": "array",
+    "activeEpisodeId": "string"
+  },
+  "hash": "string",
+  "source": "string"
+}
+```
+
+Observed counts from the target canvas:
+
+- `nodes`: 84
+- `edges`: 25
+- detected URL-like fields: 85
+- node type counts:
+  - `image`: 80
+  - `video`: 3
+  - `subtitleRemove`: 1
+
+Important resource fields found in node data:
+
+- images: `imageUrl`, `assetId`, `assetUri`, `assetStatus`
+- videos: `videoUrl`, `seedanceProviderUrl`, `duration`, `resolution`, `generateAudio`, `genTab`, `videoPersisted`
+- subtitle removal: `sourceVideoUrl`, `outputVideoUrl`, `sourceProviderUrl`, `sourceModel`, `runId`, `channel`
+
+`GET /api/asset/list?statuses=Active&pageSize=5` returned an empty `items` array for this account during the pass, so the first resource-loading implementation should prefer snapshot nodes. `GET /api/library` returned library items, but that is a broader material library and should be treated as optional enrichment/search, not the primary canvas read path.
+
+### Upload Sequence
+
+A real minimal image upload to `POST /api/upload-file` succeeded.
+
+Request shape:
+
+- `FormData.file`
+- `FormData.prefix`
+- optional `FormData.projectId`
+
+Response shape:
+
+```json
+{
+  "publicUrl": "string",
+  "key": "string",
+  "fileSize": "number",
+  "storage": "string"
+}
+```
+
+Conclusion:
+
+- For generation references, `POST /api/upload-file` is enough to obtain a usable URL.
+- `POST /api/asset/upload` is the asset-library registration/review layer. It is needed when the app wants the uploaded file to appear in the server asset library.
+- The registration endpoint accepts JSON and returns an asset record or an error with fields such as `error`, `errorCode`, `errorDetail`, and `assetName`.
+- Each media type should first use file storage upload. Asset registration should be a separate optional step unless the specific product flow requires library persistence.
+
+### Generation
+
+Directly sending display model name `Seedance 2.0` to `POST /api/generate-video` failed with `404`, proving that the backend requires a model id rather than the UI display name.
+
+Confirmed display-to-backend mapping from the production front-end bundle:
+
+```json
+{
+  "Seedance 2.0": "ep-20260319213857-htd7q",
+  "Seedance 2.0 fast": "ep-20260319215138-fl4m6"
+}
+```
+
+A real minimal generation request using `ep-20260319213857-htd7q` succeeded.
+
+Request fields used:
+
+```json
+{
+  "prompt": "string",
+  "model": "ep-20260319213857-htd7q",
+  "duration": "number",
+  "aspectRatio": "9:16",
+  "resolution": "720p",
+  "generateAudio": "boolean",
+  "referenceImages": ["string"]
+}
+```
+
+`POST /api/generate-video` response shape:
+
+```json
+{
+  "taskId": "string",
+  "queueTaskId": "object",
+  "_genTaskId": "object"
+}
+```
+
+`GET /api/generate-video/{taskId}` polling shape:
+
+```json
+{
+  "taskId": "string",
+  "status": "string",
+  "videoUrl": "string",
+  "providerVideoUrl": "string",
+  "persisted": "boolean",
+  "error": "object"
+}
+```
+
+The test generation reached `status: succeeded` and returned both `videoUrl` and `providerVideoUrl`. The response had `persisted: true`.
+
+Default values found in existing canvas video nodes:
+
+- display model: `Seedance 2.0`
+- backend model id: `ep-20260319213857-htd7q`
+- `duration`: 15 in existing nodes; allowed duration list includes 4-15
+- `aspectRatio`: `9:16`
+- `resolution`: `720p`
+- `generateAudio`: `true`
+- `genTab`: `allref` for multi-reference generation; `extend` for extension nodes
+
+### Generation Queue And Persist Task
+
+The canvas UI also uses `/api/gen-queue` as a queue wrapper.
+
+Relevant queue endpoints:
+
+- `GET /api/gen-queue?projectId={projectId}`
+- `POST /api/gen-queue` with `{ "action": "batch", "tasks": [...] }`
+- `POST /api/gen-queue` with `{ "action": "mark_succeeded", "taskId": "...", "resultUrl": "..." }`
+- `POST /api/gen-queue` with `{ "action": "mark_failed", "taskId": "...", "errorMessage": "..." }`
+- `POST /api/gen-queue` with `{ "action": "cancel_node_tasks", "nodeId": "...", "projectId": "...", "excludeTaskId": "..." }`
+
+Batch queue video task shape includes:
+
+```json
+{
+  "projectId": "string",
+  "nodeId": "string",
+  "episodeId": "string",
+  "type": "video",
+  "params": {
+    "prompt": "string",
+    "model": "string",
+    "duration": "number",
+    "aspectRatio": "string",
+    "resolution": "string",
+    "generateAudio": "boolean",
+    "referenceImages": ["string"],
+    "referenceVideos": ["string"],
+    "referenceAudios": ["string"]
+  },
+  "label": "string",
+  "modelName": "string",
+  "duration": "number",
+  "priority": "number"
+}
+```
+
+`POST /api/asset/persist-task` is used when a generated video is still on a provider temporary link. Request shape:
+
+```json
+{
+  "taskId": "string"
+}
+```
+
+Response shape:
+
+```json
+{
+  "persisted": "boolean",
+  "url": "string",
+  "error": "string"
+}
+```
+
+Conclusion:
+
+- Direct `/api/generate-video` can return `persisted: true`, in which case `persist-task` is not required.
+- The app should still implement `persist-task` as a fallback when `persisted` is false or the UI shows an unpersisted provider URL.
+- To mirror the canvas UI exactly, generation from canvas nodes should use `/api/gen-queue`; a simpler first version can call `/api/generate-video` directly and store local task history.
+
+### Subtitle Removal
+
+Both subtitle-removal routes were verified to accept real tasks:
+
+- `POST /api/subtitle-remove`
+- `POST /api/subtitle-remove/ark`
+
+Default route:
+
+- `POST /api/subtitle-remove` accepts the persisted `videoUrl`.
+- It returned `200` with shape `{ "runId": "string", "status": "string", "_genTaskId": "object" }`.
+- Poll route: `GET /api/subtitle-remove/{runId}`.
+
+Ark route:
+
+- `POST /api/subtitle-remove/ark` accepts the provider/original URL.
+- It returned `200` with shape `{ "runId": "string", "status": "string", "_genTaskId": "object" }`.
+- Poll route: `GET /api/subtitle-remove/ark/{runId}`.
+
+Polling shape for both routes:
+
+```json
+{
+  "runId": "string",
+  "status": "string",
+  "videoUrl": "object-or-string",
+  "error": "object-or-string"
+}
+```
+
+At the end of the observation window, both subtitle-removal test tasks were still `running`, so the creation and polling routes are confirmed, but final success timing was not measured in this pass.
+
+Recommendation:
+
+- Use `/api/subtitle-remove` as the default product path because it works with the normal persisted output URL.
+- Offer `/api/subtitle-remove/ark` only when a fresh `providerVideoUrl` exists. The production UI treats this as the free/provider channel and checks that the provider URL is still available.
