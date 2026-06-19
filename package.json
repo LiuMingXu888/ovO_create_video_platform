@@ -16,6 +16,7 @@
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist:win:installer": "npm run build && electron-builder --win nsis --x64",
     "dist:win:portable": "npm run build && electron-builder --win portable --x64",
+    "release:patch": "node scripts/release-patch.mjs",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "preview": "vite preview --host 127.0.0.1"
