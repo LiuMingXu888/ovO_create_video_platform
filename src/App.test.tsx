@@ -32,6 +32,7 @@ afterEach(() => {
 
 beforeEach(() => {
   localStorage.clear();
+  window.ovoDesktop = undefined;
   vi.mocked(companyApiFacade.uploadCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.saveCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.renameCanvasAsset).mockReset();
@@ -1774,6 +1775,90 @@ describe("App shell", () => {
         expect.objectContaining({ fileName: "开场参考视频.mp4", category: "video", categoryLabel: "视频" })
       ])
     );
+  });
+
+  it("shows the app version beside the ovO logo and places update between credits and account", async () => {
+    window.ovoDesktop = {
+      version: "0.1.0",
+      updater: {
+        getCurrentVersion: vi.fn(async () => "0.1.7"),
+        checkForUpdates: vi.fn(),
+        downloadUpdate: vi.fn(),
+        installUpdate: vi.fn(),
+        onProgress: vi.fn(() => () => undefined)
+      },
+      auth: {
+        openLoginWindow: vi.fn(),
+        checkSession: vi.fn(),
+        clearSession: vi.fn()
+      },
+      discovery: {
+        inspectCanvas: vi.fn()
+      },
+      api: {
+        request: vi.fn(),
+        uploadFile: vi.fn()
+      },
+      file: {
+        saveAsset: vi.fn()
+      }
+    };
+
+    render(<App />);
+
+    expect(await screen.findByText("v0.1.7")).toBeInTheDocument();
+    const headerText = document.querySelector(".header-actions")?.textContent ?? "";
+    expect(headerText.indexOf("--")).toBeLessThan(headerText.indexOf("更新"));
+    expect(headerText.indexOf("更新")).toBeLessThan(headerText.indexOf("未登录"));
+  });
+
+  it("checks Gitee updates manually and switches to download state", async () => {
+    const checkForUpdates = vi.fn(async () => ({
+      ok: true as const,
+      status: "available" as const,
+      currentVersion: "0.1.1",
+      latestVersion: "0.1.2",
+      message: "发现新版本 v0.1.2",
+      update: {
+        releaseId: 7,
+        tagName: "v0.1.2",
+        version: "0.1.2",
+        installerName: "ovO-0.1.2-x64-setup.exe",
+        installerUrl: "https://gitee.com/setup.exe",
+        latestYmlUrl: "https://gitee.com/latest.yml"
+      }
+    }));
+    window.ovoDesktop = {
+      version: "0.1.1",
+      updater: {
+        getCurrentVersion: vi.fn(async () => "0.1.1"),
+        checkForUpdates,
+        downloadUpdate: vi.fn(),
+        installUpdate: vi.fn(),
+        onProgress: vi.fn(() => () => undefined)
+      },
+      auth: {
+        openLoginWindow: vi.fn(),
+        checkSession: vi.fn(),
+        clearSession: vi.fn()
+      },
+      discovery: {
+        inspectCanvas: vi.fn()
+      },
+      api: {
+        request: vi.fn(),
+        uploadFile: vi.fn()
+      },
+      file: {
+        saveAsset: vi.fn()
+      }
+    };
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "手动更新" }));
+
+    expect(await screen.findByRole("button", { name: "手动更新" })).toHaveTextContent("下载更新");
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
 });
 

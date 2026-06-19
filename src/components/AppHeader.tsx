@@ -1,5 +1,6 @@
-import { Coins, Download, LogOut, MousePointer2, SquareCheck, UserRound, X } from "lucide-react";
+import { Coins, Download, LogOut, MousePointer2, RefreshCw, SquareCheck, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
+import { getManualUpdateButtonLabel, isManualUpdateBusy, type ManualUpdateState } from "../update/manualUpdateState";
 
 interface AppHeaderProps {
   authState?: AuthState;
@@ -7,10 +8,13 @@ interface AppHeaderProps {
   selectionMode?: boolean;
   selectedCount?: number;
   totalAssetCount?: number;
+  appVersion?: string;
+  updateState?: ManualUpdateState;
   onToggleSelectionMode?: () => void;
   onSelectAllAssets?: () => void;
   onDownloadSelected?: () => void;
   onCancelSelectionMode?: () => void;
+  onUpdateClick?: () => void;
   onLogout?: () => void;
 }
 
@@ -20,10 +24,13 @@ export function AppHeader({
   selectionMode = false,
   selectedCount = 0,
   totalAssetCount = 0,
+  appVersion = "0.1.0",
+  updateState = { phase: "idle" },
   onToggleSelectionMode,
   onSelectAllAssets,
   onDownloadSelected,
   onCancelSelectionMode,
+  onUpdateClick,
   onLogout
 }: AppHeaderProps) {
   const accountLabel =
@@ -41,7 +48,7 @@ export function AppHeader({
     <header className="app-header">
       <div className="brand" aria-label="ovO">
         <span className="brand-mark">ovO</span>
-        <span className="brand-subtitle">Create Video</span>
+        <span className="brand-version">v{appVersion}</span>
       </div>
 
       <div className="project-title">
@@ -87,6 +94,17 @@ export function AppHeader({
           <Coins size={16} />
           <span>{creditLabel}</span>
         </div>
+        <button
+          type="button"
+          className={`header-tool-button update-button update-button-${updateState.phase}`}
+          aria-label="手动更新"
+          title={updateState.message ?? "从 Gitee 检查更新"}
+          onClick={onUpdateClick}
+          disabled={isManualUpdateBusy(updateState)}
+        >
+          <RefreshCw size={16} />
+          <span>{getManualUpdateButtonLabel(updateState)}</span>
+        </button>
         <button type="button" className="account-button" title="账户">
           <UserRound size={18} />
           <span>{accountLabel}</span>

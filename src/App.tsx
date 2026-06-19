@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
@@ -32,6 +32,7 @@ import type {
   ReferenceItem,
   SortMode
 } from "./types";
+import { manualUpdateReducer, type ManualUpdateState } from "./update/manualUpdateState";
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
 const mb = 1024 * 1024;
@@ -255,6 +256,11 @@ export function App() {
   const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
+  const [appVersion, setAppVersion] = useState(() => window.ovoDesktop?.version ?? "0.1.0");
+  const [updateState, dispatchUpdate] = useReducer(
+    manualUpdateReducer,
+    { phase: "idle" } satisfies ManualUpdateState
+  );
   const assetObjectUrls = useRef<Set<string>>(new Set());
   const referenceObjectUrls = useRef<Map<string, string>>(new Map());
   const mediaElements = useRef<Map<string, HTMLMediaElement>>(new Map());
@@ -271,6 +277,25 @@ export function App() {
       assetObjectUrls.current.clear();
       referenceObjectUrls.current.clear();
       mediaElements.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void window.ovoDesktop?.updater?.getCurrentVersion().then((version) => {
+      if (!cancelled) {
+        setAppVersion(version);
+      }
+    });
+
+    const unsubscribe = window.ovoDesktop?.updater?.onProgress((progress) => {
+      dispatchUpdate({ type: "download-progress", percent: progress.percent });
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
     };
   }, []);
 
@@ -422,6 +447,41 @@ export function App() {
     setReferences([]);
     setReferenceIssues([]);
     setCanvasNotice("已退出登录");
+  }
+
+  async function handleManualUpdateClick() {
+    const updater = window.ovoDesktop?.updater;
+    if (!updater) {
+      dispatchUpdate({
+        type: "check-result",
+        result: { ok: false, status: "unsupported", currentVersion: appVersion, message: "开发模式不检查更新" }
+      });
+      return;
+    }
+
+    if (updateState.phase === "available") {
+      dispatchUpdate({ type: "start-download" });
+      const result = await updater.downloadUpdate();
+      if (result.ok && result.filePath) {
+        dispatchUpdate({ type: "downloaded", filePath: result.filePath, message: result.message });
+        return;
+      }
+
+      dispatchUpdate({ type: "install-error", message: result.message });
+      return;
+    }
+
+    if (updateState.phase === "downloaded") {
+      const result = await updater.installUpdate();
+      if (!result.ok) {
+        dispatchUpdate({ type: "install-error", message: result.message });
+      }
+      return;
+    }
+
+    dispatchUpdate({ type: "start-check" });
+    const result = await updater.checkForUpdates();
+    dispatchUpdate({ type: "check-result", result });
   }
 
   function insertAsset(asset: CanvasAsset) {
@@ -1265,6 +1325,8 @@ export function App() {
       <AppHeader
         authState={authState}
         project={displayProject}
+        appVersion={appVersion}
+        updateState={updateState}
         selectionMode={selectionMode}
         selectedCount={selectedAssetIds.size}
         totalAssetCount={assets.length}
@@ -1272,6 +1334,7 @@ export function App() {
         onSelectAllAssets={selectAllAssets}
         onCancelSelectionMode={cancelSelectionMode}
         onDownloadSelected={handleDownloadSelected}
+        onUpdateClick={handleManualUpdateClick}
         onLogout={handleLogout}
       />
 

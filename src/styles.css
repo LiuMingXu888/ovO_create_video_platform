@@ -73,9 +73,22 @@ button {
   letter-spacing: 0;
 }
 
-.brand-subtitle,
+.brand-version,
 .project-title small {
   color: #68705f;
+}
+
+.brand-version {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid #d7d4cc;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #68705f;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .project-title {
@@ -143,6 +156,21 @@ button {
 .header-tool-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.update-button {
+  min-width: 92px;
+}
+
+.update-button-available,
+.update-button-downloaded {
+  border-color: #e24f57;
+  color: #e24f57;
+}
+
+.update-button-error {
+  border-color: #c2410c;
+  color: #c2410c;
 }
 
 .credit-pill {
