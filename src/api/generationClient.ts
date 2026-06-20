@@ -19,7 +19,8 @@ export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput)
   const settings: GenerationSettings = input.settings ?? {
     aspectRatio: "9:16",
     durationSeconds: 15,
-    omnireference: true
+    omnireference: true,
+    webSearch: false
   };
 
   return {
@@ -39,7 +40,8 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
   const settings: GenerationSettings = input.settings ?? {
     aspectRatio: "9:16",
     durationSeconds: 15,
-    omnireference: true
+    omnireference: true,
+    webSearch: false
   };
   const params = buildCompanyGenerateVideoParams(input, settings);
 

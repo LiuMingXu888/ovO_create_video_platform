@@ -235,7 +235,8 @@ export function App() {
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     aspectRatio: "9:16",
     durationSeconds: 15,
-    omnireference: true
+    omnireference: true,
+    webSearch: false
   });
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);

@@ -18,6 +18,7 @@ export interface GenerationSettings {
   aspectRatio: "9:16" | "16:9" | "1:1";
   durationSeconds: number;
   omnireference: boolean;
+  webSearch: boolean;
 }
 
 export interface CanvasAsset {

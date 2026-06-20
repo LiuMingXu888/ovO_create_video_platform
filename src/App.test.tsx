@@ -830,7 +830,8 @@ describe("App shell", () => {
       settings: {
         aspectRatio: "9:16",
         durationSeconds: 15,
-        omnireference: true
+        omnireference: true,
+        webSearch: false
       }
     });
   });
@@ -1972,7 +1973,7 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true }}
+        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
       />
     );
@@ -2000,7 +2001,7 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "16:9", durationSeconds: 5, omnireference: true }}
+        generationSettings={{ aspectRatio: "16:9", durationSeconds: 5, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
       />
     );
@@ -2020,7 +2021,7 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true }}
+        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
       />
     );

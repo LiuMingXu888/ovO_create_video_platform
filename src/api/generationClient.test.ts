@@ -62,7 +62,8 @@ describe("buildGenerateVideoPayload", () => {
         settings: {
           aspectRatio: "9:16",
           durationSeconds: 15,
-          omnireference: true
+          omnireference: true,
+          webSearch: false
         }
       })
     ).toEqual({
