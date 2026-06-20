@@ -28,6 +28,7 @@ const promptPlaceholder = "输入视频提示词，可用图片1、音频1说明
 const generateButtonName = /生成视频\(需要\d+积分\)/;
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -806,7 +807,7 @@ describe("App shell", () => {
       expect(generatedVideo).toHaveAttribute("src", "https://example.com/generated.mp4");
     });
     expect(screen.queryByText("生成中")).not.toBeInTheDocument();
-    expect(screen.getByText("已生成真实视频：生成视频 1")).toBeInTheDocument();
+    expect(screen.getByText(/已生成真实视频：生成视频 1/)).toBeInTheDocument();
     expect(companyApiFacade.saveCanvasAsset).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "cmq6fwhft0bg5m2l5u78zby8x",
@@ -835,6 +836,140 @@ describe("App shell", () => {
         webSearch: false
       }
     });
+  });
+
+  it("updates the real generation activity item with the final elapsed time", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000);
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    let resolveGeneration: (value: { taskId: string; videoUrl: string }) => void = () => undefined;
+    vi.mocked(companyApiFacade.generateVideo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      })
+    );
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-video-node",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "镜头缓慢推进" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
+
+    expect(await screen.findByText("正在生成真实视频：生成视频 1（已等待 0分0秒）")).toBeInTheDocument();
+
+    vi.mocked(Date.now).mockReturnValue(66_000);
+    resolveGeneration({ taskId: "task-1", videoUrl: "https://example.com/generated.mp4" });
+
+    expect(await screen.findByText("已生成真实视频：生成视频 1（用时 1分5秒）")).toBeInTheDocument();
+    expect(screen.queryByText("正在生成真实视频：生成视频 1（已等待 0分0秒）")).not.toBeInTheDocument();
+
+    const generatedActivityItems = within(screen.getByRole("list", { name: "提示记录列表" }))
+      .getAllByRole("listitem")
+      .filter((item) => item.textContent?.includes("生成视频 1"));
+    expect(generatedActivityItems).toHaveLength(1);
+  });
+
+  it("updates the in-progress real generation activity item without stacking timer messages", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000);
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    let resolveGeneration: (value: { taskId: string; videoUrl: string }) => void = () => undefined;
+    vi.mocked(companyApiFacade.generateVideo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      })
+    );
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-video-node",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "镜头缓慢推进" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
+
+    expect(await screen.findByText("正在生成真实视频：生成视频 1（已等待 0分0秒）")).toBeInTheDocument();
+
+    vi.mocked(Date.now).mockReturnValue(6_000);
+
+    expect(await screen.findByText("正在生成真实视频：生成视频 1（已等待 0分5秒）")).toBeInTheDocument();
+    expect(screen.queryByText("正在生成真实视频：生成视频 1（已等待 0分0秒）")).not.toBeInTheDocument();
+
+    const generatedActivityItems = within(screen.getByRole("list", { name: "提示记录列表" }))
+      .getAllByRole("listitem")
+      .filter((item) => item.textContent?.includes("生成视频 1"));
+    expect(generatedActivityItems).toHaveLength(1);
+
+    resolveGeneration({ taskId: "task-1", videoUrl: "https://example.com/generated.mp4" });
+    await screen.findByText("已生成真实视频：生成视频 1（用时 0分5秒）");
   });
 
   it("passes provider video URLs into the canvas save flow after generation", async () => {

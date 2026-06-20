@@ -51,6 +51,11 @@ interface ReferenceIssue {
   message: string;
 }
 
+interface ActivityMessage {
+  id: string;
+  text: string;
+}
+
 function createId(prefix: string) {
   const randomPart =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -254,7 +259,7 @@ export function App() {
   );
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
-  const [activityMessages, setActivityMessages] = useState<string[]>([]);
+  const [activityMessages, setActivityMessages] = useState<ActivityMessage[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
@@ -333,18 +338,21 @@ export function App() {
     );
   }
 
-  function addActivityMessage(message: string) {
-    setActivityMessages((current) => [message, ...current].slice(0, maxActivityMessages));
+  function addActivityMessage(text: string) {
+    const id = createId("activity");
+    setActivityMessages((current) => [{ id, text }, ...current].slice(0, maxActivityMessages));
+    return id;
   }
 
-  function updateLatestActivityMessage(message: string) {
-    setActivityMessages((current) => {
-      if (current.length === 0) {
-        return [message];
-      }
+  function updateActivityMessage(id: string, text: string) {
+    setActivityMessages((current) => current.map((message) => (message.id === id ? { ...message, text } : message)));
+  }
 
-      return [message, ...current.slice(1)];
-    });
+  function formatElapsedTime(startTime: number, endTime: number) {
+    const elapsedSeconds = Math.max(0, Math.floor((endTime - startTime) / 1000));
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    return `${minutes}分${seconds}秒`;
   }
 
   function persistCanvasHistoryEntry(nextUrl = canvasUrl, nextName = canvasName, nextProject = project, nextAssets = assets) {
@@ -1226,15 +1234,11 @@ export function App() {
       const startTime = Date.now();
       const GENERATION_TIMEOUT_MS = 40 * 60 * 1000; // 40分钟超时
       let progressInterval: NodeJS.Timeout | undefined;
+      const generationActivityId = addActivityMessage(`正在生成真实视频：${generatedAsset.name}（已等待 0分0秒）`);
 
       // 显示生成进度
       progressInterval = setInterval(() => {
-        const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-        const minutes = Math.floor(elapsedSeconds / 60);
-        const seconds = elapsedSeconds % 60;
-        updateLatestActivityMessage(
-          `正在生成真实视频：${generatedAsset.name}（已等待 ${minutes}分${seconds}秒）`
-        );
+        updateActivityMessage(generationActivityId, `正在生成真实视频：${generatedAsset.name}（已等待 ${formatElapsedTime(startTime, Date.now())}）`);
       }, 1000);
 
       // 设置超时检测
@@ -1251,10 +1255,8 @@ export function App() {
               : asset
           )
         );
-        addActivityMessage("生成超时（超过40分钟），请检查网络或重试");
+        updateActivityMessage(generationActivityId, "生成超时（超过40分钟），请检查网络或重试");
       }, GENERATION_TIMEOUT_MS);
-
-      addActivityMessage(`正在生成真实视频：${generatedAsset.name}（已等待 0分0秒）`);
 
       try {
         const result = await companyApiFacade.generateVideo({
@@ -1299,7 +1301,7 @@ export function App() {
         setCanvasSnapshot(savedResult.snapshot);
         setAssets(completedAssets);
         persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
-        addActivityMessage(`已生成真实视频：${generatedAsset.name}`);
+        updateActivityMessage(generationActivityId, `已生成真实视频：${generatedAsset.name}（用时 ${formatElapsedTime(startTime, Date.now())}）`);
         await refreshAuthState();
       } catch (error) {
         // 清除超时和进度更新
@@ -1323,7 +1325,7 @@ export function App() {
               : asset
           )
         );
-        addActivityMessage(errorMessage);
+        updateActivityMessage(generationActivityId, errorMessage);
         await refreshAuthState();
       }
 
@@ -1417,7 +1419,7 @@ export function App() {
         onRemoveReference={removeReference}
         onLocalFilesSelected={handleReferenceFilesSelected}
         onGenerate={handleGeneratePreview}
-        activityMessages={activityMessages}
+        activityMessages={activityMessages.map((message) => message.text)}
         generationSettings={generationSettings}
         onGenerationSettingsChange={setGenerationSettings}
       />
