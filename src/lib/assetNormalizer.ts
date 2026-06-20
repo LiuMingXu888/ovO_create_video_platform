@@ -233,8 +233,22 @@ function getGenerationReferences(record: RawAssetRecord): ReferenceItem[] | unde
     ...parseNamedReferences(record.referenceAudios, "audio"),
     ...parseNamedReferences(record.referenceVideos, "video")
   ];
-  const references = [...directReferences, ...groupedReferences];
 
+  // 节点会把参考存两份：generationReferences(带正常名) + referenceImages/Audios/Videos(仅URL,回退哈希名)。
+  // 按 URL 去重，优先保留带正常名(generationReferences)的那条，避免复用时出现重复+哈希名。
+  const byUrl = new Map<string, ReferenceItem>();
+  const noUrl: ReferenceItem[] = [];
+  for (const ref of [...directReferences, ...groupedReferences]) {
+    if (ref.url) {
+      if (!byUrl.has(ref.url)) {
+        byUrl.set(ref.url, ref);
+      }
+    } else {
+      noUrl.push(ref);
+    }
+  }
+
+  const references = [...byUrl.values(), ...noUrl];
   return references.length > 0 ? references : undefined;
 }
 

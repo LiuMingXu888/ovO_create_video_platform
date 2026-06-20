@@ -343,4 +343,30 @@ describe("normalizeSnapshotAssets", () => {
       }
     ]);
   });
+
+  it("does not duplicate reused references stored in both generationReferences and referenceImages", () => {
+    const url = "https://oss.example.com/users/x/images/1bad79953c2bb.png";
+    const snapshot = {
+      nodes: [
+        {
+          id: "gen-1",
+          type: "video",
+          data: {
+            label: "生成视频 1",
+            status: "succeeded",
+            videoUrl: "https://oss.example.com/v.mp4",
+            generationPrompt: "p",
+            generationReferences: [{ id: "a", name: "人物-民警", kind: "image", url }],
+            referenceImages: [url]
+          }
+        }
+      ]
+    };
+    const assets = normalizeSnapshotAssets(snapshot);
+    const video = assets.find((a) => a.id === "gen-1");
+    const refs = video?.generationReferences ?? [];
+    const forUrl = refs.filter((r) => r.url === url);
+    expect(forUrl).toHaveLength(1);
+    expect(forUrl[0]?.name).toBe("人物-民警");
+  });
 });
