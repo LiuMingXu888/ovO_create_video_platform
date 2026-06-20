@@ -54,15 +54,6 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
         nodeId: input.nodeId,
         projectId: input.projectId,
         label: getTaskLabel(input.prompt)
-      },
-      task: {
-        projectId: input.projectId,
-        nodeId: input.nodeId,
-        type: "video",
-        label: getTaskLabel(input.prompt),
-        modelName: SEEDANCE_MODEL_NAME,
-        duration: settings.durationSeconds,
-        aspectRatio: settings.aspectRatio
       }
     };
   } else {
@@ -88,25 +79,27 @@ export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloa
 }
 
 function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, settings: GenerationSettings) {
-  return {
+  const referenceVideos = getReferenceValues(input.references, "video");
+  const params: Record<string, unknown> = {
     prompt: input.prompt,
     model: SEEDANCE_MODEL_ID,
-    aspectRatio: settings.aspectRatio,
+    ratio: settings.aspectRatio,
     resolution: "720p",
     duration: settings.durationSeconds,
     generateAudio: true,
-    genTab: "allref",
-    referenceMode: settings.omnireference ? "omnireference" : "standard",
-    // 网页版用 webSearch 字段开联网/全网搜索；app 历史只发 networkEnabled，可能导致联网静默失效。
-    // 两个都发以对齐网页并兼容服务端任一字段名。
-    networkEnabled: true,
-    webSearch: true,
+    // 网页用 webSearch 控制联网/全网搜索；默认关。
+    webSearch: settings.webSearch ?? false,
+    // 全能参考保持默认 omnireference（用户要求，不做开关）。相对网页多发的 superset 字段。
+    referenceMode: "omnireference",
     referenceImages: getReferenceValues(input.references, "image"),
-    // 与 referenceImages 等长的标签数组，对齐网页版，提升多参考图的提示词指代质量。
     referenceImageLabels: getReferenceLabels(input.references, "image"),
-    referenceVideos: getReferenceValues(input.references, "video"),
     referenceAudios: getReferenceValues(input.references, "audio")
   };
+  // 仅在有视频参考时发送，贴近网页（网页空时不发）。
+  if (referenceVideos.length > 0) {
+    params.referenceVideos = referenceVideos;
+  }
+  return params;
 }
 
 function getTaskLabel(prompt: string) {

@@ -33,23 +33,37 @@ describe("buildGenerateVideoPayload", () => {
     });
   });
 
-  it("maps the Seedance display model to the company backend model id", () => {
+  it("maps the Seedance display model to the company backend model id (web-aligned)", () => {
     expect(buildCompanyGenerateVideoPayload({ prompt: "生成一段视频", references: refs })).toEqual({
       prompt: "生成一段视频",
       model: "ep-20260319213857-htd7q",
-      aspectRatio: "9:16",
+      ratio: "9:16",
       resolution: "720p",
       duration: 15,
       generateAudio: true,
-      genTab: "allref",
+      webSearch: false,
       referenceMode: "omnireference",
-      networkEnabled: true,
-      webSearch: true,
       referenceImages: ["https://example.com/image.png"],
       referenceImageLabels: ["图"],
       referenceVideos: ["https://example.com/video.mp4"],
       referenceAudios: ["https://example.com/audio.mp3"]
     });
+  });
+
+  it("follows settings.webSearch and omits app-only fields + empty referenceVideos", () => {
+    const imageOnly = [refs[0]]; // only the image ref
+    const payload: any = buildCompanyGenerateVideoPayload({
+      prompt: "p",
+      references: imageOnly,
+      settings: { aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: true }
+    });
+    expect(payload.webSearch).toBe(true);
+    expect(payload.referenceMode).toBe("omnireference");
+    expect("aspectRatio" in payload).toBe(false);
+    expect("genTab" in payload).toBe(false);
+    expect("networkEnabled" in payload).toBe(false);
+    expect("task" in payload).toBe(false);
+    expect("referenceVideos" in payload).toBe(false);
   });
 
   it("builds a canvas video generation payload with explicit vertical generation metadata", () => {
@@ -69,15 +83,12 @@ describe("buildGenerateVideoPayload", () => {
     ).toEqual({
       prompt: "生成一段视频",
       model: "ep-20260319213857-htd7q",
-      aspectRatio: "9:16",
       ratio: "9:16",
       resolution: "720p",
       duration: 15,
       generateAudio: true,
-      genTab: "allref",
+      webSearch: false,
       referenceMode: "omnireference",
-      networkEnabled: true,
-      webSearch: true,
       referenceImages: ["https://example.com/image.png"],
       referenceImageLabels: ["图"],
       referenceVideos: ["https://example.com/video.mp4"],
@@ -86,15 +97,6 @@ describe("buildGenerateVideoPayload", () => {
         nodeId: "video-node-1",
         projectId: "project-1",
         label: "生成一段视频"
-      },
-      task: {
-        projectId: "project-1",
-        nodeId: "video-node-1",
-        type: "video",
-        label: "生成一段视频",
-        modelName: "Seedance 2.0",
-        duration: 15,
-        aspectRatio: "9:16"
       }
     });
   });
@@ -105,8 +107,9 @@ describe("buildGenerateVideoPayload", () => {
       unknown
     >;
     // The web client sends `webSearch` (not `networkEnabled`) for the 联网/全网搜索 toggle.
-    // Sending only `networkEnabled` can leave web search silently disabled server-side.
-    expect(payload.webSearch).toBe(true);
+    // It follows settings and defaults off; the app-only `networkEnabled` is no longer sent.
+    expect(payload.webSearch).toBe(false);
+    expect("networkEnabled" in payload).toBe(false);
     // The web client sends labels parallel to referenceImages to improve multi-reference prompting.
     expect(payload.referenceImageLabels).toEqual(["图"]);
   });
@@ -183,19 +186,15 @@ describe("generateVideo", () => {
       method: "POST",
       body: expect.objectContaining({
         ratio: "9:16",
-        aspectRatio: "9:16",
         model: "ep-20260319213857-htd7q",
         prompt: "生成一段视频",
+        webSearch: false,
+        referenceMode: "omnireference",
         _meta: {
           projectId: "project-1",
           nodeId: "video-node-1",
           label: "生成一段视频"
-        },
-        task: expect.objectContaining({
-          projectId: "project-1",
-          nodeId: "video-node-1",
-          aspectRatio: "9:16"
-        })
+        }
       })
     });
     expect(transport.request).toHaveBeenNthCalledWith(2, "/api/gen-queue?projectId=project-1&taskId=task-1");
