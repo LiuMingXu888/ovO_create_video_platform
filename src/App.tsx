@@ -44,6 +44,7 @@ const defaultSortModes: Record<AssetCategory, SortMode> = {
   video: "generated-desc"
 };
 const manualUpdateBridgeErrorMessage = "更新失败，请稍后重试";
+const maxActivityMessages = 50;
 
 interface ReferenceIssue {
   id: string;
@@ -253,8 +254,7 @@ export function App() {
   );
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
-  const [canvasNotice, setCanvasNotice] = useState<string | undefined>();
-  const [generateStatus, setGenerateStatus] = useState<string | undefined>();
+  const [activityMessages, setActivityMessages] = useState<string[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
@@ -333,6 +333,20 @@ export function App() {
     );
   }
 
+  function addActivityMessage(message: string) {
+    setActivityMessages((current) => [message, ...current].slice(0, maxActivityMessages));
+  }
+
+  function updateLatestActivityMessage(message: string) {
+    setActivityMessages((current) => {
+      if (current.length === 0) {
+        return [message];
+      }
+
+      return [message, ...current.slice(1)];
+    });
+  }
+
   function persistCanvasHistoryEntry(nextUrl = canvasUrl, nextName = canvasName, nextProject = project, nextAssets = assets) {
     setCanvasHistory((current) => {
       const nextEntries = upsertCanvasHistoryEntry(current, {
@@ -368,7 +382,7 @@ export function App() {
         layout: createCanvasAssetLayout(assets)
       });
     });
-    setCanvasNotice(`已保存画布名称：${nextName}`);
+    addActivityMessage(`已保存画布名称：${nextName}`);
   }
 
   function selectCanvasHistory(entry: CanvasHistoryEntry) {
@@ -389,7 +403,7 @@ export function App() {
 
     setCanvasHistory((current) => current.filter((item) => item !== entry));
     if (entry.url === canvasUrl || (project?.projectId && entry.projectId === project.projectId)) {
-      setCanvasNotice(`已删除历史画布：${entry.name}`);
+      addActivityMessage(`已删除历史画布：${entry.name}`);
     }
   }
 
@@ -401,13 +415,11 @@ export function App() {
     setProject(null);
     setCanvasSnapshot(null);
     setCanvasError(undefined);
-    setCanvasNotice(undefined);
   }
 
   async function createCompanyCanvasSession() {
     setCanvasLoading(true);
     setCanvasError(undefined);
-    setCanvasNotice(undefined);
 
     try {
       const nextProject = await companyApiFacade.createCompanyCanvas();
@@ -425,12 +437,12 @@ export function App() {
           layout: createCanvasAssetLayout([])
         })
       );
-      setCanvasNotice("已新建公司画布");
+      addActivityMessage("已新建公司画布");
       await loadCanvasFromUrl(nextProject.canvasUrl);
     } catch (error) {
       try {
         const result = await companyApiFacade.inspectCanvas("http://qijing.kjjhz.cn/projects");
-        setCanvasNotice(`已打开公司新建流程并捕获 ${result.summaries?.length ?? 0} 个请求，请在内置浏览器完成新建后复制画布地址`);
+        addActivityMessage(`已打开公司新建流程并捕获 ${result.summaries?.length ?? 0} 个请求，请在内置浏览器完成新建后复制画布地址`);
       } catch {
         setCanvasError(error instanceof Error ? error.message : "新建公司画布失败");
       }
@@ -450,7 +462,7 @@ export function App() {
     setPrompt("");
     setReferences([]);
     setReferenceIssues([]);
-    setCanvasNotice("已退出登录");
+    addActivityMessage("已退出登录");
   }
 
   async function handleManualUpdateClick() {
@@ -511,7 +523,7 @@ export function App() {
 
   function reuseGeneration(asset: CanvasAsset) {
     if (!asset.generationPrompt || !asset.generationReferences?.length) {
-      setGenerateStatus(`「${asset.name}」暂无可复用的生成提示词和引用`);
+      addActivityMessage(`「${asset.name}」暂无可复用的生成提示词和引用`);
       return;
     }
 
@@ -522,13 +534,13 @@ export function App() {
     if (validation.valid) {
       setReferenceIssues([]);
       setReferences(nextReferences);
-      setGenerateStatus(`已复用「${asset.name}」的提示词和引用`);
+      addActivityMessage(`已复用「${asset.name}」的提示词和引用`);
       return;
     }
 
     setReferences([]);
     setReferenceIssues(validation.errors.map((message) => ({ id: createId("reference-error"), message })));
-    setGenerateStatus(validation.errors.join(" / "));
+    addActivityMessage(validation.errors.join(" / "));
   }
 
   function createGeneratedVideoPlaceholder() {
@@ -574,7 +586,7 @@ export function App() {
     }
 
     if (!project || !canvasSnapshot) {
-      setGenerateStatus(`请先加载公司画布后再去字幕：${asset.name}`);
+      addActivityMessage(`请先加载公司画布后再去字幕：${asset.name}`);
       return;
     }
 
@@ -586,7 +598,7 @@ export function App() {
       video: [...current.video, placeholder.id]
     }));
     persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
-    setGenerateStatus(`去字幕中：${placeholder.name}`);
+    addActivityMessage(`去字幕中：${placeholder.name}`);
 
     try {
       const result = await companyApiFacade.removeSubtitles({
@@ -603,7 +615,7 @@ export function App() {
       setCanvasSnapshot(result.snapshot);
       setAssets(completedAssets);
       persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
-      setGenerateStatus(`已完成去字幕：${placeholder.name}`);
+      addActivityMessage(`已完成去字幕：${placeholder.name}`);
     } catch (error) {
       if (!mounted.current) {
         return;
@@ -621,7 +633,7 @@ export function App() {
             : item
         )
       );
-      setGenerateStatus(errorMessage);
+      addActivityMessage(errorMessage);
     }
   }
 
@@ -692,7 +704,7 @@ export function App() {
 
     try {
       await downloadAssets(selectedAssets);
-      setCanvasNotice(`已下载 ${selectedAssets.length} 个资源`);
+      addActivityMessage(`已下载 ${selectedAssets.length} 个资源`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "批量下载失败");
     }
@@ -747,7 +759,7 @@ export function App() {
 
         return nextOrder;
       });
-      setCanvasNotice(`已删除「${asset.name}」`);
+      addActivityMessage(`已删除「${asset.name}」`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "删除同步失败");
     }
@@ -833,12 +845,11 @@ export function App() {
   async function loadCanvasFromUrl(targetCanvasUrl: string) {
     setCanvasLoading(true);
     setCanvasError(undefined);
-    setCanvasNotice(undefined);
 
     try {
       if (isSharedCanvasUrl(targetCanvasUrl)) {
         await handleOpenLogin(targetCanvasUrl);
-        setCanvasNotice("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载");
+        addActivityMessage("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载");
         return;
       }
 
@@ -860,7 +871,7 @@ export function App() {
           layout: createCanvasAssetLayout(nextAssets)
         })
       );
-      setCanvasNotice(`已加载 ${result.assets.length} 个资源`);
+      addActivityMessage(`已加载 ${result.assets.length} 个资源`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
     } finally {
@@ -871,11 +882,10 @@ export function App() {
   async function handleInspectCanvas() {
     setCanvasLoading(true);
     setCanvasError(undefined);
-    setCanvasNotice(undefined);
 
     try {
       const result = await companyApiFacade.inspectCanvas(canvasUrl);
-      setCanvasNotice(`接口诊断已捕获 ${result.summaries?.length ?? 0} 个请求`);
+      addActivityMessage(`接口诊断已捕获 ${result.summaries?.length ?? 0} 个请求`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "接口诊断失败");
     } finally {
@@ -899,7 +909,7 @@ export function App() {
     setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name } : item)));
 
     if (!project || !canvasSnapshot) {
-      setCanvasNotice(`已本地改名：${name}`);
+      addActivityMessage(`已本地改名：${name}`);
       return;
     }
 
@@ -911,7 +921,7 @@ export function App() {
         name
       });
       setCanvasSnapshot(result.snapshot);
-      setCanvasNotice(`已同步名称：${name}`);
+      addActivityMessage(`已同步名称：${name}`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "名称同步失败");
     }
@@ -961,7 +971,7 @@ export function App() {
         name: nextName
       });
       setCanvasSnapshot(result.snapshot);
-      setCanvasNotice(`已同步分类：${nextName}`);
+      addActivityMessage(`已同步分类：${nextName}`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "分类同步失败");
     }
@@ -1024,7 +1034,7 @@ export function App() {
 
     if (project && canvasSnapshot) {
       setCanvasError(undefined);
-      setCanvasNotice(`正在上传 ${uploadInputs.length} 个资源`);
+      addActivityMessage(`正在上传 ${uploadInputs.length} 个资源`);
 
       try {
         const uploadedAssets: CanvasAsset[] = [];
@@ -1056,7 +1066,7 @@ export function App() {
         setAssets(normalizedAssets);
         setDefaultAssetOrder(createAssetOrder(normalizedAssets));
         persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, normalizedAssets);
-        setCanvasNotice(`已同步上传 ${uploadedAssets.length} 个资源`);
+        addActivityMessage(`已同步上传 ${uploadedAssets.length} 个资源`);
       } catch (error) {
         if (!mounted.current) {
           return;
@@ -1175,17 +1185,17 @@ export function App() {
     const validation = validateReferenceItems(references);
     const promptText = prompt.trim();
     if (!promptText.trim()) {
-      setGenerateStatus("请输入提示词");
+      addActivityMessage("请输入提示词");
       return;
     }
 
     if (!validation.valid) {
-      setGenerateStatus(validation.errors.join(" / "));
+      addActivityMessage(validation.errors.join(" / "));
       return;
     }
 
     if (project && references.every((reference) => reference.kind !== "image")) {
-      setGenerateStatus("真实生成至少需要 1 张参考图，请先添加图片参考素材");
+      addActivityMessage("真实生成至少需要 1 张参考图，请先添加图片参考素材");
       return;
     }
 
@@ -1222,7 +1232,7 @@ export function App() {
         const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
         const minutes = Math.floor(elapsedSeconds / 60);
         const seconds = elapsedSeconds % 60;
-        setGenerateStatus(
+        updateLatestActivityMessage(
           `正在生成真实视频：${generatedAsset.name}（已等待 ${minutes}分${seconds}秒）`
         );
       }, 1000);
@@ -1241,10 +1251,10 @@ export function App() {
               : asset
           )
         );
-        setGenerateStatus("生成超时（超过40分钟），请检查网络或重试");
+        addActivityMessage("生成超时（超过40分钟），请检查网络或重试");
       }, GENERATION_TIMEOUT_MS);
 
-      setGenerateStatus(`正在生成真实视频：${generatedAsset.name}（已等待 0分0秒）`);
+      addActivityMessage(`正在生成真实视频：${generatedAsset.name}（已等待 0分0秒）`);
 
       try {
         const result = await companyApiFacade.generateVideo({
@@ -1289,7 +1299,7 @@ export function App() {
         setCanvasSnapshot(savedResult.snapshot);
         setAssets(completedAssets);
         persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
-        setGenerateStatus(`已生成真实视频：${generatedAsset.name}`);
+        addActivityMessage(`已生成真实视频：${generatedAsset.name}`);
         await refreshAuthState();
       } catch (error) {
         // 清除超时和进度更新
@@ -1313,14 +1323,14 @@ export function App() {
               : asset
           )
         );
-        setGenerateStatus(errorMessage);
+        addActivityMessage(errorMessage);
         await refreshAuthState();
       }
 
       return;
     }
 
-    setGenerateStatus(
+    addActivityMessage(
       `已生成 ${generationSettings.aspectRatio} · ${generationSettings.durationSeconds}s · ${
         generationSettings.omnireference ? "全能参考" : "标准参考"
       } 请求预览，未提交公司接口`
@@ -1359,7 +1369,6 @@ export function App() {
         authState={authState}
         loading={canvasLoading}
         errorMessage={canvasError}
-        notice={canvasNotice}
         onCanvasUrlChange={handleCanvasUrlChange}
         onCanvasNameChange={setCanvasName}
         onSaveCanvasName={handleSaveCanvasName}
@@ -1408,7 +1417,7 @@ export function App() {
         onRemoveReference={removeReference}
         onLocalFilesSelected={handleReferenceFilesSelected}
         onGenerate={handleGeneratePreview}
-        generateStatus={generateStatus}
+        activityMessages={activityMessages}
         generationSettings={generationSettings}
         onGenerationSettingsChange={setGenerationSettings}
       />

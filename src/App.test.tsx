@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./services/companyApiFacade", () => ({
@@ -1307,7 +1307,9 @@ describe("App shell", () => {
       assetId: "node-image",
       name: "接口图片改名"
     });
-    expect(await screen.findByText("已同步名称：接口图片改名")).toBeInTheDocument();
+    const promptNotes = within(screen.getByRole("list", { name: "提示记录列表" }));
+    expect(await promptNotes.findByText("已同步名称：接口图片改名")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("画布加载")).queryByText("已同步名称：接口图片改名")).not.toBeInTheDocument();
   });
 
   it("selects section sorting across default, generated time, and name modes", async () => {
@@ -1407,6 +1409,26 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "生成视频(需要120积分)" }));
 
     expect(await screen.findByText("已生成 16:9 · 12s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
+  });
+
+  it("keeps prompt note history with the newest message first", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "图片1是角色参考" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
+    await screen.findByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口");
+
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
+    await screen.findByText("请输入提示词");
+
+    const noteItems = within(screen.getByRole("list", { name: "提示记录列表" })).getAllByRole("listitem");
+    expect(noteItems.map((item) => item.textContent)).toEqual([
+      "请输入提示词",
+      "已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"
+    ]);
   });
 
   it("offers image category conversion actions only on image assets", async () => {
@@ -2078,7 +2100,7 @@ describe("PromptDock", () => {
         onGenerate={() => undefined}
         generationSettings={{ aspectRatio: "9:16", durationSeconds: 15, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
-        generateStatus="已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"
+        activityMessages={["请输入提示词", "已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"]}
       />
     );
 
@@ -2089,6 +2111,10 @@ describe("PromptDock", () => {
     expect(notes).toHaveClass("prompt-note-panel");
     expect(notes.previousElementSibling).toHaveClass("generate-panel");
     expect(screen.getByRole("list", { name: "提示记录列表" })).toBeInTheDocument();
+    expect(within(notes).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "请输入提示词",
+      "已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"
+    ]);
     expect(screen.getByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
   });
 });

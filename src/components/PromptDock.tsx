@@ -16,7 +16,7 @@ interface PromptDockProps {
   generationSettings: GenerationSettings;
   onGenerationSettingsChange: (settings: GenerationSettings) => void;
   generateDisabled?: boolean;
-  generateStatus?: string;
+  activityMessages?: string[];
 }
 
 function getReferenceLabel(item: ReferenceItem, references: ReferenceItem[]) {
@@ -44,15 +44,12 @@ export function PromptDock({
   generationSettings,
   onGenerationSettingsChange,
   generateDisabled,
-  generateStatus
+  activityMessages = []
 }: PromptDockProps) {
   const validation = validateReferenceItems(references);
   const errors = [...validation.errors, ...validationErrors];
   const [hoveredReferenceId, setHoveredReferenceId] = useState<string | null>(null);
   const hoveredReference = references.find((item) => item.id === hoveredReferenceId && item.previewUrl);
-  const promptNotes = generateStatus
-    ? [generateStatus]
-    : ["可添加图片、视频或音频参考素材", "输入提示词后即可生成视频"];
 
   return (
     <div className="prompt-dock">
@@ -112,8 +109,8 @@ export function PromptDock({
         />
         <section className="prompt-note-panel" aria-label="提示记录">
           <ul aria-label="提示记录列表">
-            {promptNotes.map((note) => (
-              <li key={note}>{note}</li>
+            {activityMessages.map((message, index) => (
+              <li key={`${message}-${index}`}>{message}</li>
             ))}
           </ul>
         </section>
