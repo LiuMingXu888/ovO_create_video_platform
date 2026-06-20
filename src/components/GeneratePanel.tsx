@@ -52,6 +52,15 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
           }
         />
       </label>
+      <label className="field-line">
+        <span>联网搜索</span>
+        <input
+          type="checkbox"
+          aria-label="联网搜索"
+          checked={settings.webSearch}
+          onChange={(event) => onSettingsChange({ ...settings, webSearch: event.currentTarget.checked })}
+        />
+      </label>
       <div className="credit-cost">需 {creditCost} 积分</div>
       <button type="button" className="generate-button" onClick={onGenerate} disabled={disabled}>
         <Sparkles size={18} />
