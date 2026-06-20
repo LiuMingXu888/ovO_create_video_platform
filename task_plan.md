@@ -18,7 +18,7 @@ Fix ovO subtitle removal so videos generated within 24 hours use the free Seedan
 - [x] Phase 5: Implement minimal route-selection fix.
 - [x] Phase 6: Run focused and full verification.
 - [x] Phase 7: Verify real canvas behavior with the built-in browser or CDP.
-- [ ] Phase 8: Commit and push `feature/ui-shell` to Gitee.
+- [x] Phase 8: Commit and push `feature/ui-shell` to Gitee.
 
 ## Design
 - Introduce a small, testable route selector in `src/api/subtitleClient.ts`.
@@ -43,3 +43,5 @@ Fix ovO subtitle removal so videos generated within 24 hours use the free Seedan
 - Related tests: `node node_modules/.bin/vitest run src/lib/assetNormalizer.test.ts src/api/subtitleClient.test.ts src/services/canvasLoader.test.ts` passed 22 tests.
 - Full tests: `node node_modules/.bin/vitest run --no-file-parallelism --maxWorkers=1` passed 40 files and 257 tests. Parallel full runs showed App JSDOM timeout flakiness under load; the timed-out tests passed individually.
 - Build: explicit `tsc -p tsconfig.json`, `tsc -p tsconfig.node.json`, and `vite build` completed successfully.
+- Commit: `5ec00f1 fix: route subtitle removal by video age`.
+- Push: `git push gitee feature/ui-shell` succeeded.
