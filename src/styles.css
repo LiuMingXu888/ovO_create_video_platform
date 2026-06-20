@@ -749,9 +749,13 @@ button {
 .prompt-row {
   display: grid;
   width: min(96vw, 1800px);
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(620px, 1fr) 220px 220px;
   align-items: end;
-  gap: 10px;
+  gap: 6px;
+}
+
+.prompt-row-three-column {
+  grid-template-columns: minmax(620px, 1fr) 220px 220px;
 }
 
 .prompt-token-editor {
@@ -814,8 +818,8 @@ button {
   position: relative;
   display: grid;
   height: 154px;
-  grid-template-rows: 20px 28px 22px 20px 32px;
-  gap: 3px;
+  grid-template-rows: 20px 28px 22px 22px 32px;
+  gap: 4px;
   border: 1px solid #d7d4cc;
   border-radius: 8px;
   background: #ffffff;
@@ -836,7 +840,7 @@ button {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .generate-panel strong,
@@ -849,7 +853,7 @@ button {
 .generate-panel span {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 4px;
   color: #68705f;
   font-size: 12px;
 }
@@ -874,11 +878,15 @@ button {
 
 .field-line {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #2f3847;
   font-size: 12px;
+}
+
+.field-line-nowrap span {
+  white-space: nowrap;
 }
 
 .field-line select {
@@ -896,36 +904,48 @@ button {
   accent-color: #d94c54;
 }
 
-.credit-cost {
-  color: #7a5b00;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .generate-button {
   height: 30px;
-  gap: 8px;
+  gap: 6px;
+  padding: 0 10px;
   border-color: #d94c54;
   border-radius: 8px;
   background: #d94c54;
   color: #ffffff;
+  font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.generate-button svg {
+  flex: 0 0 auto;
 }
 
 .generate-button:hover {
   background: #c93d46;
 }
 
-.generate-status {
-  position: absolute;
-  right: 8px;
-  bottom: -18px;
-  left: 8px;
-  overflow: hidden;
-  color: #68705f;
+.prompt-note-panel {
+  align-self: end;
+  height: 154px;
+  overflow: auto;
+  border: 1px solid #d94c54;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+  color: #2f3847;
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.prompt-note-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+
+.prompt-note-panel li {
+  line-height: 1.45;
 }
 
 .modal-backdrop {

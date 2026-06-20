@@ -25,6 +25,7 @@ import { companyApiFacade } from "./services/companyApiFacade";
 import type { ReferenceItem } from "./types";
 
 const promptPlaceholder = "输入视频提示词，可用图片1、音频1说明参考素材";
+const generateButtonName = /生成视频\(需要\d+积分\)/;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -700,7 +701,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "图片1是女主，镜头缓慢推进" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     expect(await screen.findByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
     expect(screen.getByText(/Seedance 2.0/)).toBeInTheDocument();
@@ -715,7 +716,7 @@ describe("App shell", () => {
     render(<App />);
 
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     expect(await screen.findByText("请输入提示词")).toBeInTheDocument();
     expect(screen.queryByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).not.toBeInTheDocument();
@@ -794,7 +795,7 @@ describe("App shell", () => {
       target: { value: "镜头缓慢推进" }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
     expect(screen.getByText("生成中")).toBeInTheDocument();
@@ -886,7 +887,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "镜头缓慢推进" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     await waitFor(() =>
       expect(companyApiFacade.saveCanvasAsset).toHaveBeenCalledWith(
@@ -945,7 +946,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "镜头缓慢推进" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     await waitFor(() => expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue(""));
     expect(referenceChips()).toHaveLength(0);
@@ -1058,7 +1059,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "随机生成一个视频" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     await waitFor(() => {
       expect(screen.getByText("生成视频 1").closest("article")).toHaveTextContent("参考素材不能为空");
@@ -1088,7 +1089,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "随机生成一个视频" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     expect(await screen.findByText("真实生成至少需要 1 张参考图，请先添加图片参考素材")).toBeInTheDocument();
     expect(companyApiFacade.generateVideo).not.toHaveBeenCalled();
@@ -1102,7 +1103,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "镜头缓慢推进，人物回头" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
 
     expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("");
@@ -1345,13 +1346,13 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "第一个生成" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
     await screen.findByText("生成视频 1");
 
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "第二个生成" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
     await screen.findByText("生成视频 2");
 
     const videoSection = screen.getByRole("button", { name: "视频" }).closest("section") as HTMLElement;
@@ -1390,7 +1391,8 @@ describe("App shell", () => {
 
     expect(screen.getByLabelText("比例")).toHaveValue("9:16");
     expect(screen.getByLabelText("时长")).toHaveValue("15");
-    expect(screen.getByText("需 150 积分")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成视频(需要150积分)" })).toBeInTheDocument();
+    expect(screen.queryByText("需 150 积分")).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "全能参考模式" })).not.toBeInTheDocument();
     expect(screen.getByText("全能参考")).toBeInTheDocument();
 
@@ -1400,8 +1402,9 @@ describe("App shell", () => {
     });
     fireEvent.change(screen.getByLabelText("比例"), { target: { value: "16:9" } });
     fireEvent.change(screen.getByLabelText("时长"), { target: { value: "12" } });
-    expect(screen.getByText("需 120 积分")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "生成视频" }));
+    expect(screen.getByRole("button", { name: "生成视频(需要120积分)" })).toBeInTheDocument();
+    expect(screen.queryByText("需 120 积分")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "生成视频(需要120积分)" }));
 
     expect(await screen.findByText("已生成 16:9 · 12s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
   });
@@ -2062,5 +2065,30 @@ describe("PromptDock", () => {
     fireEvent(window, new MouseEvent("pointerup", { bubbles: true }));
 
     expect(editor).toHaveStyle({ height: "154px" });
+  });
+
+  it("places prompt, generation settings, and prompt notes in a three-column row", () => {
+    render(
+      <PromptDock
+        prompt=""
+        references={[]}
+        onPromptChange={() => undefined}
+        onRemoveReference={() => undefined}
+        onLocalFilesSelected={() => undefined}
+        onGenerate={() => undefined}
+        generationSettings={{ aspectRatio: "9:16", durationSeconds: 15, omnireference: true, webSearch: false }}
+        onGenerationSettingsChange={() => undefined}
+        generateStatus="已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"
+      />
+    );
+
+    const row = document.querySelector(".prompt-row") as HTMLElement;
+    const notes = screen.getByRole("region", { name: "提示记录" });
+
+    expect(row).toHaveClass("prompt-row-three-column");
+    expect(notes).toHaveClass("prompt-note-panel");
+    expect(notes.previousElementSibling).toHaveClass("generate-panel");
+    expect(screen.getByRole("list", { name: "提示记录列表" })).toBeInTheDocument();
+    expect(screen.getByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
   });
 });

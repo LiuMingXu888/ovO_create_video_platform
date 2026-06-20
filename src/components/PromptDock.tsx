@@ -50,6 +50,9 @@ export function PromptDock({
   const errors = [...validation.errors, ...validationErrors];
   const [hoveredReferenceId, setHoveredReferenceId] = useState<string | null>(null);
   const hoveredReference = references.find((item) => item.id === hoveredReferenceId && item.previewUrl);
+  const promptNotes = generateStatus
+    ? [generateStatus]
+    : ["可添加图片、视频或音频参考素材", "输入提示词后即可生成视频"];
 
   return (
     <div className="prompt-dock">
@@ -96,7 +99,7 @@ export function PromptDock({
 
       {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
 
-      <div className="prompt-row">
+      <div className="prompt-row prompt-row-three-column">
         <PromptTokenEditor
           prompt={prompt}
           onPromptChange={onPromptChange}
@@ -106,8 +109,14 @@ export function PromptDock({
           onSettingsChange={onGenerationSettingsChange}
           onGenerate={onGenerate}
           disabled={generateDisabled}
-          statusMessage={generateStatus}
         />
+        <section className="prompt-note-panel" aria-label="提示记录">
+          <ul aria-label="提示记录列表">
+            {promptNotes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </section>
       </div>
     </div>
   );

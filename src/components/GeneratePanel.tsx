@@ -6,10 +6,9 @@ interface GeneratePanelProps {
   onSettingsChange: (settings: GenerationSettings) => void;
   onGenerate: () => void;
   disabled?: boolean;
-  statusMessage?: string;
 }
 
-export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled = false, statusMessage }: GeneratePanelProps) {
+export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled = false }: GeneratePanelProps) {
   const creditCost = settings.durationSeconds * 10;
 
   return (
@@ -52,7 +51,7 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
           }
         />
       </label>
-      <label className="field-line">
+      <label className="field-line field-line-nowrap">
         <span>联网搜索</span>
         <input
           type="checkbox"
@@ -61,12 +60,10 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
           onChange={(event) => onSettingsChange({ ...settings, webSearch: event.currentTarget.checked })}
         />
       </label>
-      <div className="credit-cost">需 {creditCost} 积分</div>
       <button type="button" className="generate-button" onClick={onGenerate} disabled={disabled}>
         <Sparkles size={18} />
-        <span>生成视频</span>
+        <span>生成视频(需要{creditCost}积分)</span>
       </button>
-      {statusMessage && <div className="generate-status">{statusMessage}</div>}
     </aside>
   );
 }

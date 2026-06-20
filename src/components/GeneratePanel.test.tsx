@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GeneratePanel } from "./GeneratePanel";
@@ -12,6 +13,9 @@ describe("GeneratePanel toggles", () => {
 
     const web = screen.getByLabelText("联网搜索") as HTMLInputElement;
     expect(web.checked).toBe(false);
+    expect(web.closest("label")).toHaveClass("field-line-nowrap");
+    expect(screen.getByRole("button", { name: "生成视频(需要150积分)" })).toBeInTheDocument();
+    expect(screen.queryByText("需 150 积分")).not.toBeInTheDocument();
 
     fireEvent.click(web);
     expect(onSettingsChange).toHaveBeenCalledWith({ ...base, webSearch: true });
