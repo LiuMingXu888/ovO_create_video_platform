@@ -1346,6 +1346,12 @@ export function App() {
         onLogout={handleLogout}
       />
 
+      {updateState.phase === "error" && updateState.detail ? (
+        <pre className="update-error-detail" title="更新失败详情，可截图反馈" aria-label="更新失败详情">
+          {updateState.detail}
+        </pre>
+      ) : null}
+
       <CanvasControls
         canvasUrl={canvasUrl}
         canvasName={canvasName}

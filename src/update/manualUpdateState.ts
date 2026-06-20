@@ -6,7 +6,7 @@ export type ManualUpdateState =
   | { phase: "downloaded"; filePath: string; message?: string }
   | { phase: "latest"; message: string }
   | { phase: "unsupported"; message: string }
-  | { phase: "error"; message: string };
+  | { phase: "error"; message: string; detail?: string };
 
 type CheckResult =
   | {
@@ -29,6 +29,7 @@ type CheckResult =
       status: "unsupported" | "error";
       currentVersion: string;
       message: string;
+      detail?: string;
     };
 
 export type ManualUpdateAction =
@@ -48,7 +49,11 @@ export function manualUpdateReducer(state: ManualUpdateState, action: ManualUpda
       if (!action.result.ok) {
         return action.result.status === "unsupported"
           ? { phase: "unsupported", message: action.result.message }
-          : { phase: "error", message: action.result.message };
+          : {
+              phase: "error",
+              message: action.result.message,
+              detail: (action.result as { detail?: string }).detail
+            };
       }
 
       if (action.result.status === "latest") {

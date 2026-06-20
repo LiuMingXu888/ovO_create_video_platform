@@ -45,6 +45,22 @@ button {
   padding-bottom: 250px;
 }
 
+.update-error-detail {
+  margin: 8px 24px 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
 .app-header {
   position: sticky;
   top: 0;

@@ -199,12 +199,29 @@ describe("Gitee release updater", () => {
       platform: "win32"
     });
 
-    await expect(updater.checkForUpdates()).resolves.toEqual({
+    await expect(updater.checkForUpdates()).resolves.toMatchObject({
       ok: false,
       status: "error",
       currentVersion: "0.1.1",
       message: "更新包不完整"
     });
+  });
+
+  it("surfaces the original error detail on check failure", async () => {
+    const updater = createGiteeReleaseUpdater({
+      currentVersion: "0.1.1",
+      isPackaged: true,
+      platform: "win32",
+      fetcher: (async () => ({ ok: false, status: 503, json: async () => ({}) })) as unknown as typeof fetch
+    });
+    const result = await updater.checkForUpdates();
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.status === "error") {
+      expect(result.message).toContain("Gitee");
+      expect(result.detail).toContain("503");
+    } else {
+      throw new Error("expected error result");
+    }
   });
 
   it("short-circuits in development mode", async () => {

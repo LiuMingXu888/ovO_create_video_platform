@@ -56,6 +56,7 @@ export type UpdateCheckResult =
       status: "unsupported" | "error";
       currentVersion: string;
       message: string;
+      detail?: string;
     };
 
 export interface UpdateDownloadResult {
@@ -100,7 +101,8 @@ export function findRequiredUpdateAssets(files: GiteeAttachFile[]) {
   const latestYml = files.find((file) => file.name === "latest.yml");
 
   if (!installer?.browser_download_url || !latestYml?.browser_download_url) {
-    throw new Error("更新包不完整");
+    console.error("[updater] missing assets; have:", files.map((f) => f.name));
+    throw new Error(`更新包不完整 (assets: ${files.map((f) => f.name).join(",") || "none"})`);
   }
 
   return {
@@ -121,10 +123,12 @@ export function createGiteeReleaseUpdater(options: UpdaterOptions = {}) {
   let downloadedUpdate: UpdateInfo | undefined;
 
   async function checkForUpdates(): Promise<UpdateCheckResult> {
+    console.log("[updater] checkForUpdates", { isPackaged, platform, currentVersion });
     latestUpdate = undefined;
     downloadedUpdate = undefined;
 
     if (!isPackaged || platform !== "win32") {
+      console.log("[updater] skipped: dev/non-win32");
       return {
         ok: false,
         status: "unsupported",
@@ -169,16 +173,21 @@ export function createGiteeReleaseUpdater(options: UpdaterOptions = {}) {
         message: `发现新版本 v${latestVersion}`
       };
     } catch (error) {
+      const detail =
+        error instanceof Error ? `${error.message}${error.stack ? "\n" + error.stack : ""}` : String(error);
+      console.error("[updater] checkForUpdates error", detail);
       return {
         ok: false,
         status: "error",
         currentVersion,
-        message: normalizeUpdateError(error)
+        message: normalizeUpdateError(error),
+        detail
       };
     }
   }
 
   async function downloadUpdate(update = latestUpdate): Promise<UpdateDownloadResult> {
+    console.log("[updater] downloadUpdate", update?.installerUrl);
     if (!update) {
       return {
         ok: false,
@@ -238,9 +247,12 @@ export function createGiteeReleaseUpdater(options: UpdaterOptions = {}) {
   }
 
   async function fetchJson<T>(url: string): Promise<T> {
+    console.log("[updater] fetchJson", url);
     const response = await fetcher(url, { headers: { accept: "application/json" } });
     if (!response.ok) {
-      throw new Error(response.status === 404 ? "更新包不完整" : "无法连接 Gitee，请检查网络或稍后重试");
+      console.error("[updater] fetchJson failed", url, response.status);
+      const detail = `HTTP ${response.status} @ ${url}`;
+      throw new Error(response.status === 404 ? `更新包不完整 (${detail})` : `无法连接 Gitee (${detail})`);
     }
 
     return (await response.json()) as T;
@@ -267,7 +279,8 @@ function versionFromRelease(release: GiteeRelease) {
   const rawVersion = release.tag_name ?? release.name ?? "";
   const version = rawVersion.replace(/^v/i, "");
   if (!/^\d+\.\d+\.\d+$/.test(version)) {
-    throw new Error("更新包不完整");
+    console.error("[updater] bad tag/version:", rawVersion);
+    throw new Error(`更新包不完整 (tag: ${rawVersion || "empty"})`);
   }
 
   return version;
