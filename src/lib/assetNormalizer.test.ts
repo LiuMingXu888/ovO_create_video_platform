@@ -124,6 +124,7 @@ describe("normalizeSnapshotAssets", () => {
               label: "生成视频",
               videoUrl: "https://example.com/video.mp4",
               seedanceProviderUrl: "https://example.com/provider.mp4",
+              generationStartedAt: "2026-06-20T01:00:00.000Z",
               duration: 5
             }
           }
@@ -148,9 +149,11 @@ describe("normalizeSnapshotAssets", () => {
         kind: "video",
         category: "video",
         url: "https://example.com/video.mp4",
+        providerVideoUrl: "https://example.com/provider.mp4",
         thumbnailUrl: undefined,
         durationSeconds: 5,
         sizeBytes: undefined,
+        createdAt: "2026-06-20T01:00:00.000Z",
         generationPrompt: undefined,
         generationReferences: undefined
       }

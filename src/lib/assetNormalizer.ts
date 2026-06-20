@@ -16,6 +16,8 @@ interface RawAssetRecord {
   videoUrl?: string;
   providerVideoUrl?: string;
   seedanceProviderUrl?: string;
+  createdAt?: string;
+  generationStartedAt?: string;
   assetUri?: string;
   thumbnailUrl?: string;
   coverUrl?: string;
@@ -78,9 +80,11 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
     kind,
     category: getCategoryForAssetName(kind, record.name ?? record.title ?? record.label ?? fallbackName(url), normalizeCategory(record.category) ?? "characters"),
     url,
+    providerVideoUrl: record.providerVideoUrl ?? record.seedanceProviderUrl,
     thumbnailUrl: record.thumbnailUrl ?? record.coverUrl ?? record.posterUrl,
     durationSeconds: record.durationSeconds ?? record.duration,
     sizeBytes: record.sizeBytes ?? record.size,
+    createdAt: record.createdAt ?? record.generationStartedAt,
     generationPrompt: getGenerationPrompt(record),
     generationReferences: getGenerationReferences(record)
   };
@@ -204,6 +208,8 @@ function pickMediaFields(record: Record<string, unknown>): Partial<RawAssetRecor
     videoUrl: stringValue(record.videoUrl),
     providerVideoUrl: stringValue(record.providerVideoUrl),
     seedanceProviderUrl: stringValue(record.seedanceProviderUrl),
+    createdAt: stringValue(record.createdAt),
+    generationStartedAt: stringValue(record.generationStartedAt),
     assetUri: stringValue(record.assetUri),
     thumbnailUrl: stringValue(record.thumbnailUrl),
     coverUrl: stringValue(record.coverUrl),

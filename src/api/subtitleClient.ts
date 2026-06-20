@@ -26,14 +26,19 @@ interface SubtitleRemovalPollResponse {
 interface SubtitleRemovalPollOptions {
   intervalMs: number;
   maxAttempts: number;
+  now?: Date;
 }
+
+type SubtitleRemovalRoute = "default" | "ark";
+
+const FREE_SUBTITLE_ROUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function removeSubtitles(
   transport: ApiTransport,
-  asset: { url: string; providerVideoUrl?: string },
+  asset: { url: string; providerVideoUrl?: string; createdAt?: string },
   options: SubtitleRemovalPollOptions
 ): Promise<SubtitleRemovalResult> {
-  const route = asset.providerVideoUrl ? "ark" : "default";
+  const route = chooseSubtitleRemovalRoute(asset, options.now ?? new Date());
   const endpoint = route === "ark" ? endpoints.subtitleRemoveArk() : endpoints.subtitleRemove();
   const body = route === "ark" && asset.providerVideoUrl ? { videoUrl: asset.providerVideoUrl, providerVideoUrl: asset.providerVideoUrl } : buildSubtitleRemovePayload(asset.url);
   const submitResult = await transport.request<{ taskId?: string }>(endpoint, {
@@ -60,6 +65,28 @@ export async function removeSubtitles(
     persisted: pollResult.persisted,
     route
   };
+}
+
+export function chooseSubtitleRemovalRoute(
+  asset: { providerVideoUrl?: string; createdAt?: string },
+  now: Date
+): SubtitleRemovalRoute {
+  if (!asset.providerVideoUrl || !asset.createdAt) {
+    return "default";
+  }
+
+  const createdAtMs = Date.parse(asset.createdAt);
+  const nowMs = now.getTime();
+  if (!Number.isFinite(createdAtMs) || !Number.isFinite(nowMs)) {
+    return "default";
+  }
+
+  const ageMs = nowMs - createdAtMs;
+  if (ageMs < 0 || ageMs > FREE_SUBTITLE_ROUTE_WINDOW_MS) {
+    return "default";
+  }
+
+  return "ark";
 }
 
 export async function pollSubtitleRemoval(

@@ -1,22 +1,26 @@
-# Video Polling Stall Progress
+# Subtitle Removal Route Progress
 
-## 2026-06-18
-- Read Superpowers, brainstorming, planning-with-files, writing-plans, systematic-debugging, TDD, verification, and browser-control instructions relevant to this task.
+## 2026-06-20
+- Read superpowers brainstorming instructions, planning-with-files instructions, computer-use instructions, TDD instructions, and verification-before-completion instructions.
 - Confirmed active implementation worktree is `.worktrees/ui-shell` on `feature/ui-shell`.
-- Read user browser log and identified stalled queue task `cmqj86fp10k5xm223d96hl3nd`.
-- Confirmed the local verification folder contains 2 images, 2 audio files, and 1 video file.
-- User confirmed asset names can be treated loosely; use the actual files in the folder.
-- User approved the recommended approach: raw queue evidence first, targeted client fix second, real canvas verification third, then push.
-- Wrote implementation plan and persistent working files.
-- Extracted late browser log evidence: attempt 845 shows `providerTaskId=cgt-20260618161550-frvvp`, `status=polling`, `resultUrl=null`, `errorMessage=null`, and `completedAt=null`.
-- Checked `http://127.0.0.1:9333/json/version`; DevTools port was not open before manual startup.
-- Found existing Electron/Vite processes from `launch-mac.mjs`; 9222 was occupied by Chrome, explaining why Electron could not expose useful DevTools on that port.
-- Started a second Electron instance manually with `--remote-debugging-port=9333`.
-- Used Playwright CDP to call `window.ovoDesktop.auth.checkSession()` and confirmed authenticated user `cmpm7d828001em22x9en36d4e`.
-- Queried old queue task through `window.ovoDesktop.api.request`; it eventually succeeded at `2026-06-18T09:11:22.020Z`, after the current 35-minute frontend timeout window.
-- Added failing tests for 90-minute default polling coverage and canvas queue timeout diagnostics; confirmed RED with `npm test -- src/api/generationClient.test.ts -t "covers delayed queue starts|includes the last canvas queue diagnostics|uses a longer default polling window"`.
-- Updated `src/api/generationClient.ts` to use 3600 attempts at 1500 ms and include last queue diagnostics in timeout errors.
-- Confirmed GREEN for the focused tests and then ran `npm test -- src/api/generationClient.test.ts`; all 18 tests passed.
-- Re-queried old task live through the authenticated Electron bridge; it returned `status=succeeded` and a non-empty result URL.
-- Ran `npm test`; 35 test files and 190 tests passed.
-- Ran `npm run build`; TypeScript and Vite production build passed.
+- Inspected current subtitle removal code and tests.
+- Found current route selection is based only on `providerVideoUrl`, which can send old videos to the free/provider route.
+- User approved the design to route by `createdAt` age: within 24 hours uses free `/api/subtitle-remove/ark`, older or unknown uses paid `/api/subtitle-remove`.
+- Replaced stale root planning files in this worktree with this task's plan, findings, and progress.
+- Added RED test for an old video that still has `providerVideoUrl`; current code failed by returning route `ark` instead of `default`.
+- Implemented `chooseSubtitleRemovalRoute` with a 24-hour window and conservative paid fallback.
+- Focused `src/api/subtitleClient.test.ts` now passes: 6 tests.
+- Related tests passed: `src/api/subtitleClient.test.ts`, `src/services/canvasLoader.test.ts`, and `src/App.test.tsx` passed 77 tests.
+- Full test suite passed: 40 files, 257 tests.
+- Production build passed via explicit bundled Node + local `tsc`/`vite`.
+- Confirmed authenticated ovO desktop bridge on DevTools port 9333 before the app exited.
+- Direct snapshot query for target canvas found existing video `1-1` without `createdAt` or `providerVideoUrl`; by the new rule it should use the paid `/api/subtitle-remove` route.
+- First UI automation attempt could not find the canvas URL input before the Electron debug port closed.
+- Inspected live target canvas snapshot and found video nodes can use `generationStartedAt`/`seedanceProviderUrl`.
+- Added a failing normalizer test proving those fields were not copied to `CanvasAsset.createdAt`/`providerVideoUrl`.
+- Fixed `normalizeSnapshotAssets` to preserve provider URL and generation timestamp for video assets.
+- Re-ran focused normalizer/subtitle/canvasLoader tests: 22 tests passed.
+- Reloaded target canvas resources in the running ovO app; UI listed 98 loaded resources and video assets after the fix.
+- Parallel full test runs repeatedly hit unrelated App test timeout flakiness under load; the failing tests passed individually.
+- Stopped the local dev app and ran full tests serially: 40 files and 257 tests passed.
+- Ran production build with explicit bundled Node and local TypeScript/Vite binaries; build passed.

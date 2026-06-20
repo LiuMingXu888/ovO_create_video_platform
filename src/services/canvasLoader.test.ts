@@ -190,7 +190,8 @@ describe("loadCanvasResources", () => {
           kind: "video",
           category: "video",
           url: "https://example.com/video.mp4",
-          providerVideoUrl: "https://provider.example.com/video.mp4"
+          providerVideoUrl: "https://provider.example.com/video.mp4",
+          createdAt: new Date().toISOString()
         },
         placeholderAsset: {
           id: "subtitle-video-1",
@@ -255,6 +256,60 @@ describe("loadCanvasResources", () => {
         }
       }
     });
+  });
+
+  it("uses the paid subtitle route for an old provider video", async () => {
+    const requests: Array<{ path: string; options?: unknown }> = [];
+    let savedSnapshot: unknown = { snapshot: { nodes: [] } };
+    const transport: ApiTransport = {
+      request: async (path: string, options?: { method?: string; body?: unknown }) => {
+        requests.push({ path, options });
+
+        if (path === "/api/subtitle-remove") {
+          return { taskId: "subtitle-task-1" } as never;
+        }
+
+        if (path === "/api/subtitle-remove/subtitle-task-1") {
+          return {
+            status: "succeeded",
+            videoUrl: "https://example.com/no-subtitles.mp4"
+          } as never;
+        }
+
+        if (options?.method === "PUT") {
+          savedSnapshot = options.body;
+          return { ok: true } as never;
+        }
+
+        return savedSnapshot as never;
+      }
+    };
+
+    await removeCanvasAssetSubtitles(transport, {
+      projectId: "project-1",
+      sourceAsset: {
+        id: "video-1",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/video.mp4",
+        providerVideoUrl: "https://provider.example.com/video.mp4",
+        createdAt: "2026-06-18T00:00:00.000Z"
+      },
+      placeholderAsset: {
+        id: "subtitle-video-1",
+        name: "去字幕-生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "",
+        status: "generating",
+        statusLabel: "去字幕中"
+      }
+    });
+
+    expect(requests.map((request) => request.path)).toContain("/api/subtitle-remove");
+    expect(requests.map((request) => request.path)).toContain("/api/subtitle-remove/subtitle-task-1");
+    expect(requests.map((request) => request.path)).not.toContain("/api/subtitle-remove/ark");
   });
 });
 
