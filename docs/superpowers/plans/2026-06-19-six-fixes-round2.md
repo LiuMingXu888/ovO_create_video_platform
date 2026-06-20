@@ -91,15 +91,10 @@ describe("GeneratePanel toggles", () => {
     render(<GeneratePanel settings={base} onSettingsChange={onSettingsChange} onGenerate={() => {}} />);
 
     const web = screen.getByLabelText("联网搜索") as HTMLInputElement;
-    const omni = screen.getByLabelText("全能参考") as HTMLInputElement;
     expect(web.checked).toBe(false);
-    expect(omni.checked).toBe(true);
 
     fireEvent.click(web);
     expect(onSettingsChange).toHaveBeenCalledWith({ ...base, webSearch: true });
-
-    fireEvent.click(omni);
-    expect(onSettingsChange).toHaveBeenCalledWith({ ...base, omnireference: false });
   });
 });
 ```
@@ -109,7 +104,7 @@ describe("GeneratePanel toggles", () => {
 Run: `npx vitest run src/components/GeneratePanel.test.tsx`
 Expected: FAIL（找不到 label "联网搜索"）。
 
-- [ ] **Step 3: 实现** — 在 `GeneratePanel.tsx` 时长 `field-line` 之后、`credit-cost` 之前插入两个开关：
+- [ ] **Step 3: 实现** — 在 `GeneratePanel.tsx` 时长 `field-line` 之后、`credit-cost` 之前插入联网搜索开关：
 
 ```tsx
       <label className="field-line">
@@ -121,18 +116,9 @@ Expected: FAIL（找不到 label "联网搜索"）。
           onChange={(event) => onSettingsChange({ ...settings, webSearch: event.currentTarget.checked })}
         />
       </label>
-      <label className="field-line">
-        <span>全能参考</span>
-        <input
-          type="checkbox"
-          aria-label="全能参考"
-          checked={settings.omnireference}
-          onChange={(event) => onSettingsChange({ ...settings, omnireference: event.currentTarget.checked })}
-        />
-      </label>
 ```
 
-并把顶部 `<div className="generate-summary">` 里写死的 `<b>全能参考</b>` 文案删除或保留为标题（不影响开关；删除以免与开关重复表达）。
+顶部 `<div className="generate-summary">` 里写死的 `<b>全能参考</b>` 文案**保留**（全能参考保持默认 omnireference，不做开关）。
 
 - [ ] **Step 4: 跑绿**
 
@@ -143,43 +129,14 @@ Expected: PASS。
 
 ```bash
 git add src/components/GeneratePanel.tsx src/components/GeneratePanel.test.tsx
-git commit -m "feat: add 联网搜索/全能参考 toggles to GeneratePanel"
+git commit -m "feat: add 联网搜索 toggle to GeneratePanel"
 ```
 
 ---
 
-### Task 3: 抓网页「标准参考」模式基线（诊断，决定 referenceMode 去留）
+### Task 3: ~~抓网页「标准参考」模式基线~~（已取消）
 
-**Files:**
-- Create: `docs/superpowers/diagnostics/2026-06-19-web-standard-mode-capture.md`
-
-**Interfaces:**
-- Produces: 网页在「标准参考」模式下 `/api/generate-video` 实发字段集合，供 Task 4 决定 `referenceMode`/`genTab` 去留。
-
-- [ ] **Step 1: 内置浏览器导航到测试画布**
-
-```bash
-node /tmp/ovo-cdp/nav-canvas.mjs   # 已存在；或重写指向 cmqlzufagtb0ulq1tejj5hwa7
-```
-
-- [ ] **Step 2: 在网页 UI 把参考模式切到「标准/非全能」，填好提示词，启动 CDP 网络录制后点生成**
-
-用 `/tmp/ovo-cdp/network-record.mjs <ws> /api/generate-video 35000 /tmp/ovo-cdp/web-standard.json`，再点生成按钮。
-
-- [ ] **Step 3: 提取标准模式 payload 键集合，落盘文档**
-
-对比全能模式基线（11 键、无 `referenceMode`），记录标准模式是否出现 `referenceMode`/`genTab`/其他字段。写入 `docs/superpowers/diagnostics/2026-06-19-web-standard-mode-capture.md`。
-
-- [ ] **Step 4: 据结论确定 Task 4 的 referenceMode 策略**
-  - 若标准模式也不发 `referenceMode` → Task 4 删 `referenceMode`，参考模式仅由 UI 是否带全部参考体现（与网页一致）。
-  - 若标准模式发 `referenceMode: "standard"` 且全能发 `"omnireference"`（或全能省略）→ Task 4 让 `referenceMode` 跟随 `omnireference`，仅在需要时发送。
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add docs/superpowers/diagnostics/2026-06-19-web-standard-mode-capture.md
-git commit -m "docs: capture web standard-reference-mode generate payload baseline"
-```
+用户决定：全能参考保持默认 `omnireference`，不做开关、不抓标准模式包、不尝试其他模式。`referenceMode` 在 Task 4 中**写死 `"omnireference"`**（保持当前行为，作为相对网页的 superset 字段）。本任务无操作。
 
 ---
 
@@ -190,10 +147,10 @@ git commit -m "docs: capture web standard-reference-mode generate payload baseli
 - Test: `src/api/generationClient.test.ts`
 
 **Interfaces:**
-- Consumes: `GenerationSettings`（含 `webSearch`、`omnireference`、`aspectRatio`、`durationSeconds`）。
-- Produces: payload 键集合对齐网页 = `prompt, model, ratio, duration, resolution, generateAudio, webSearch, referenceImages, referenceImageLabels, referenceAudios[, referenceVideos][, referenceMode]`，删除 `aspectRatio`、`genTab`、`networkEnabled`、`task` 包装；`referenceVideos` 仅在非空时发送；`webSearch` 跟随 settings。
+- Consumes: `GenerationSettings`（含 `webSearch`、`aspectRatio`、`durationSeconds`；`omnireference` 不再影响 payload，固定 omnireference）。
+- Produces: payload 键集合对齐网页 = `prompt, model, ratio, duration, resolution, generateAudio, webSearch, referenceMode, referenceImages, referenceImageLabels, referenceAudios[, referenceVideos]`，删除 `aspectRatio`、`genTab`、`networkEnabled`、`task` 包装；`referenceVideos` 仅在非空时发送；`webSearch` 跟随 settings；`referenceMode` 写死 `"omnireference"`。
 
-> 注意：`buildCompanyGenerateVideoPayload` 的 `projectId+nodeId` 分支当前在 params 之上又加 `ratio`、`_meta`、`task`。本任务保留 `ratio`+`_meta`，删除 `task`。网页只发 `ratio`(不发 `aspectRatio`)，故 params 内不再单独发 `aspectRatio`。
+> 注意：`buildCompanyGenerateVideoPayload` 的 `projectId+nodeId` 分支当前在 params 之上又加 `ratio`、`_meta`、`task`。本任务保留 `ratio`+`_meta`，删除 `task`。网页只发 `ratio`(不发 `aspectRatio`)，故 params 内不再单独发 `aspectRatio`。`referenceMode` 是相对网页多发的 superset 字段（用户要求保持全能参考），保留。
 
 - [ ] **Step 1: 改失败测试** — 更新 `generationClient.test.ts` 中 `buildCompanyGenerateVideoPayload` 两处断言为对齐后的键集合。无 project/node 分支的断言改为：
 
@@ -216,7 +173,7 @@ git commit -m "docs: capture web standard-reference-mode generate payload baseli
   });
 ```
 
-> `refs` 含一个 video，故 `referenceVideos` 非空仍出现。`webSearch` 默认随未提供 settings 的默认 `false`。`referenceMode` 按 Task 3 结论保留/删除——若删除则从断言移除。新增一条断言：传 `settings.webSearch=true` 时 payload.webSearch===true；传 `settings.webSearch=false`（无 video 的 refs）时不含 `referenceVideos`、不含 `aspectRatio`/`genTab`/`networkEnabled`/`task`。
+> `refs` 含一个 video，故 `referenceVideos` 非空仍出现。`webSearch` 默认随未提供 settings 的默认 `false`。新增一条断言：传 `settings.webSearch=true` 时 payload.webSearch===true；用只含图片的 refs 时不含 `referenceVideos`、不含 `aspectRatio`/`genTab`/`networkEnabled`/`task`，`referenceMode` 恒为 `"omnireference"`。
 
 ```typescript
   it("follows settings.webSearch and omits app-only fields + empty referenceVideos", () => {
@@ -224,10 +181,10 @@ git commit -m "docs: capture web standard-reference-mode generate payload baseli
     const payload: any = buildCompanyGenerateVideoPayload({
       prompt: "p",
       references: imageOnly,
-      settings: { aspectRatio: "9:16", durationSeconds: 5, omnireference: false, webSearch: true }
+      settings: { aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: true }
     });
     expect(payload.webSearch).toBe(true);
-    expect(payload.referenceMode).toBe("standard"); // 若 Task3 决定删 referenceMode，则改断言 payload.referenceMode === undefined
+    expect(payload.referenceMode).toBe("omnireference");
     expect("aspectRatio" in payload).toBe(false);
     expect("genTab" in payload).toBe(false);
     expect("networkEnabled" in payload).toBe(false);
@@ -255,8 +212,8 @@ function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, 
     generateAudio: true,
     // 网页用 webSearch 控制联网/全网搜索；默认关。
     webSearch: settings.webSearch ?? false,
-    // referenceMode 跟随全能参考开关；Task 3 若证明网页不发此字段则删除本行。
-    referenceMode: settings.omnireference ? "omnireference" : "standard",
+    // 全能参考保持默认 omnireference（用户要求，不做开关）。相对网页多发的 superset 字段。
+    referenceMode: "omnireference",
     referenceImages: getReferenceValues(input.references, "image"),
     referenceImageLabels: getReferenceLabels(input.references, "image"),
     referenceAudios: getReferenceValues(input.references, "audio")
@@ -288,7 +245,7 @@ function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, 
 - [ ] **Step 4: 跑绿 + 修受影响的旧断言**
 
 Run: `npx vitest run src/api/generationClient.test.ts`
-Expected: PASS。旧的「builds a canvas video generation payload with explicit vertical generation metadata」断言含 `task`/`aspectRatio`，改为对齐后的键集合（删 `task`、`aspectRatio`，加 `webSearch`，`referenceMode` 按 Task3）。
+Expected: PASS。旧的「builds a canvas video generation payload with explicit vertical generation metadata」断言含 `task`/`aspectRatio`，改为对齐后的键集合（删 `task`、`aspectRatio`，加 `webSearch`，`referenceMode` 恒为 `"omnireference"`）。
 
 - [ ] **Step 5: Commit**
 
@@ -567,7 +524,7 @@ Expected: 推送成功。若 origin 也需要同步则另行 `git push origin fe
 
 ## Self-Review
 
-- **Spec coverage:** ①webSearch+全能参考开关=Task1-2；②字段对齐=Task3(抓标准模式)+Task4；③推 gitee=Task7;④更新诊断=Task6;⑤复用去重=Task5;⑥诊断文件不改(无任务)。全覆盖。
-- **Placeholder scan:** Task3/Task4 的 referenceMode 去留是诊断驱动的二选一，已给出两种断言写法的明确切换条件，非占位。
+- **Spec coverage:** ①webSearch 开关=Task1-2（全能参考保持默认，不做开关）；②字段对齐=Task4；③推 gitee=Task7;④更新诊断=Task6;⑤复用去重=Task5;⑥诊断文件不改(无任务)。Task3 已取消。全覆盖。
+- **Placeholder scan:** 无占位；`referenceMode` 固定 `"omnireference"`，无诊断驱动的待定项。
 - **Type consistency:** `GenerationSettings.webSearch`、`getReferenceLabels`、`UpdateCheckResult.detail`、`ManualUpdateState.error.detail` 命名跨任务一致。
-- **Risk:** Task4 删 `task` 已验证持久化不依赖（App.tsx:1265 独立 saveCanvasAsset）；referenceMode 待 Task3 实测定夺。
+- **Risk:** Task4 删 `task` 已验证持久化不依赖（App.tsx:1265 独立 saveCanvasAsset）；`referenceMode` 保持 omnireference 为相对网页的 superset，已知能工作。
