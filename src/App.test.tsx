@@ -1148,9 +1148,9 @@ describe("App shell", () => {
       },
       snapshot: { snapshot: { nodes: [] } },
       result: {
-        taskId: "subtitle-task-1",
+        runId: "hb:subtitle-1",
         videoUrl: "https://example.com/no-subtitles.mp4",
-        route: "ark"
+        route: "paid"
       }
     });
 

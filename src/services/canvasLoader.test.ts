@@ -161,14 +161,14 @@ describe("loadCanvasResources", () => {
         requests.push({ path, options });
 
         if (path === "/api/subtitle-remove/ark") {
-          return { taskId: "subtitle-task-1" } as never;
+          return { runId: "hb:sub1", status: "running" } as never;
         }
 
-        if (path === "/api/subtitle-remove/ark/subtitle-task-1") {
+        if (path === "/api/subtitle-remove/ark/hb%3Asub1") {
           return {
+            runId: "hb:sub1",
             status: "succeeded",
-            videoUrl: "https://example.com/no-subtitles.mp4",
-            providerVideoUrl: "https://provider.example.com/no-subtitles.mp4"
+            videoUrl: "https://example.com/no-subtitles.mp4"
           } as never;
         }
 
@@ -191,6 +191,7 @@ describe("loadCanvasResources", () => {
           category: "video",
           url: "https://example.com/video.mp4",
           providerVideoUrl: "https://provider.example.com/video.mp4",
+          model: "Seedance 2.0",
           createdAt: new Date().toISOString()
         },
         placeholderAsset: {
@@ -207,7 +208,6 @@ describe("loadCanvasResources", () => {
       asset: {
         id: "subtitle-video-1",
         url: "https://example.com/no-subtitles.mp4",
-        providerVideoUrl: "https://provider.example.com/no-subtitles.mp4",
         status: "ready"
       }
     });
@@ -216,7 +216,7 @@ describe("loadCanvasResources", () => {
       "/api/projects/project-1/snapshot",
       "/api/projects/project-1/snapshot",
       "/api/subtitle-remove/ark",
-      "/api/subtitle-remove/ark/subtitle-task-1",
+      "/api/subtitle-remove/ark/hb%3Asub1",
       "/api/projects/project-1/snapshot",
       "/api/projects/project-1/snapshot",
       "/api/projects/project-1/snapshot"
@@ -266,11 +266,12 @@ describe("loadCanvasResources", () => {
         requests.push({ path, options });
 
         if (path === "/api/subtitle-remove") {
-          return { taskId: "subtitle-task-1" } as never;
+          return { runId: "hb:sub2", status: "running" } as never;
         }
 
-        if (path === "/api/subtitle-remove/subtitle-task-1") {
+        if (path === "/api/subtitle-remove/hb%3Asub2") {
           return {
+            runId: "hb:sub2",
             status: "succeeded",
             videoUrl: "https://example.com/no-subtitles.mp4"
           } as never;
@@ -308,7 +309,7 @@ describe("loadCanvasResources", () => {
     });
 
     expect(requests.map((request) => request.path)).toContain("/api/subtitle-remove");
-    expect(requests.map((request) => request.path)).toContain("/api/subtitle-remove/subtitle-task-1");
+    expect(requests.map((request) => request.path)).toContain("/api/subtitle-remove/hb%3Asub2");
     expect(requests.map((request) => request.path)).not.toContain("/api/subtitle-remove/ark");
   });
 });

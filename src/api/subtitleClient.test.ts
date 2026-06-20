@@ -1,154 +1,168 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildSubtitleRemovePayload, chooseSubtitleRemovalRoute, removeSubtitles } from "./subtitleClient";
-import type { CanvasAsset } from "../types";
+import { chooseSubtitleRemovalRoute, removeSubtitles } from "./subtitleClient";
 import type { ApiTransport } from "./transport";
 
-describe("subtitleClient", () => {
-  const persistedVideo: CanvasAsset = {
-    id: "video-1",
-    name: "成片",
-    kind: "video",
-    category: "video",
-    url: "https://cdn.example.com/video.mp4"
-  };
+describe("chooseSubtitleRemovalRoute", () => {
+  const now = new Date("2026-06-20T12:00:00.000Z");
+  const base = { providerVideoUrl: "https://provider.example.com/v.mp4", isSeedance: true };
 
-  const providerVideo: CanvasAsset = {
-    ...persistedVideo,
-    providerVideoUrl: "https://provider.example.com/video.mp4",
-    createdAt: "2026-06-20T01:00:00.000Z"
-  };
-
-  it("builds the default persisted-video subtitle payload", () => {
-    expect(buildSubtitleRemovePayload("https://cdn.example.com/video.mp4")).toEqual({
-      videoUrl: "https://cdn.example.com/video.mp4"
-    });
+  it("returns paid when createdAt is missing", () => {
+    expect(chooseSubtitleRemovalRoute({ ...base, createdAt: undefined }, now)).toBe("paid");
   });
 
-  it("uses the Ark/free route when a provider URL is fresh within 24 hours", async () => {
-    const transport: ApiTransport = {
-      request: vi.fn()
-        .mockResolvedValueOnce({ taskId: "subtitle-task-1" })
-        .mockResolvedValueOnce({
-          status: "succeeded",
-          videoUrl: "https://cdn.example.com/no-subtitles.mp4",
-          providerVideoUrl: "https://provider.example.com/no-subtitles.mp4"
-        })
-    };
+  it("returns paid when createdAt is unparseable", () => {
+    expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "not-a-date" }, now)).toBe("paid");
+  });
 
-    await expect(
-      removeSubtitles(transport, providerVideo, {
-        intervalMs: 0,
-        maxAttempts: 1,
-        now: new Date("2026-06-20T02:00:00.000Z")
-      })
-    ).resolves.toEqual({
-      taskId: "subtitle-task-1",
-      videoUrl: "https://cdn.example.com/no-subtitles.mp4",
-      providerVideoUrl: "https://provider.example.com/no-subtitles.mp4",
-      route: "ark"
+  it("returns paid when createdAt is in the future", () => {
+    expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "2026-06-20T13:00:00.000Z" }, now)).toBe("paid");
+  });
+
+  it("returns paid when older than 24h", () => {
+    expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "2026-06-19T11:00:00.000Z" }, now)).toBe("paid");
+  });
+
+  it("returns free when within 24h and Seedance with a provider URL", () => {
+    expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "2026-06-20T01:00:00.000Z" }, now)).toBe("free");
+  });
+
+  it("returns paid when within 24h but not Seedance", () => {
+    expect(
+      chooseSubtitleRemovalRoute({ ...base, isSeedance: false, createdAt: "2026-06-20T01:00:00.000Z" }, now)
+    ).toBe("paid");
+  });
+
+  it("returns paid when within 24h + Seedance but no provider URL", () => {
+    expect(
+      chooseSubtitleRemovalRoute(
+        { createdAt: "2026-06-20T01:00:00.000Z", isSeedance: true, providerVideoUrl: undefined },
+        now
+      )
+    ).toBe("paid");
+  });
+
+  it("treats exactly 24h as a free boundary", () => {
+    expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "2026-06-19T12:00:00.000Z" }, now)).toBe("free");
+  });
+});
+
+describe("removeSubtitles", () => {
+  it("submits the paid route with a _meta body and polls by runId", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ runId: "hb:abc", status: "running", _genTaskId: "q1" })
+      .mockResolvedValueOnce({ runId: "hb:abc", status: "succeeded", videoUrl: "https://cdn.example.com/clean.mp4", error: null });
+    const transport: ApiTransport = { request };
+
+    const result = await removeSubtitles(
+      transport,
+      { url: "https://cdn.example.com/v.mp4", createdAt: "2026-06-19T00:00:00.000Z", nodeId: "n1", projectId: "p1" },
+      { intervalMs: 0, maxAttempts: 5, now: new Date("2026-06-21T00:00:00.000Z") }
+    );
+
+    expect(request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove", {
+      method: "POST",
+      body: { videoUrl: "https://cdn.example.com/v.mp4", _meta: { nodeId: "n1", projectId: "p1", label: "字幕擦除" } }
     });
-    expect(transport.request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove/ark", {
+    expect(request).toHaveBeenNthCalledWith(2, "/api/subtitle-remove/hb%3Aabc");
+    expect(result).toEqual({ runId: "hb:abc", videoUrl: "https://cdn.example.com/clean.mp4", route: "paid" });
+  });
+
+  it("submits the free route with the provider URL and free label", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ runId: "hb:free", status: "running" })
+      .mockResolvedValueOnce({ runId: "hb:free", status: "succeeded", videoUrl: "https://cdn.example.com/free-clean.mp4" });
+    const transport: ApiTransport = { request };
+
+    const result = await removeSubtitles(
+      transport,
+      {
+        url: "https://cdn.example.com/v.mp4",
+        providerVideoUrl: "https://provider.example.com/orig.mp4",
+        isSeedance: true,
+        createdAt: "2026-06-20T23:00:00.000Z",
+        nodeId: "n2",
+        projectId: "p2"
+      },
+      { intervalMs: 0, maxAttempts: 5, now: new Date("2026-06-21T00:00:00.000Z") }
+    );
+
+    expect(request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove/ark", {
       method: "POST",
       body: {
-        videoUrl: "https://provider.example.com/video.mp4",
-        providerVideoUrl: "https://provider.example.com/video.mp4"
+        videoUrl: "https://provider.example.com/orig.mp4",
+        _meta: { nodeId: "n2", projectId: "p2", label: "字幕擦除（免费）" }
       }
     });
-    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/subtitle-remove/ark/subtitle-task-1");
+    expect(request).toHaveBeenNthCalledWith(2, "/api/subtitle-remove/ark/hb%3Afree");
+    expect(result).toEqual({ runId: "hb:free", videoUrl: "https://cdn.example.com/free-clean.mp4", route: "free" });
   });
 
-  it("uses the paid route when a provider URL is older than 24 hours", async () => {
-    const transport: ApiTransport = {
-      request: vi.fn()
-        .mockResolvedValueOnce({ taskId: "subtitle-task-1" })
-        .mockResolvedValueOnce({
-          status: "succeeded",
-          videoUrl: "https://cdn.example.com/no-subtitles.mp4"
-        })
-    };
+  it("throws a diagnostic error when submit returns no runId", async () => {
+    const transport: ApiTransport = { request: vi.fn().mockResolvedValueOnce({}) };
 
     await expect(
       removeSubtitles(
         transport,
         {
-          ...providerVideo,
-          createdAt: "2026-06-18T01:59:59.000Z"
+          url: "https://cdn.example.com/v.mp4",
+          createdAt: "2026-06-20T01:00:00.000Z",
+          isSeedance: true,
+          providerVideoUrl: "https://provider.example.com/v.mp4",
+          nodeId: "n1",
+          projectId: "p1"
         },
-        {
-          intervalMs: 0,
-          maxAttempts: 1,
-          now: new Date("2026-06-20T02:00:00.000Z")
-        }
+        { intervalMs: 0, maxAttempts: 1, now: new Date("2026-06-20T02:00:00.000Z") }
       )
-    ).resolves.toMatchObject({
-      taskId: "subtitle-task-1",
-      videoUrl: "https://cdn.example.com/no-subtitles.mp4",
-      route: "default"
-    });
-    expect(transport.request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove", {
-      method: "POST",
-      body: {
-        videoUrl: "https://cdn.example.com/video.mp4"
-      }
-    });
-    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/subtitle-remove/subtitle-task-1");
+    ).rejects.toThrow(/未返回 runId.*(free|paid)/);
   });
 
-  it("falls back to the default subtitle route for persisted-only URLs", async () => {
-    const transport: ApiTransport = {
-      request: vi.fn()
-        .mockResolvedValueOnce({ taskId: "subtitle-task-1" })
-        .mockResolvedValueOnce({
-          status: "succeeded",
-          videoUrl: "https://cdn.example.com/no-subtitles.mp4"
-        })
-    };
+  it("throws a timeout diagnostic with attempts and last status", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ runId: "hb:x", status: "running" })
+      .mockResolvedValue({ runId: "hb:x", status: "running", videoUrl: null });
+    const transport: ApiTransport = { request };
 
-    await expect(removeSubtitles(transport, persistedVideo, { intervalMs: 0, maxAttempts: 1 })).resolves.toMatchObject({
-      taskId: "subtitle-task-1",
-      videoUrl: "https://cdn.example.com/no-subtitles.mp4",
-      route: "default"
-    });
-    expect(transport.request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove", {
-      method: "POST",
-      body: {
-        videoUrl: "https://cdn.example.com/video.mp4"
-      }
-    });
-    expect(transport.request).toHaveBeenNthCalledWith(2, "/api/subtitle-remove/subtitle-task-1");
+    await expect(
+      removeSubtitles(
+        transport,
+        { url: "https://cdn.example.com/v.mp4", nodeId: "n1", projectId: "p1" },
+        { intervalMs: 0, maxAttempts: 2, now: new Date("2026-06-21T00:00:00.000Z") }
+      )
+    ).rejects.toThrow(/轮询超时.*2.*running/);
   });
 
-  it("keeps the free route available through the exact 24-hour boundary", () => {
-    expect(
-      chooseSubtitleRemovalRoute(
-        {
-          providerVideoUrl: "https://provider.example.com/video.mp4",
-          createdAt: "2026-06-19T02:00:00.000Z"
-        },
-        new Date("2026-06-20T02:00:00.000Z")
+  it("throws when the task succeeds without a video URL", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ runId: "hb:y", status: "running" })
+      .mockResolvedValueOnce({ runId: "hb:y", status: "succeeded", videoUrl: null });
+    const transport: ApiTransport = { request };
+
+    await expect(
+      removeSubtitles(
+        transport,
+        { url: "https://cdn.example.com/v.mp4", nodeId: "n1", projectId: "p1" },
+        { intervalMs: 0, maxAttempts: 3, now: new Date("2026-06-21T00:00:00.000Z") }
       )
-    ).toBe("ark");
+    ).rejects.toThrow(/未返回视频地址/);
   });
 
-  it("uses the paid route when generation time is missing or invalid", () => {
-    const now = new Date("2026-06-20T02:00:00.000Z");
+  it("surfaces the server error message when the task fails", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ runId: "hb:z", status: "running" })
+      .mockResolvedValueOnce({ runId: "hb:z", status: "failed", error: "字幕擦除失败：源视频无法访问" });
+    const transport: ApiTransport = { request };
 
-    expect(
-      chooseSubtitleRemovalRoute(
-        {
-          providerVideoUrl: "https://provider.example.com/video.mp4"
-        },
-        now
+    await expect(
+      removeSubtitles(
+        transport,
+        { url: "https://cdn.example.com/v.mp4", nodeId: "n1", projectId: "p1" },
+        { intervalMs: 0, maxAttempts: 3, now: new Date("2026-06-21T00:00:00.000Z") }
       )
-    ).toBe("default");
-    expect(
-      chooseSubtitleRemovalRoute(
-        {
-          providerVideoUrl: "https://provider.example.com/video.mp4",
-          createdAt: "not-a-date"
-        },
-        now
-      )
-    ).toBe("default");
+    ).rejects.toThrow("字幕擦除失败：源视频无法访问");
   });
 });

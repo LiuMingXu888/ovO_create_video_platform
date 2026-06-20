@@ -156,7 +156,15 @@ export async function removeCanvasAssetSubtitles(
   const placeholderSnapshot = addAssetNodeToSnapshot(latestSnapshot, input.placeholderAsset);
   await saveProjectSnapshotAndVerify(transport, input.projectId, placeholderSnapshot, input.placeholderAsset.id);
 
-  const result = await removeSubtitles(transport, input.sourceAsset, { intervalMs: 1500, maxAttempts: 1400 });
+  const sourceForRoute = {
+    url: input.sourceAsset.url,
+    providerVideoUrl: input.sourceAsset.providerVideoUrl,
+    createdAt: input.sourceAsset.createdAt,
+    isSeedance: isSeedanceModel(input.sourceAsset.model),
+    nodeId: input.placeholderAsset.id,
+    projectId: input.projectId
+  };
+  const result = await removeSubtitles(transport, sourceForRoute, { intervalMs: 1500, maxAttempts: 360 });
   const completedAsset = createSubtitleRemovedAsset(input.placeholderAsset, result);
   const completionLatestSnapshot = await loadProjectSnapshot(transport, input.projectId);
   const completedSnapshot = addAssetNodeToSnapshot(completionLatestSnapshot, completedAsset);
@@ -187,11 +195,14 @@ function createNodeId(kind: AssetKind) {
   return `saved-${kind}-${randomPart}`;
 }
 
+function isSeedanceModel(model?: string): boolean {
+  return !!model && /seedance/i.test(model);
+}
+
 function createSubtitleRemovedAsset(placeholderAsset: CanvasAsset, result: SubtitleRemovalResult): CanvasAsset {
   return {
     ...placeholderAsset,
     url: result.videoUrl,
-    providerVideoUrl: result.providerVideoUrl,
     status: "ready"
   };
 }

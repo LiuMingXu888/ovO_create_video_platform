@@ -32,6 +32,8 @@ export interface CanvasAsset {
   durationSeconds?: number;
   sizeBytes?: number;
   createdAt?: string;
+  generationStartedAt?: string;
+  model?: string;
   status?: "ready" | "generating" | "failed";
   statusLabel?: string;
   errorMessage?: string;

@@ -1,25 +1,18 @@
 import type { ApiTransport } from "./transport";
 import { endpoints } from "./endpoints";
 
-export function buildSubtitleRemovePayload(videoUrl: string) {
-  return { videoUrl };
-}
+export type SubtitleRemovalRoute = "free" | "paid";
 
 export interface SubtitleRemovalResult {
-  taskId: string;
+  runId: string;
   videoUrl: string;
-  providerVideoUrl?: string;
-  persisted?: boolean;
-  route: "default" | "ark";
+  route: SubtitleRemovalRoute;
 }
 
 interface SubtitleRemovalPollResponse {
+  runId?: string;
   status?: string;
-  videoUrl?: string;
-  providerVideoUrl?: string;
-  outputUrl?: string;
-  persisted?: boolean;
-  errorMessage?: string;
+  videoUrl?: string | null;
   error?: unknown;
 }
 
@@ -29,76 +22,110 @@ interface SubtitleRemovalPollOptions {
   now?: Date;
 }
 
-type SubtitleRemovalRoute = "default" | "ark";
+interface SubtitleRemovalSource {
+  url: string;
+  providerVideoUrl?: string;
+  createdAt?: string;
+  isSeedance?: boolean;
+  nodeId?: string;
+  projectId?: string;
+}
 
 const FREE_SUBTITLE_ROUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export async function removeSubtitles(
-  transport: ApiTransport,
-  asset: { url: string; providerVideoUrl?: string; createdAt?: string },
-  options: SubtitleRemovalPollOptions
-): Promise<SubtitleRemovalResult> {
-  const route = chooseSubtitleRemovalRoute(asset, options.now ?? new Date());
-  const endpoint = route === "ark" ? endpoints.subtitleRemoveArk() : endpoints.subtitleRemove();
-  const body = route === "ark" && asset.providerVideoUrl ? { videoUrl: asset.providerVideoUrl, providerVideoUrl: asset.providerVideoUrl } : buildSubtitleRemovePayload(asset.url);
-  const submitResult = await transport.request<{ taskId?: string }>(endpoint, {
-    method: "POST",
-    body
-  });
-
-  if (!submitResult.taskId) {
-    throw new Error("去字幕接口未返回任务 ID");
-  }
-
-  const pollPath = route === "ark" ? endpoints.subtitleRemoveArkTask(submitResult.taskId) : endpoints.subtitleRemoveTask(submitResult.taskId);
-  const pollResult = await pollSubtitleRemoval(transport, pollPath, options);
-  const videoUrl = pollResult.videoUrl ?? pollResult.outputUrl ?? pollResult.providerVideoUrl;
-
-  if (!videoUrl) {
-    throw new Error("去字幕成功但接口未返回视频地址");
-  }
-
-  return {
-    taskId: submitResult.taskId,
-    videoUrl,
-    providerVideoUrl: pollResult.providerVideoUrl,
-    persisted: pollResult.persisted,
-    route
-  };
-}
-
+/**
+ * Pick the subtitle-removal route from the source video's age and origin.
+ *
+ * The free (方舟/Ark) route only accepts fresh Seedance original videos and is
+ * keyed on the provider URL; everything else falls back to the paid (火山 VOD)
+ * route, which accepts any video. Unknown / unparseable / future timestamps and
+ * missing provider URLs all default to paid — the conservative choice that
+ * almost never fails.
+ */
 export function chooseSubtitleRemovalRoute(
-  asset: { providerVideoUrl?: string; createdAt?: string },
+  asset: { providerVideoUrl?: string; createdAt?: string; isSeedance?: boolean },
   now: Date
 ): SubtitleRemovalRoute {
-  if (!asset.providerVideoUrl || !asset.createdAt) {
-    return "default";
+  if (!asset.createdAt) {
+    return "paid";
   }
 
   const createdAtMs = Date.parse(asset.createdAt);
   const nowMs = now.getTime();
   if (!Number.isFinite(createdAtMs) || !Number.isFinite(nowMs)) {
-    return "default";
+    return "paid";
   }
 
   const ageMs = nowMs - createdAtMs;
   if (ageMs < 0 || ageMs > FREE_SUBTITLE_ROUTE_WINDOW_MS) {
-    return "default";
+    return "paid";
   }
 
-  return "ark";
+  if (!asset.isSeedance) {
+    return "paid";
+  }
+
+  // The ark route needs the 方舟 original URL; without it the free channel
+  // cannot be used, so degrade to paid (matches the web app's client gate).
+  if (!asset.providerVideoUrl) {
+    return "paid";
+  }
+
+  return "free";
+}
+
+export async function removeSubtitles(
+  transport: ApiTransport,
+  asset: SubtitleRemovalSource,
+  options: SubtitleRemovalPollOptions
+): Promise<SubtitleRemovalResult> {
+  const route = chooseSubtitleRemovalRoute(asset, options.now ?? new Date());
+  const endpoint = route === "free" ? endpoints.subtitleRemoveArk() : endpoints.subtitleRemove();
+  const videoUrl = route === "free" ? asset.providerVideoUrl ?? asset.url : asset.url;
+  const label = route === "free" ? "字幕擦除（免费）" : "字幕擦除";
+
+  const submitResult = await transport.request<{ runId?: string }>(endpoint, {
+    method: "POST",
+    body: {
+      videoUrl,
+      _meta: { nodeId: asset.nodeId, projectId: asset.projectId, label }
+    }
+  });
+
+  if (!submitResult.runId) {
+    throw new Error(`去字幕接口未返回 runId（route=${route}, endpoint=${endpoint}）`);
+  }
+
+  const pollPath =
+    route === "free"
+      ? endpoints.subtitleRemoveArkTask(submitResult.runId)
+      : endpoints.subtitleRemoveTask(submitResult.runId);
+  const pollResult = await pollSubtitleRemoval(transport, pollPath, options);
+
+  if (!pollResult.videoUrl) {
+    throw new Error("去字幕成功但接口未返回视频地址");
+  }
+
+  return {
+    runId: submitResult.runId,
+    videoUrl: pollResult.videoUrl,
+    route
+  };
 }
 
 export async function pollSubtitleRemoval(
   transport: ApiTransport,
   path: string,
   options: SubtitleRemovalPollOptions
-) {
+): Promise<SubtitleRemovalPollResponse> {
+  let lastStatus: string | undefined;
+
   for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
     const result = await transport.request<SubtitleRemovalPollResponse>(path);
+    lastStatus = result.status ?? lastStatus;
 
     if (result.status === "failed") {
-      throw new Error(result.errorMessage ?? getSubtitlePollError(result.error) ?? "去字幕失败");
+      throw new Error(getSubtitlePollError(result.error) ?? "去字幕失败");
     }
 
     if (result.status === "succeeded") {
@@ -110,7 +137,7 @@ export async function pollSubtitleRemoval(
     }
   }
 
-  throw new Error("去字幕任务轮询超时");
+  throw new Error(`去字幕任务轮询超时（已轮询 ${options.maxAttempts} 次，最后状态=${lastStatus ?? "未知"}）`);
 }
 
 function getSubtitlePollError(error: unknown) {
