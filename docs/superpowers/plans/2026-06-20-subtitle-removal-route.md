@@ -94,11 +94,16 @@ describe("chooseSubtitleRemovalRoute", () => {
   it("returns paid when within 24h but not Seedance", () => {
     expect(chooseSubtitleRemovalRoute({ ...base, isSeedance: false, createdAt: "2026-06-20T01:00:00.000Z" }, now)).toBe("paid");
   });
+  it("returns paid when within 24h + Seedance but no providerVideoUrl", () => {
+    expect(chooseSubtitleRemovalRoute({ createdAt: "2026-06-20T01:00:00.000Z", isSeedance: true, providerVideoUrl: undefined }, now)).toBe("paid");
+  });
   it("treats exactly 24h as free boundary", () => {
     expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "2026-06-19T12:00:00.000Z" }, now)).toBe("free");
   });
 });
 ```
+
+> **实测契约修正（findings.md §1, §3）：** 免费(ark)接口 `videoUrl` 必须填 `providerVideoUrl`(方舟原始URL)；节点无 `providerVideoUrl` 时免费通道用不了。故路由增加门槛：免费要求 `providerVideoUrl` 非空，否则降级付费（用户决策）。
 
 - [ ] **Step 2: 运行测试确认失败**
 
@@ -107,7 +112,7 @@ Expected: FAIL（返回 `"ark"/"default"` 与新断言 `"free"/"paid"` 不符）
 
 - [ ] **Step 3: 改写 `chooseSubtitleRemovalRoute` 与类型**
 
-`subtitleClient.ts`：把 `type SubtitleRemovalRoute = "default" | "ark";` 改为 `"free" | "paid"`，`SubtitleRemovalResult.route` 同步改为 `"free" | "paid"`，并改写函数：
+`subtitleClient.ts`：把 `type SubtitleRemovalRoute = "default" | "ark";` 改为 `"free" | "paid"`，`SubtitleRemovalResult.route` 同步改为 `"free" | "paid"`，并改写函数（免费需 `providerVideoUrl` 非空）：
 
 ```typescript
 export function chooseSubtitleRemovalRoute(
@@ -120,7 +125,9 @@ export function chooseSubtitleRemovalRoute(
   if (!Number.isFinite(createdAtMs) || !Number.isFinite(nowMs)) return "paid";
   const ageMs = nowMs - createdAtMs;
   if (ageMs < 0 || ageMs > FREE_SUBTITLE_ROUTE_WINDOW_MS) return "paid";
-  return asset.isSeedance ? "free" : "paid";
+  if (!asset.isSeedance) return "paid";
+  if (!asset.providerVideoUrl) return "paid"; // 免费(ark)需方舟原始URL，无则降级付费
+  return "free";
 }
 ```
 
@@ -236,77 +243,160 @@ git commit -m "feat: persist generationStartedAt and model on saved canvas asset
 
 ### Task 4: 对齐实测契约 + 把 createdAt/isSeedance 喂给 removeSubtitles
 
+> **实测契约（findings.md，已确认 codex 端点路径正确，但 payload/响应形状全错——这才是「未返回任务 ID」真因）：**
+> - 提交免费 `POST /api/subtitle-remove/ark`，付费 `POST /api/subtitle-remove`；body 都是 `{ videoUrl, _meta:{ nodeId, projectId, label } }`。
+> - **免费 `videoUrl` 填 `providerVideoUrl`(方舟原始URL)；付费 `videoUrl` 填 OSS `url`。** 没有单独的 `providerVideoUrl` 键。
+> - `label`：付费 `"字幕擦除"`，免费 `"字幕擦除（免费）"`。
+> - 提交响应 **顶层** `{ runId, status:"running", _genTaskId }`——**任务 ID 是 `runId` 不是 `taskId`**（codex 读 `submitResult.taskId` 永远为空→报错）。
+> - 轮询 `GET /api/subtitle-remove[/ark]/{runId}`，返回 `{ runId, status, videoUrl, error }`；status 取值 `running`/`succeeded`/`failed`（小写）；结果地址在 **`videoUrl`**。
+
 **Files:**
-- Modify: `src/api/endpoints.ts`（按 `findings.md` 校正去字幕端点；不一致则改）
-- Modify: `src/api/subtitleClient.ts`（`removeSubtitles` 按 route 映射端点/payload，传 `isSeedance`）
-- Modify: `src/services/canvasLoader.ts:159`（`removeCanvasAssetSubtitles` 调用 `removeSubtitles` 时透传 `createdAt`/`isSeedance`）
+- Modify: `src/api/endpoints.ts`（端点路径已确认正确——`subtitleRemove`/`subtitleRemoveArk` + `/{runId}` 轮询，仅确认 task 端点参数名语义）
+- Modify: `src/api/subtitleClient.ts`（`removeSubtitles`/`pollSubtitleRemoval` 全面对齐 `_meta` body + `runId` 响应 + `videoUrl` 结果）
+- Modify: `src/services/canvasLoader.ts`（`removeCanvasAssetSubtitles` 透传 `createdAt`/`providerVideoUrl`/`isSeedance`，并把 `projectId`/`nodeId` 传进 `_meta`）
 - Test: `src/api/subtitleClient.test.ts`、`src/api/endpoints.test.ts`
 
 **Interfaces:**
-- Consumes: `findings.md`（Task 1 的真实契约）；`chooseSubtitleRemovalRoute`（Task 2，`"free"|"paid"`）；`CanvasAsset.model`/`createdAt`（Task 3）。
-- Produces: `removeSubtitles(transport, asset, options)` 中 `asset` 接收 `{ url; providerVideoUrl?; createdAt?; isSeedance?: boolean }`；提交到与实测一致的免费/付费端点。
+- Consumes: `chooseSubtitleRemovalRoute`（Task 2，`"free"|"paid"`，免费需 `providerVideoUrl`）；`CanvasAsset.model`/`createdAt`/`providerVideoUrl`（Task 3）。
+- Produces: `removeSubtitles(transport, asset, options)` 中 `asset` 接收 `{ url; providerVideoUrl?; createdAt?; isSeedance?: boolean; nodeId?: string; projectId?: string }`；按 `runId` 轮询；返回 `{ runId, videoUrl, route }`（`SubtitleRemovalResult` 的 `taskId` 改名/补 `runId`）。
 
-- [ ] **Step 1: 按 findings 更新 endpoints 测试**
+- [ ] **Step 1: 改 endpoints 测试为 runId 轮询语义**
 
-依据 `findings.md` 的真实路径改 `endpoints.test.ts`。示例（**实际值以 findings 为准**，若实测就是 `/api/subtitle-remove` + `/ark` 则保持）：
+`endpoints.test.ts`：确认提交端点不变，轮询端点按 `runId`：
 
 ```typescript
-expect(endpoints.subtitleRemove()).toBe("<paid 提交路径 from findings>");
-expect(endpoints.subtitleRemoveArk()).toBe("<free 提交路径 from findings>");
+expect(endpoints.subtitleRemove()).toBe("/api/subtitle-remove");
+expect(endpoints.subtitleRemoveArk()).toBe("/api/subtitle-remove/ark");
+expect(endpoints.subtitleRemoveTask("hb:abc")).toBe("/api/subtitle-remove/hb%3Aabc");
+expect(endpoints.subtitleRemoveArkTask("hb:abc")).toBe("/api/subtitle-remove/ark/hb%3Aabc");
 ```
 
-- [ ] **Step 2: 更新 subtitleClient 测试断言 route→端点/payload 映射**
+- [ ] **Step 2: 改 subtitleClient 测试对齐真实契约**
 
-在 `subtitleClient.test.ts` 的 `removeSubtitles` 用例里，断言 free route 打 free 端点、paid route 打 paid 端点，payload 字段与 findings 一致（taskId 读取路径、轮询路径、status 字符串、结果地址字段都按 findings）。给 `providerVideo` fixture 补 `isSeedance: true`。
+把 `subtitleClient.test.ts` 的 `removeSubtitles` mock 改为真实形状：提交响应返回 `{ runId, status:"running", _genTaskId }`，轮询返回 `{ runId, status:"succeeded", videoUrl }`。断言：
+- free route（fixture 加 `isSeedance:true` + `providerVideoUrl` + 近 24h `createdAt`）打 `/api/subtitle-remove/ark`，提交 body 为 `{ videoUrl: <providerVideoUrl>, _meta:{ nodeId, projectId, label:"字幕擦除（免费）" } }`。
+- paid route（无 provider 或老视频）打 `/api/subtitle-remove`，body `{ videoUrl: <url>, _meta:{ nodeId, projectId, label:"字幕擦除" } }`。
+- 轮询打 `/api/subtitle-remove[/ark]/<runId>`，结果取 `videoUrl`。
+- 提交响应无 `runId` 时抛错（替换旧的「无 taskId」断言）。
+
+```typescript
+it("submits paid route with _meta body and polls by runId", async () => {
+  const request = vi.fn()
+    .mockResolvedValueOnce({ runId: "hb:abc", status: "running", _genTaskId: "q1" })
+    .mockResolvedValueOnce({ runId: "hb:abc", status: "succeeded", videoUrl: "https://cdn/clean.mp4", error: null });
+  const transport: ApiTransport = { request };
+  const result = await removeSubtitles(transport,
+    { url: "https://cdn/v.mp4", createdAt: "2026-06-19T00:00:00.000Z", nodeId: "n1", projectId: "p1" },
+    { intervalMs: 0, maxAttempts: 5, now: new Date("2026-06-21T00:00:00.000Z") });
+  expect(request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove", {
+    method: "POST",
+    body: { videoUrl: "https://cdn/v.mp4", _meta: { nodeId: "n1", projectId: "p1", label: "字幕擦除" } }
+  });
+  expect(request).toHaveBeenNthCalledWith(2, "/api/subtitle-remove/hb%3Aabc");
+  expect(result.videoUrl).toBe("https://cdn/clean.mp4");
+  expect(result.route).toBe("paid");
+});
+
+it("submits free route with provider url and free label", async () => {
+  const request = vi.fn()
+    .mockResolvedValueOnce({ runId: "hb:free", status: "running" })
+    .mockResolvedValueOnce({ runId: "hb:free", status: "succeeded", videoUrl: "https://cdn/free-clean.mp4" });
+  const transport: ApiTransport = { request };
+  await removeSubtitles(transport,
+    { url: "https://cdn/v.mp4", providerVideoUrl: "https://provider/orig.mp4", isSeedance: true,
+      createdAt: "2026-06-20T23:00:00.000Z", nodeId: "n2", projectId: "p2" },
+    { intervalMs: 0, maxAttempts: 5, now: new Date("2026-06-21T00:00:00.000Z") });
+  expect(request).toHaveBeenNthCalledWith(1, "/api/subtitle-remove/ark", {
+    method: "POST",
+    body: { videoUrl: "https://provider/orig.mp4", _meta: { nodeId: "n2", projectId: "p2", label: "字幕擦除（免费）" } }
+  });
+});
+```
 
 - [ ] **Step 3: 运行测试确认失败**
 
 Run: `npm test -- src/api/subtitleClient.test.ts src/api/endpoints.test.ts`
-Expected: FAIL（端点/字段与旧猜测不符）
+Expected: FAIL（旧代码读 `taskId`、body 是 flat `{videoUrl}`）
 
-- [ ] **Step 4: 按 findings 改 endpoints.ts 与 removeSubtitles**
+- [ ] **Step 4: 改 endpoints.ts 与 removeSubtitles/pollSubtitleRemoval**
 
-`endpoints.ts`：把 `subtitleRemove`/`subtitleRemoveArk`/`subtitleRemoveTask`/`subtitleRemoveArkTask` 改成 findings 的真实路径（一致则不动）。
-`subtitleClient.ts` 的 `removeSubtitles`：
-- route 映射：`route === "free" ? endpoints.subtitleRemoveArk() : endpoints.subtitleRemove()`；轮询同理用 free/paid 对应 task 端点。
-- body 按 findings 构造（免费/付费各自的 payload 形状；taskId 读取路径按 findings，必要时从 `data.taskId` 取）。
-- 函数签名 asset 加 `isSeedance?: boolean`，传给 `chooseSubtitleRemovalRoute`。
+`endpoints.ts`：`subtitleRemoveTask`/`subtitleRemoveArkTask` 已是 `/{taskId}` 模板，确认用 `encodeURIComponent`（`hb:` 里的 `:` 需转义）。提交端点保持 `/api/subtitle-remove` 与 `/api/subtitle-remove/ark`。
 
-- [ ] **Step 5: canvasLoader 透传 createdAt/isSeedance**
+`subtitleClient.ts` 全面改写 `removeSubtitles`：
 
-`canvasLoader.ts` `removeCanvasAssetSubtitles` 里调用 `removeSubtitles(transport, input.sourceAsset, …)` 处，确保 `input.sourceAsset` 含 `createdAt`，并推导 `isSeedance`：
+```typescript
+export interface SubtitleRemovalResult {
+  runId: string;
+  videoUrl: string;
+  route: "free" | "paid";
+}
+
+export async function removeSubtitles(
+  transport: ApiTransport,
+  asset: { url: string; providerVideoUrl?: string; createdAt?: string; isSeedance?: boolean; nodeId?: string; projectId?: string },
+  options: SubtitleRemovalPollOptions
+): Promise<SubtitleRemovalResult> {
+  const route = chooseSubtitleRemovalRoute(asset, options.now ?? new Date());
+  const endpoint = route === "free" ? endpoints.subtitleRemoveArk() : endpoints.subtitleRemove();
+  const videoUrl = route === "free" ? (asset.providerVideoUrl ?? asset.url) : asset.url;
+  const label = route === "free" ? "字幕擦除（免费）" : "字幕擦除";
+  const body = {
+    videoUrl,
+    _meta: { nodeId: asset.nodeId, projectId: asset.projectId, label }
+  };
+  const submitResult = await transport.request<{ runId?: string }>(endpoint, { method: "POST", body });
+  if (!submitResult.runId) {
+    throw new Error(`去字幕接口未返回 runId（route=${route}, endpoint=${endpoint}）`);
+  }
+  const pollPath = route === "free"
+    ? endpoints.subtitleRemoveArkTask(submitResult.runId)
+    : endpoints.subtitleRemoveTask(submitResult.runId);
+  const pollResult = await pollSubtitleRemoval(transport, pollPath, options);
+  if (!pollResult.videoUrl) {
+    throw new Error("去字幕成功但接口未返回视频地址");
+  }
+  return { runId: submitResult.runId, videoUrl: pollResult.videoUrl, route };
+}
+```
+
+`pollSubtitleRemoval` 已按 `status === "succeeded"/"failed"` 处理且读 `result`——确认 `SubtitleRemovalPollResponse` 含 `videoUrl`/`error`，并返回 `{ videoUrl, error }`（删掉旧的 `outputUrl`/`providerVideoUrl` 回退，真实字段只有 `videoUrl`）。
+
+- [ ] **Step 5: canvasLoader 透传 nodeId/projectId/createdAt/isSeedance**
+
+`canvasLoader.ts` `removeCanvasAssetSubtitles` 调用 `removeSubtitles` 处：
 
 ```typescript
 const sourceForRoute = {
   url: input.sourceAsset.url,
   providerVideoUrl: input.sourceAsset.providerVideoUrl,
   createdAt: input.sourceAsset.createdAt,
-  isSeedance: isSeedanceModel(input.sourceAsset.model)
+  isSeedance: isSeedanceModel(input.sourceAsset.model),
+  nodeId: input.placeholderAsset.id,
+  projectId: input.projectId
 };
-const result = await removeSubtitles(transport, sourceForRoute, { intervalMs: 1500, maxAttempts: 1400 });
+const result = await removeSubtitles(transport, sourceForRoute, { intervalMs: 1500, maxAttempts: 360 });
 ```
 
-并在 `canvasLoader.ts` 加一个最小判定（Seedance 原始视频）：
+并加最小判定：
 
 ```typescript
 function isSeedanceModel(model?: string): boolean {
-  if (!model) return false;
-  return /seedance/i.test(model);
+  return !!model && /seedance/i.test(model);
 }
 ```
 
-（若 Task 1 实测显示免费接口不挑模型、任意 ≤24h 视频均免费，则把 `isSeedance` 恒传 `true`，并在 `findings.md` 记下该结论。）
+`createSubtitleRemovedAsset(placeholderAsset, result)` 改读 `result.videoUrl`（不再读 `result.providerVideoUrl`，真实契约无此字段）。
 
 - [ ] **Step 6: 运行测试确认通过**
 
-Run: `npm test -- src/api/subtitleClient.test.ts src/api/endpoints.test.ts`
+Run: `npm test -- src/api/subtitleClient.test.ts src/api/endpoints.test.ts src/services/canvasLoader.test.ts`
 Expected: PASS
 
 - [ ] **Step 7: 提交**
 
 ```bash
 git add src/api/endpoints.ts src/api/subtitleClient.ts src/services/canvasLoader.ts src/api/subtitleClient.test.ts src/api/endpoints.test.ts
-git commit -m "fix: align subtitle endpoints/payload with captured contract, route by age+model"
+git commit -m "fix: align subtitle client with real contract (_meta body, runId, videoUrl)"
 ```
 
 ---
@@ -469,7 +559,7 @@ git commit -m "feat: enable reuse-generation when only prompt exists"
 ### Task 7: 去字幕节点继承元数据 + 错误诊断透传
 
 **Files:**
-- Modify: `src/api/subtitleClient.ts`（`removeSubtitles` taskId 缺失时抛带诊断的错）
+- Modify: `src/api/subtitleClient.ts`（`pollSubtitleRemoval` 超时带诊断）
 - Modify: `src/services/canvasLoader.ts`（`createSubtitleRemovedAsset` 继承元数据）
 - Modify: `src/App.tsx`（`createSubtitlePlaceholder` 继承 `generationStartedAt/model`；activity log 打路由依据）
 - Test: `src/api/subtitleClient.test.ts`、`src/services/canvasLoader.test.ts`
@@ -478,17 +568,30 @@ git commit -m "feat: enable reuse-generation when only prompt exists"
 - Consumes: Task 4 的 route 映射；`CanvasAsset` 全字段。
 - Produces: 去字幕产出节点带 `generationPrompt/generationReferences/generationStartedAt/model`；提交失败时错误信息含 route+URL+状态。
 
-- [ ] **Step 1: 写失败测试 —— taskId 缺失抛带诊断错**
+- [ ] **Step 1: 写失败测试 —— runId 缺失抛带诊断错 + 超时诊断**
+
+> Task 4 已实现「无 runId 抛带 route/endpoint 的错」。本步补强：确认该诊断错存在，并新增轮询超时诊断测试。
 
 `subtitleClient.test.ts` 加：
 
 ```typescript
-it("throws a diagnostic error when submit returns no taskId", async () => {
+it("throws a diagnostic error when submit returns no runId", async () => {
   const transport: ApiTransport = { request: vi.fn().mockResolvedValueOnce({}) };
   await expect(
-    removeSubtitles(transport, { url: "https://cdn.example.com/v.mp4", createdAt: "2026-06-20T01:00:00.000Z", isSeedance: true, providerVideoUrl: "https://provider.example.com/v.mp4" },
+    removeSubtitles(transport, { url: "https://cdn.example.com/v.mp4", createdAt: "2026-06-20T01:00:00.000Z", isSeedance: true, providerVideoUrl: "https://provider.example.com/v.mp4", nodeId: "n1", projectId: "p1" },
       { intervalMs: 0, maxAttempts: 1, now: new Date("2026-06-20T02:00:00.000Z") })
-  ).rejects.toThrow(/未返回任务 ID.*(free|paid)/);
+  ).rejects.toThrow(/未返回 runId.*(free|paid)/);
+});
+
+it("throws a timeout diagnostic with attempts and last status", async () => {
+  const request = vi.fn()
+    .mockResolvedValueOnce({ runId: "hb:x", status: "running" })
+    .mockResolvedValue({ runId: "hb:x", status: "running", videoUrl: null });
+  const transport: ApiTransport = { request };
+  await expect(
+    removeSubtitles(transport, { url: "https://cdn.example.com/v.mp4", nodeId: "n1", projectId: "p1" },
+      { intervalMs: 0, maxAttempts: 2, now: new Date("2026-06-21T00:00:00.000Z") })
+  ).rejects.toThrow(/轮询超时.*2.*running/);
 });
 ```
 
@@ -516,17 +619,9 @@ it("inherits generation metadata onto the subtitle-removed asset", async () => {
 Run: `npm test -- src/api/subtitleClient.test.ts src/services/canvasLoader.test.ts`
 Expected: FAIL
 
-- [ ] **Step 4: 实现诊断错误 + 元数据继承**
+- [ ] **Step 4: 实现超时诊断 + 元数据继承**
 
-`subtitleClient.ts` 的 `removeSubtitles`，taskId 缺失分支：
-
-```typescript
-  if (!submitResult.taskId) {
-    throw new Error(`去字幕接口未返回任务 ID（route=${route}, endpoint=${endpoint}）`);
-  }
-```
-
-`pollSubtitleRemoval` 的超时分支带上已轮询次数与最后一次 status：
+`subtitleClient.ts` 的无 `runId` 诊断错已在 Task 4 实现。本步实现 `pollSubtitleRemoval` 超时分支带已轮询次数与最后一次 status：
 
 ```typescript
   throw new Error(`去字幕任务轮询超时（已轮询 ${options.maxAttempts} 次，最后状态=${lastStatus ?? "未知"}）`);
@@ -534,8 +629,7 @@ Expected: FAIL
 
 （循环内用 `let lastStatus = result.status;` 记录最近一次 status。）
 
-
-`canvasLoader.ts` 的 `createSubtitleRemovedAsset` 改为继承源元数据（当前 `...placeholderAsset` 已带，确认 placeholder 自身已含这些字段即可；若 placeholder 不含，则改为从单独传入的 source 继承）。本任务在 `removeCanvasAssetSubtitles` 入口确保 `placeholderAsset` 已包含 `generationStartedAt/model`（由 Step 5 的 placeholder 构造保证）。
+`canvasLoader.ts` 的 `createSubtitleRemovedAsset` 继承源元数据：当前 `...placeholderAsset` 已带，确认 placeholder 自身已含 `generationPrompt/generationReferences/generationStartedAt/model`（由 Step 5 的 placeholder 构造保证），并把 `url` 设为 `result.videoUrl`。
 
 - [ ] **Step 5: App.tsx placeholder 继承 + activity 路由日志**
 
