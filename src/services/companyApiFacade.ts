@@ -69,6 +69,9 @@ export const companyApiFacade = {
     thumbnailUrl?: string;
     durationSeconds?: number;
     sizeBytes?: number;
+    createdAt?: string;
+    generationStartedAt?: string;
+    model?: string;
     generationPrompt?: string;
     generationReferences?: ReferenceItem[];
   }) => saveCanvasAsset(window.ovoDesktop ? desktopTransport : transport, input),

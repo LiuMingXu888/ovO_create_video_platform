@@ -13,7 +13,7 @@ interface BuildGenerateVideoPayloadInput {
 }
 
 const SEEDANCE_MODEL_ID = "ep-20260319213857-htd7q";
-const SEEDANCE_MODEL_NAME = "Seedance 2.0";
+export const SEEDANCE_MODEL_NAME = "Seedance 2.0";
 
 export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
   const settings: GenerationSettings = input.settings ?? {

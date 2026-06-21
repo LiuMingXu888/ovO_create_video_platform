@@ -123,13 +123,17 @@ describe("loadCanvasResources", () => {
         category: "video",
         url: "https://example.com/generated.mp4",
         providerVideoUrl: "https://provider.example.com/generated.mp4",
-        durationSeconds: 15
+        durationSeconds: 15,
+        generationStartedAt: "2026-06-21T00:00:00.000Z",
+        model: "Seedance 2.0"
       })
     ).resolves.toMatchObject({
       asset: {
         id: "generated-video-node",
         url: "https://example.com/generated.mp4",
-        providerVideoUrl: "https://provider.example.com/generated.mp4"
+        providerVideoUrl: "https://provider.example.com/generated.mp4",
+        generationStartedAt: "2026-06-21T00:00:00.000Z",
+        model: "Seedance 2.0"
       },
       snapshot: {
         snapshot: {

@@ -21,6 +21,7 @@ import { getCategoryForAssetName } from "./lib/assetCategory";
 import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
+import { SEEDANCE_MODEL_NAME } from "./api/generationClient";
 import type {
   AssetAction,
   AssetCategory,
@@ -1285,6 +1286,8 @@ export function App() {
           url: result.videoUrl,
           providerVideoUrl: result.providerVideoUrl,
           durationSeconds: generatedAsset.durationSeconds,
+          generationStartedAt: new Date(startTime).toISOString(),
+          model: SEEDANCE_MODEL_NAME,
           generationPrompt: promptText,
           generationReferences: savedReferences
         });

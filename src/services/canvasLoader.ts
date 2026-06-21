@@ -112,6 +112,9 @@ export async function saveCanvasAsset(
     thumbnailUrl?: string;
     durationSeconds?: number;
     sizeBytes?: number;
+    createdAt?: string;
+    generationStartedAt?: string;
+    model?: string;
     generationPrompt?: string;
     generationReferences?: CanvasAsset["generationReferences"];
   }
@@ -126,7 +129,9 @@ export async function saveCanvasAsset(
     thumbnailUrl: input.thumbnailUrl,
     durationSeconds: input.durationSeconds,
     sizeBytes: input.sizeBytes,
-    createdAt: new Date().toISOString(),
+    createdAt: input.createdAt ?? new Date().toISOString(),
+    generationStartedAt: input.generationStartedAt,
+    model: input.model,
     status: "ready",
     generationPrompt: input.generationPrompt,
     generationReferences: input.generationReferences
