@@ -88,6 +88,28 @@ describe("Gitee release updater", () => {
     });
   });
 
+  it("treats a 404 on releases/latest as 'already latest' (no release published yet)", async () => {
+    const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {
+      const url = fetchInputHref(input);
+      expect(url).toContain(`/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/latest`);
+      return jsonResponse({ message: "Not Found" }, { status: 404 });
+    });
+    const updater = createGiteeReleaseUpdater({
+      currentVersion: "0.1.1",
+      fetcher,
+      isPackaged: true,
+      platform: "win32"
+    });
+
+    await expect(updater.checkForUpdates()).resolves.toEqual({
+      ok: true,
+      status: "latest",
+      currentVersion: "0.1.1",
+      latestVersion: "0.1.1",
+      message: "当前已是最新版本 v0.1.1"
+    });
+  });
+
   it("clears stale available update state when a later check finds no update", async () => {
     let latestVersion = "v0.1.2";
     const fetcher: typeof fetch = vi.fn(async (input: FetchInput) => {

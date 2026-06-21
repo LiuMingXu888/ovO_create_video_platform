@@ -138,7 +138,23 @@ export function createGiteeReleaseUpdater(options: UpdaterOptions = {}) {
     }
 
     try {
-      const latestRelease = await fetchJson<GiteeRelease>(`${GITEE_API_BASE}/releases/latest`);
+      const latestRelease = await fetchJson<GiteeRelease>(`${GITEE_API_BASE}/releases/latest`, {
+        allowNotFound: true
+      });
+
+      // Gitee returns 404 on /releases/latest when the repo has no published
+      // release yet. That is not a broken package — there is simply nothing to
+      // update to, so report "already latest" instead of a scary error.
+      if (!latestRelease) {
+        return {
+          ok: true,
+          status: "latest",
+          currentVersion,
+          latestVersion: currentVersion,
+          message: `当前已是最新版本 v${currentVersion}`
+        };
+      }
+
       const latestVersion = versionFromRelease(latestRelease);
 
       if (compareSemver(currentVersion, latestVersion) >= 0) {
@@ -154,7 +170,7 @@ export function createGiteeReleaseUpdater(options: UpdaterOptions = {}) {
       const attachments = await fetchJson<GiteeAttachFile[]>(
         `${GITEE_API_BASE}/releases/${latestRelease.id}/attach_files`
       );
-      const assets = findRequiredUpdateAssets(attachments);
+      const assets = findRequiredUpdateAssets(attachments ?? []);
       latestUpdate = {
         releaseId: latestRelease.id,
         tagName: latestRelease.tag_name ?? `v${latestVersion}`,
@@ -246,10 +262,15 @@ export function createGiteeReleaseUpdater(options: UpdaterOptions = {}) {
     };
   }
 
-  async function fetchJson<T>(url: string): Promise<T> {
+  async function fetchJson<T>(url: string, options: { allowNotFound: true }): Promise<T | null>;
+  async function fetchJson<T>(url: string, options?: { allowNotFound?: false }): Promise<T>;
+  async function fetchJson<T>(url: string, options?: { allowNotFound?: boolean }): Promise<T | null> {
     console.log("[updater] fetchJson", url);
     const response = await fetcher(url, { headers: { accept: "application/json" } });
     if (!response.ok) {
+      if (options?.allowNotFound && response.status === 404) {
+        return null;
+      }
       console.error("[updater] fetchJson failed", url, response.status);
       const detail = `HTTP ${response.status} @ ${url}`;
       throw new Error(response.status === 404 ? `更新包不完整 (${detail})` : `无法连接 Gitee (${detail})`);
