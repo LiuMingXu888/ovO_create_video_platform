@@ -98,6 +98,10 @@
     },
     "portable": {
       "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://placeholder.example.com"
     }
   }
 }
