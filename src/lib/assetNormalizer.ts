@@ -19,6 +19,9 @@ interface RawAssetRecord {
   createdAt?: string;
   generationStartedAt?: string;
   model?: string;
+  // Server snapshot stores the human-readable model name separately under
+  // `modelName` (e.g. "Seedance 2.0"); `model` holds an internal endpoint ID.
+  modelName?: string;
   assetUri?: string;
   thumbnailUrl?: string;
   coverUrl?: string;
@@ -86,7 +89,9 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
     durationSeconds: record.durationSeconds ?? record.duration,
     sizeBytes: record.sizeBytes ?? record.size,
     createdAt: record.createdAt ?? record.generationStartedAt,
-    model: record.model,
+    // Prefer `modelName` ("Seedance 2.0") over `model` (internal endpoint ID
+    // like "ep-20260319213857-htd7q") so isSeedanceModel() can match by name.
+    model: record.modelName ?? record.model,
     generationPrompt: getGenerationPrompt(record),
     generationReferences: getGenerationReferences(record)
   };
@@ -213,6 +218,7 @@ function pickMediaFields(record: Record<string, unknown>): Partial<RawAssetRecor
     createdAt: stringValue(record.createdAt),
     generationStartedAt: stringValue(record.generationStartedAt),
     model: stringValue(record.model),
+    modelName: stringValue(record.modelName),
     assetUri: stringValue(record.assetUri),
     thumbnailUrl: stringValue(record.thumbnailUrl),
     coverUrl: stringValue(record.coverUrl),

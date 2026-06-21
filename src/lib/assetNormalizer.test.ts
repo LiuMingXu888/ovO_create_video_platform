@@ -181,6 +181,49 @@ describe("normalizeSnapshotAssets", () => {
     expect(video?.createdAt).toBe("2026-06-20T01:00:00.000Z");
   });
 
+  it("prefers modelName over model (internal endpoint ID) when both are present", () => {
+    // createCompanyVideoNode writes model="ep-20260319213857-htd7q" (internal
+    // endpoint ID) and modelName="Seedance 2.0" (human-readable). The
+    // isSeedanceModel check uses /seedance/i so we must surface modelName.
+    const assets = normalizeSnapshotAssets({
+      nodes: [
+        {
+          id: "v2",
+          type: "seedance-video",
+          data: {
+            assetId: "v2",
+            label: "生成片",
+            videoUrl: "https://cdn.example.com/v2.mp4",
+            model: "ep-20260319213857-htd7q",
+            modelName: "Seedance 2.0",
+            createdAt: "2026-06-20T01:00:00.000Z"
+          }
+        }
+      ]
+    });
+    const video = assets.find((a) => a.id === "v2");
+    expect(video?.model).toBe("Seedance 2.0");
+  });
+
+  it("falls back to model when modelName is absent", () => {
+    const assets = normalizeSnapshotAssets({
+      nodes: [
+        {
+          id: "v3",
+          type: "seedance-video",
+          data: {
+            assetId: "v3",
+            label: "旧片",
+            videoUrl: "https://cdn.example.com/v3.mp4",
+            model: "Seedance 2.0"
+          }
+        }
+      ]
+    });
+    const video = assets.find((a) => a.id === "v3");
+    expect(video?.model).toBe("Seedance 2.0");
+  });
+
   it("finds media URLs nested inside canvas node payloads", () => {
     expect(
       normalizeSnapshotAssets({
