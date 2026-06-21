@@ -275,6 +275,15 @@ export function App() {
   const mediaElements = useRef<Map<string, HTMLMediaElement>>(new Map());
   const mounted = useRef(true);
 
+  // Live mirror of `assets` so async completion handlers (generation /
+  // subtitle removal) merge into the *current* list instead of a stale
+  // snapshot captured at submit time — otherwise two concurrent placeholders
+  // clobber each other.
+  const assetsRef = useRef(assets);
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
+
   useEffect(() => {
     mounted.current = true;
 
@@ -641,7 +650,7 @@ export function App() {
         return;
       }
 
-      const completedAssets = assetsWithPlaceholder.map((item) => (item.id === placeholder.id ? result.asset : item));
+      const completedAssets = assetsRef.current.map((item) => (item.id === placeholder.id ? result.asset : item));
       setCanvasSnapshot(result.snapshot);
       setAssets(completedAssets);
       persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
@@ -1319,7 +1328,7 @@ export function App() {
           url: savedResult.asset.url,
           status: "ready" as const
         };
-        const completedAssets = assetsWithPlaceholder.map((asset) =>
+        const completedAssets = assetsRef.current.map((asset) =>
           asset.id === generatedAsset.id ? completedAsset : asset
         );
         setCanvasSnapshot(savedResult.snapshot);

@@ -1161,6 +1161,114 @@ describe("App shell", () => {
     expect(screen.queryByText("去字幕中")).not.toBeInTheDocument();
   });
 
+  it("keeps the generation placeholder when a concurrent subtitle removal finishes first", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "ref-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        },
+        {
+          id: "video-1",
+          name: "原片",
+          kind: "video",
+          category: "video",
+          url: "https://example.com/video.mp4",
+          providerVideoUrl: "https://provider.example.com/video.mp4"
+        }
+      ]
+    });
+
+    let resolveRemoval: (value: Awaited<ReturnType<typeof companyApiFacade.removeSubtitles>>) => void = () => undefined;
+    vi.mocked(companyApiFacade.removeSubtitles).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRemoval = resolve;
+      })
+    );
+    let resolveGeneration: (value: { taskId: string; videoUrl: string }) => void = () => undefined;
+    vi.mocked(companyApiFacade.generateVideo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      })
+    );
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-video-node",
+        name: "生成视频 1",
+        kind: "video",
+        category: "video",
+        url: "https://example.com/generated.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } }
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("原片");
+
+    // 1) Start subtitle removal on the existing video (placeholder S).
+    fireEvent.click(screen.getByRole("button", { name: "去除字幕 原片" }));
+    await screen.findByText("去字幕-原片");
+
+    // 2) Start a new generation (placeholder G) while S is still pending.
+    fireEvent.click(screen.getByRole("button", { name: "加入提示词 小区楼道" }));
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "镜头缓慢推进" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
+    expect(await screen.findByText("生成视频 1")).toBeInTheDocument();
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+
+    // 3) Subtitle removal finishes FIRST — must not drop the generation placeholder.
+    const placeholder = vi.mocked(companyApiFacade.removeSubtitles).mock.calls[0][0].placeholderAsset;
+    resolveRemoval({
+      ok: true,
+      asset: {
+        id: placeholder.id,
+        name: placeholder.name,
+        kind: "video",
+        category: "video",
+        url: "https://example.com/no-subtitles.mp4"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      result: { runId: "hb:subtitle-1", videoUrl: "https://example.com/no-subtitles.mp4", route: "paid" }
+    });
+
+    await waitFor(() => {
+      const video = screen.getByText("去字幕-原片").closest("article")?.querySelector("video") as HTMLVideoElement;
+      expect(video).toHaveAttribute("src", "https://example.com/no-subtitles.mp4");
+    });
+    // The generation placeholder survives the subtitle completion.
+    expect(screen.getByText("生成视频 1")).toBeInTheDocument();
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+
+    // 4) Generation finishes — both nodes end up correct; the subtitle node is not resurrected.
+    resolveGeneration({ taskId: "task-1", videoUrl: "https://example.com/generated.mp4" });
+    await waitFor(() => {
+      const generated = screen.getByText("生成视频 1").closest("article")?.querySelector("video") as HTMLVideoElement;
+      expect(generated).toHaveAttribute("src", "https://example.com/generated.mp4");
+    });
+    const subtitleVideo = screen.getByText("去字幕-原片").closest("article")?.querySelector("video") as HTMLVideoElement;
+    expect(subtitleVideo).toHaveAttribute("src", "https://example.com/no-subtitles.mp4");
+    expect(screen.queryByText("生成中")).not.toBeInTheDocument();
+    expect(screen.queryByText("去字幕中")).not.toBeInTheDocument();
+  });
+
   it("shows the real generation failure reason on the failed video card", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
