@@ -284,6 +284,40 @@ export function App() {
     assetsRef.current = assets;
   }, [assets]);
 
+  // On startup: restore the persistent session without requiring a manual
+  // "检查登录态" click. The company session uses a persist: partition so
+  // cookies survive app restarts; we just need to verify them once.
+  // If already authenticated, auto-load the most-recently opened canvas.
+  useEffect(() => {
+    if (!window.ovoDesktop) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.resolve(companyApiFacade.checkAuth()).then((nextState) => {
+      if (cancelled || !nextState) {
+        return;
+      }
+
+      setAuthState(nextState);
+
+      if (nextState.status === "authenticated") {
+        const lastCanvas = loadCanvasHistory()[0];
+        if (lastCanvas?.url) {
+          void loadCanvasFromUrl(lastCanvas.url);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // loadCanvasFromUrl is stable (defined outside render cycle); intentionally
+    // omitting it from deps to run only once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     mounted.current = true;
 
