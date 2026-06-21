@@ -531,14 +531,22 @@ export function App() {
   }
 
   function reuseGeneration(asset: CanvasAsset) {
-    if (!asset.generationPrompt || !asset.generationReferences?.length) {
-      addActivityMessage(`「${asset.name}」暂无可复用的生成提示词和引用`);
+    if (!asset.generationPrompt) {
+      addActivityMessage(`「${asset.name}」暂无可复用的生成提示词`);
+      return;
+    }
+
+    setPrompt(asset.generationPrompt);
+
+    if (!asset.generationReferences?.length) {
+      setReferences([]);
+      setReferenceIssues([]);
+      addActivityMessage(`已复用「${asset.name}」的提示词（无参考资源）`);
       return;
     }
 
     const nextReferences = asset.generationReferences.map(cloneReferenceForReuse);
     const validation = validateReferenceItems(nextReferences);
-    setPrompt(asset.generationPrompt);
 
     if (validation.valid) {
       setReferenceIssues([]);

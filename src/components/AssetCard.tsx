@@ -217,9 +217,9 @@ export function AssetCard({
             <>
               <button
                 type="button"
-                title={asset.generationPrompt && asset.generationReferences?.length ? "复用生成" : "暂无可复用的生成提示词和引用"}
+                title={asset.generationPrompt ? "复用生成" : "暂无可复用的生成提示词"}
                 aria-label={`复用生成 ${asset.name}`}
-                disabled={!asset.generationPrompt || !asset.generationReferences?.length}
+                disabled={!asset.generationPrompt}
                 onClick={() => onAction(asset, "reuse-generation")}
               >
                 <RefreshCcw size={15} />
