@@ -18,6 +18,7 @@ interface RawAssetRecord {
   seedanceProviderUrl?: string;
   createdAt?: string;
   generationStartedAt?: string;
+  model?: string;
   assetUri?: string;
   thumbnailUrl?: string;
   coverUrl?: string;
@@ -85,6 +86,7 @@ function normalizeRawAsset(record: RawAssetRecord): CanvasAsset | null {
     durationSeconds: record.durationSeconds ?? record.duration,
     sizeBytes: record.sizeBytes ?? record.size,
     createdAt: record.createdAt ?? record.generationStartedAt,
+    model: record.model,
     generationPrompt: getGenerationPrompt(record),
     generationReferences: getGenerationReferences(record)
   };
@@ -210,6 +212,7 @@ function pickMediaFields(record: Record<string, unknown>): Partial<RawAssetRecor
     seedanceProviderUrl: stringValue(record.seedanceProviderUrl),
     createdAt: stringValue(record.createdAt),
     generationStartedAt: stringValue(record.generationStartedAt),
+    model: stringValue(record.model),
     assetUri: stringValue(record.assetUri),
     thumbnailUrl: stringValue(record.thumbnailUrl),
     coverUrl: stringValue(record.coverUrl),

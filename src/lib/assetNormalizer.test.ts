@@ -160,6 +160,27 @@ describe("normalizeSnapshotAssets", () => {
     ]);
   });
 
+  it("reads back model and createdAt from snapshot records", () => {
+    const assets = normalizeSnapshotAssets({
+      nodes: [
+        {
+          id: "v1",
+          type: "seedance-video",
+          data: {
+            assetId: "v1",
+            label: "成片",
+            videoUrl: "https://cdn.example.com/v.mp4",
+            model: "Seedance 2.0",
+            createdAt: "2026-06-20T01:00:00.000Z"
+          }
+        }
+      ]
+    });
+    const video = assets.find((a) => a.id === "v1");
+    expect(video?.model).toBe("Seedance 2.0");
+    expect(video?.createdAt).toBe("2026-06-20T01:00:00.000Z");
+  });
+
   it("finds media URLs nested inside canvas node payloads", () => {
     expect(
       normalizeSnapshotAssets({
