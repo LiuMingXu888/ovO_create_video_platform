@@ -22,6 +22,7 @@ import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { companyApiFacade } from "./services/companyApiFacade";
 import { SEEDANCE_MODEL_NAME } from "./api/generationClient";
+import { chooseSubtitleRemovalRoute } from "./api/subtitleClient";
 import type {
   AssetAction,
   AssetCategory,
@@ -593,7 +594,9 @@ export function App() {
       status: "generating",
       statusLabel: "去字幕中",
       generationPrompt: asset.generationPrompt,
-      generationReferences: asset.generationReferences
+      generationReferences: asset.generationReferences,
+      generationStartedAt: asset.generationStartedAt,
+      model: asset.model
     };
   }
 
@@ -615,7 +618,17 @@ export function App() {
       video: [...current.video, placeholder.id]
     }));
     persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
-    addActivityMessage(`去字幕中：${placeholder.name}`);
+    const routeForLog = chooseSubtitleRemovalRoute(
+      {
+        providerVideoUrl: asset.providerVideoUrl,
+        createdAt: asset.createdAt,
+        isSeedance: /seedance/i.test(asset.model ?? "")
+      },
+      new Date()
+    );
+    addActivityMessage(
+      `去字幕中：${placeholder.name}（${routeForLog === "free" ? "免费" : "付费"}，createdAt=${asset.createdAt ?? "无"}）`
+    );
 
     try {
       const result = await companyApiFacade.removeSubtitles({

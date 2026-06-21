@@ -262,6 +262,63 @@ describe("loadCanvasResources", () => {
     });
   });
 
+  it("inherits generation metadata onto the subtitle-removed asset", async () => {
+    let savedSnapshot: unknown = { snapshot: { nodes: [] } };
+    const transport: ApiTransport = {
+      request: async (path: string, options?: { method?: string; body?: unknown }) => {
+        if (path === "/api/subtitle-remove/ark") {
+          return { runId: "hb:sub1", status: "running" } as never;
+        }
+        if (path === "/api/subtitle-remove/ark/hb%3Asub1") {
+          return { runId: "hb:sub1", status: "succeeded", videoUrl: "https://example.com/clean.mp4" } as never;
+        }
+        if (options?.method === "PUT") {
+          savedSnapshot = options.body;
+          return { ok: true } as never;
+        }
+        return savedSnapshot as never;
+      }
+    };
+
+    const placeholder = {
+      id: "subtitle-video-1",
+      name: "去字幕-成片",
+      kind: "video",
+      category: "video",
+      url: "",
+      status: "generating",
+      statusLabel: "去字幕中",
+      generationPrompt: "提示词",
+      generationStartedAt: "2026-06-20T01:00:00.000Z",
+      model: "Seedance 2.0"
+    } as const;
+
+    await expect(
+      removeCanvasAssetSubtitles(transport, {
+        projectId: "project-1",
+        sourceAsset: {
+          id: "video-1",
+          name: "成片",
+          kind: "video",
+          category: "video",
+          url: "https://example.com/video.mp4",
+          providerVideoUrl: "https://provider.example.com/video.mp4",
+          model: "Seedance 2.0",
+          createdAt: new Date().toISOString()
+        },
+        placeholderAsset: placeholder
+      })
+    ).resolves.toMatchObject({
+      asset: {
+        url: "https://example.com/clean.mp4",
+        status: "ready",
+        generationPrompt: "提示词",
+        generationStartedAt: "2026-06-20T01:00:00.000Z",
+        model: "Seedance 2.0"
+      }
+    });
+  });
+
   it("uses the paid subtitle route for an old provider video", async () => {
     const requests: Array<{ path: string; options?: unknown }> = [];
     let savedSnapshot: unknown = { snapshot: { nodes: [] } };
