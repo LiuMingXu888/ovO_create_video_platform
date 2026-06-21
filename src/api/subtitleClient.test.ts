@@ -26,7 +26,18 @@ describe("chooseSubtitleRemovalRoute", () => {
     expect(chooseSubtitleRemovalRoute({ ...base, createdAt: "2026-06-20T01:00:00.000Z" }, now)).toBe("free");
   });
 
-  it("returns paid when within 24h but not Seedance", () => {
+  it("returns free when within 24h + providerVideoUrl even if isSeedance is undefined (pre-model-field assets)", () => {
+    // Assets generated before the model field was introduced have no isSeedance hint.
+    // providerVideoUrl presence is enough to infer Seedance origin.
+    expect(
+      chooseSubtitleRemovalRoute(
+        { providerVideoUrl: "https://provider.example.com/v.mp4", createdAt: "2026-06-20T01:00:00.000Z" },
+        now
+      )
+    ).toBe("free");
+  });
+
+  it("returns paid when within 24h but isSeedance is explicitly false", () => {
     expect(
       chooseSubtitleRemovalRoute({ ...base, isSeedance: false, createdAt: "2026-06-20T01:00:00.000Z" }, now)
     ).toBe("paid");

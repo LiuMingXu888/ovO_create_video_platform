@@ -41,6 +41,12 @@ const FREE_SUBTITLE_ROUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
  * route, which accepts any video. Unknown / unparseable / future timestamps and
  * missing provider URLs all default to paid — the conservative choice that
  * almost never fails.
+ *
+ * `isSeedance` is optional and treated as a hint only. If it is absent but a
+ * `providerVideoUrl` is present, we treat the video as Seedance-origin — the
+ * provider URL is exclusively written by the Seedance generation path, so its
+ * presence is a reliable proxy for the model flag even for assets generated
+ * before the `model` metadata field was introduced.
  */
 export function chooseSubtitleRemovalRoute(
   asset: { providerVideoUrl?: string; createdAt?: string; isSeedance?: boolean },
@@ -61,13 +67,16 @@ export function chooseSubtitleRemovalRoute(
     return "paid";
   }
 
-  if (!asset.isSeedance) {
+  // The ark route needs the 方舟 original URL; without it the free channel
+  // cannot be used, so degrade to paid (matches the web app's client gate).
+  // Having a providerVideoUrl implies Seedance origin even when the model
+  // field is absent (e.g. assets generated before model metadata was saved).
+  if (!asset.providerVideoUrl) {
     return "paid";
   }
 
-  // The ark route needs the 方舟 original URL; without it the free channel
-  // cannot be used, so degrade to paid (matches the web app's client gate).
-  if (!asset.providerVideoUrl) {
+  // Explicitly non-Seedance (model field present and not matching): paid.
+  if (asset.isSeedance === false) {
     return "paid";
   }
 
