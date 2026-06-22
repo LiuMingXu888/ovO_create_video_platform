@@ -749,13 +749,22 @@ button {
 .prompt-row {
   display: grid;
   width: min(96vw, 1800px);
-  grid-template-columns: minmax(620px, 1fr) 220px 220px;
+  grid-template-columns: minmax(560px, 1fr) 320px 220px;
   align-items: end;
   gap: 6px;
 }
 
 .prompt-row-three-column {
-  grid-template-columns: minmax(620px, 1fr) 220px 220px;
+  grid-template-columns: minmax(560px, 1fr) 320px 220px;
+}
+
+/* 中间栏:tab 内嵌在生成面板上方,整列底部对齐基线。 */
+.generate-column {
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .prompt-token-editor {
@@ -859,21 +868,20 @@ button {
   grid-template-columns: auto 1fr;
 }
 
-/* 视频/图片 生成切换 tab. */
+/* 视频/图片 生成切换 tab(内嵌在中间生成栏顶部). */
 .generate-mode-tabs {
   display: flex;
-  width: min(96vw, 1800px);
-  gap: 18px;
-  padding: 0 2px;
+  gap: 14px;
+  padding: 0 2px 2px;
 }
 
 .generate-mode-tab {
   border: 0;
   background: transparent;
   color: #9aa19a;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
-  padding: 2px 4px 6px;
+  padding: 2px 2px 5px;
   cursor: pointer;
 }
 
@@ -1007,8 +1015,10 @@ button {
 
 .prompt-note-panel {
   align-self: end;
-  height: 154px;
+  height: 128px;
   overflow: auto;
+  /* 鼠标在这个悬浮记录区滚动时,不要把滚动链给下层 canvas/素材列表. */
+  overscroll-behavior: contain;
   border: 1px solid #d94c54;
   border-radius: 8px;
   background: #ffffff;

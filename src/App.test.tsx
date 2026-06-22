@@ -2426,7 +2426,11 @@ describe("PromptDock", () => {
 
     expect(row).toHaveClass("prompt-row-three-column");
     expect(notes).toHaveClass("prompt-note-panel");
-    expect(notes.previousElementSibling).toHaveClass("generate-panel");
+    // 中间栏现在是 generate-column,内嵌了 视频/图片 tab + 生成面板.
+    const generateColumn = notes.previousElementSibling as HTMLElement;
+    expect(generateColumn).toHaveClass("generate-column");
+    expect(generateColumn.querySelector(".generate-mode-tabs")).not.toBeNull();
+    expect(generateColumn.querySelector(".generate-panel")).not.toBeNull();
     expect(screen.getByRole("list", { name: "提示记录列表" })).toBeInTheDocument();
     expect(within(notes).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "请输入提示词",

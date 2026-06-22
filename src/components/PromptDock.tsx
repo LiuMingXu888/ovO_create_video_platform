@@ -64,27 +64,6 @@ export function PromptDock({
 
   return (
     <div className="prompt-dock">
-      <div className="generate-mode-tabs" role="tablist" aria-label="生成类型">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={generateMode === "video"}
-          className={`generate-mode-tab${generateMode === "video" ? " generate-mode-tab-active" : ""}`}
-          onClick={() => onGenerateModeChange("video")}
-        >
-          视频生成
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={generateMode === "image"}
-          className={`generate-mode-tab${generateMode === "image" ? " generate-mode-tab-active" : ""}`}
-          onClick={() => onGenerateModeChange("image")}
-        >
-          图片生成
-        </button>
-      </div>
-
       <div className="reference-strip" aria-label="参考素材">
         <label className="reference-add" title="添加参考素材">
           <input
@@ -133,21 +112,43 @@ export function PromptDock({
           prompt={prompt}
           onPromptChange={onPromptChange}
         />
-        {generateMode === "video" ? (
-          <GeneratePanel
-            settings={generationSettings}
-            onSettingsChange={onGenerationSettingsChange}
-            onGenerate={onGenerate}
-            disabled={generateDisabled}
-          />
-        ) : (
-          <ImageGeneratePanel
-            settings={imageGenerationSettings}
-            onSettingsChange={onImageGenerationSettingsChange}
-            onGenerate={onGenerateImage}
-            disabled={generateDisabled}
-          />
-        )}
+        <div className="generate-column">
+          <div className="generate-mode-tabs" role="tablist" aria-label="生成类型">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={generateMode === "video"}
+              className={`generate-mode-tab${generateMode === "video" ? " generate-mode-tab-active" : ""}`}
+              onClick={() => onGenerateModeChange("video")}
+            >
+              视频生成
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={generateMode === "image"}
+              className={`generate-mode-tab${generateMode === "image" ? " generate-mode-tab-active" : ""}`}
+              onClick={() => onGenerateModeChange("image")}
+            >
+              图片生成
+            </button>
+          </div>
+          {generateMode === "video" ? (
+            <GeneratePanel
+              settings={generationSettings}
+              onSettingsChange={onGenerationSettingsChange}
+              onGenerate={onGenerate}
+              disabled={generateDisabled}
+            />
+          ) : (
+            <ImageGeneratePanel
+              settings={imageGenerationSettings}
+              onSettingsChange={onImageGenerationSettingsChange}
+              onGenerate={onGenerateImage}
+              disabled={generateDisabled}
+            />
+          )}
+        </div>
         <section className="prompt-note-panel" aria-label="提示记录">
           <ul aria-label="提示记录列表">
             {activityMessages.map((message, index) => (
