@@ -134,6 +134,19 @@ function getAssetCategoryForUpload(category: AssetCategory, kind: AssetKind): As
   return category;
 }
 
+// Map the image-generation "类别" (人物/场景/道具) onto a canvas asset category.
+function imageCategoryToAssetCategory(category: string): AssetCategory {
+  if (category === "场景") {
+    return "scenes";
+  }
+
+  if (category === "道具") {
+    return "props";
+  }
+
+  return "characters";
+}
+
 function getPrefixedAssetNameForCategory(name: string, kind: AssetKind, category: AssetCategory) {
   if ((kind === "image" && imageCategories.includes(category)) || kind === "audio") {
     return replaceAssetCategoryPrefix(name, category);
@@ -628,6 +641,23 @@ export function App() {
       statusLabel: "生成中",
       generationPrompt: prompt,
       generationReferences: references.map(cloneReferenceForReuse)
+    };
+  }
+
+  function createGeneratedImagePlaceholder(category: AssetCategory): CanvasAsset {
+    const placeholderId = createId("generated-image");
+    return {
+      id: placeholderId,
+      name: `生成图片 ${assets.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`,
+      kind: "image",
+      category,
+      url: "",
+      thumbnailUrl: undefined,
+      sizeBytes: 0,
+      createdAt: new Date().toISOString(),
+      status: "generating",
+      statusLabel: "生成中",
+      generationPrompt: prompt
     };
   }
 
@@ -1402,19 +1432,106 @@ export function App() {
   }
 
   async function handleGenerateImage() {
-    // Image generation UI is in place, but the real company endpoint + camera
-    // list still need a 接口诊断 capture of the image flow. Until that lands we
-    // surface a clear, honest message instead of silently no-op'ing or charging
-    // credits. Wire the actual request here once the endpoint is known.
     const promptText = prompt.trim();
     if (!promptText) {
       addActivityMessage("请输入图片提示词");
       return;
     }
 
-    addActivityMessage(
-      `图片生成接口尚未接入（${imageGenerationSettings.model} · ${imageGenerationSettings.aspectRatio} · ${imageGenerationSettings.quality.toUpperCase()} · ${imageGenerationSettings.camera} · ${imageGenerationSettings.category}）。请先在该流程上跑一次「接口诊断」，把抓包发我以接入真实接口。`
-    );
+    if (!project || !canvasSnapshot) {
+      addActivityMessage("请先加载公司画布后再生成图片");
+      return;
+    }
+
+    await refreshAuthState();
+
+    const assetCategory = imageCategoryToAssetCategory(imageGenerationSettings.category);
+    const placeholder = createGeneratedImagePlaceholder(assetCategory);
+    const assetsWithPlaceholder = [...assets, placeholder];
+    setAssets(assetsWithPlaceholder);
+    persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
+    setDefaultAssetOrder((current) => ({
+      ...current,
+      [assetCategory]: [...current[assetCategory], placeholder.id]
+    }));
+    setPrompt("");
+
+    const startTime = Date.now();
+    const generationActivityId = addActivityMessage(`正在生成图片：${placeholder.name}（已等待 0分0秒）`);
+    const progressInterval = setInterval(() => {
+      updateActivityMessage(generationActivityId, `正在生成图片：${placeholder.name}（已等待 ${formatElapsedTime(startTime, Date.now())}）`);
+    }, 1000);
+
+    try {
+      // Only already-remote image references can be sent to the company API; the
+      // panel's local-file references are not uploaded here.
+      const referenceImageUrls = references
+        .filter((reference) => reference.kind === "image")
+        .map((reference) => reference.url)
+        .filter((url): url is string => typeof url === "string" && /^https?:/i.test(url));
+
+      const result = await companyApiFacade.generateImage({
+        projectId: project.projectId,
+        nodeId: placeholder.id,
+        prompt: promptText,
+        settings: imageGenerationSettings,
+        referenceImageUrls
+      });
+
+      clearInterval(progressInterval);
+
+      if (!mounted.current) {
+        return;
+      }
+
+      const savedResult = await companyApiFacade.saveCanvasAsset({
+        projectId: project.projectId,
+        snapshot: canvasSnapshot,
+        id: placeholder.id,
+        name: placeholder.name,
+        kind: "image",
+        category: assetCategory,
+        url: result.imageUrl,
+        generationStartedAt: new Date(startTime).toISOString(),
+        model: imageGenerationSettings.model,
+        generationPrompt: promptText
+      });
+
+      const completedAsset = {
+        ...placeholder,
+        ...savedResult.asset,
+        url: savedResult.asset.url,
+        status: "ready" as const
+      };
+      const completedAssets = assetsRef.current.map((asset) => (asset.id === placeholder.id ? completedAsset : asset));
+      setCanvasSnapshot(savedResult.snapshot);
+      setAssets(completedAssets);
+      persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
+      updateActivityMessage(generationActivityId, `已生成图片：${placeholder.name}（用时 ${formatElapsedTime(startTime, Date.now())}）`);
+      await refreshAuthState();
+    } catch (error) {
+      clearInterval(progressInterval);
+
+      if (!mounted.current) {
+        return;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : "图片生成失败";
+      console.error("[图片生成] 错误:", error);
+      setAssets((current) =>
+        current.map((asset) =>
+          asset.id === placeholder.id
+            ? {
+                ...asset,
+                status: "failed" as const,
+                errorMessage
+              }
+            : asset
+        )
+      );
+      updateActivityMessage(generationActivityId, errorMessage);
+      await refreshAuthState();
+    }
   }
 
   return (

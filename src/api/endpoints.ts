@@ -13,6 +13,8 @@ export const endpoints = {
   assetUpload: () => "/api/asset/upload",
   generateVideo: () => "/api/generate-video",
   generateVideoTask: (taskId: string) => `/api/generate-video/${encodeURIComponent(taskId)}`,
+  generateImage: () => "/api/generate-image",
+  generateImageTask: (taskId: string) => `/api/generate-image/${encodeURIComponent(taskId)}`,
   genQueue: (projectId: string, taskId?: string) =>
     `/api/gen-queue?projectId=${encodeURIComponent(projectId)}${taskId ? `&taskId=${encodeURIComponent(taskId)}` : ""}`,
   persistTask: () => "/api/asset/persist-task",

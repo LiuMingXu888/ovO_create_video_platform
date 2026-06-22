@@ -90,11 +90,63 @@ export function addAssetNodeToSnapshot(snapshot: unknown, asset: CanvasAsset) {
   const nodes = Array.isArray(snapshotBody.nodes) ? [...snapshotBody.nodes] : [];
   const nextNode = createAssetNode(asset);
   const existingIndex = nodes.findIndex((node) => matchesAssetNode(node, asset.id));
-  snapshotBody.nodes =
-    existingIndex >= 0
-      ? nodes.map((node, index) => (index === existingIndex ? nextNode : node))
-      : [...nodes, nextNode];
+
+  if (existingIndex >= 0) {
+    // Updating an existing node (e.g. a placeholder being completed): keep its
+    // current canvas position so it doesn't jump back to the origin.
+    const previousPosition = getNodePosition(nodes[existingIndex]) ?? { x: 0, y: 0 };
+    const positioned = withNodePosition(nextNode, previousPosition);
+    snapshotBody.nodes = nodes.map((node, index) => (index === existingIndex ? positioned : node));
+  } else {
+    // New node: place it below existing content so app-added nodes don't all
+    // stack on top of each other at the origin.
+    const positioned = withNodePosition(nextNode, nextNodePosition(nodes));
+    snapshotBody.nodes = [...nodes, positioned];
+  }
+
   return cloned;
+}
+
+// Vertical gap between an app-added node and the content above it. Real canvas
+// nodes are ~288px wide / ~162px tall and hand-arranged; we only need new nodes
+// to land in clear space below everything else, never overlapping.
+const NEW_NODE_GAP_Y = 360;
+
+function nextNodePosition(nodes: unknown[]): { x: number; y: number } {
+  const positions = nodes.map(getNodePosition).filter((value): value is { x: number; y: number } => value !== undefined);
+
+  if (positions.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  const minX = Math.min(...positions.map((position) => position.x));
+  const maxY = Math.max(...positions.map((position) => position.y));
+  return { x: minX, y: maxY + NEW_NODE_GAP_Y };
+}
+
+function getNodePosition(node: unknown): { x: number; y: number } | undefined {
+  if (!isRecord(node)) {
+    return undefined;
+  }
+
+  if (isRecord(node.position) && typeof node.position.x === "number" && typeof node.position.y === "number") {
+    return { x: node.position.x, y: node.position.y };
+  }
+
+  if (typeof node.x === "number" && typeof node.y === "number") {
+    return { x: node.x, y: node.y };
+  }
+
+  return undefined;
+}
+
+function withNodePosition(node: CompanyNode, position: { x: number; y: number }): CompanyNode {
+  return {
+    ...node,
+    x: position.x,
+    y: position.y,
+    position: { x: position.x, y: position.y }
+  };
 }
 
 export function createCompanyImageNode(asset: CanvasAsset): CompanyNode {

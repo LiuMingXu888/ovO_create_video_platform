@@ -337,4 +337,57 @@ describe("uploadClient payload builders", () => {
     });
     expect(requests[3]).toEqual({ path: "/api/projects/project-1/snapshot", options: undefined });
   });
+
+  it("places consecutively added nodes at distinct positions instead of stacking at the origin", () => {
+    let snapshot: unknown = { snapshot: { nodes: [] } };
+    snapshot = addAssetNodeToSnapshot(snapshot, {
+      id: "asset-a",
+      name: "A",
+      kind: "image",
+      category: "characters",
+      url: "https://example.com/a.png"
+    });
+    snapshot = addAssetNodeToSnapshot(snapshot, {
+      id: "asset-b",
+      name: "B",
+      kind: "image",
+      category: "characters",
+      url: "https://example.com/b.png"
+    });
+
+    const nodes = (snapshot as { snapshot: { nodes: Array<{ id: string; position: { x: number; y: number } }> } }).snapshot.nodes;
+    const a = nodes.find((node) => node.id === "asset-a")!;
+    const b = nodes.find((node) => node.id === "asset-b")!;
+    expect(a.position).toEqual({ x: 0, y: 0 });
+    expect(b.position).not.toEqual(a.position);
+    expect(b.position.y).toBeGreaterThan(a.position.y);
+  });
+
+  it("preserves an existing node's position when it is updated in place", () => {
+    const snapshot = {
+      snapshot: {
+        nodes: [
+          {
+            id: "asset-c",
+            type: "image",
+            x: 120,
+            y: 340,
+            position: { x: 120, y: 340 },
+            data: { id: "asset-c", assetId: "asset-c", status: "generating" }
+          }
+        ]
+      }
+    };
+
+    const next = addAssetNodeToSnapshot(snapshot, {
+      id: "asset-c",
+      name: "完成图",
+      kind: "image",
+      category: "characters",
+      url: "https://example.com/c.png"
+    }) as { snapshot: { nodes: Array<{ id: string; position: { x: number; y: number } }> } };
+
+    expect(next.snapshot.nodes).toHaveLength(1);
+    expect(next.snapshot.nodes[0].position).toEqual({ x: 120, y: 340 });
+  });
 });

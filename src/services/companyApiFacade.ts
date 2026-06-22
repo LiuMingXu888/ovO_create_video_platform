@@ -1,12 +1,13 @@
 import { checkAuth } from "../api/authClient";
 import { DesktopApiTransport } from "../api/desktopTransport";
 import { generateVideo as generateVideoWithTransport } from "../api/generationClient";
+import { generateImage as generateImageWithTransport } from "../api/imageGenerationClient";
 import { createCompanyCanvas as createCompanyCanvasWithTransport } from "../api/projectClient";
 import { FetchApiTransport } from "../api/transport";
 import { uploadCanvasAsset as uploadCanvasAssetWithTransport } from "../api/uploadClient";
 import { extractCreditBalance } from "../lib/credits";
 import { deleteCanvasAsset, loadCanvasResources, removeCanvasAssetSubtitles, renameCanvasAsset, saveCanvasAsset } from "./canvasLoader";
-import type { AssetCategory, AssetKind, AuthState, AuthUser, CanvasAsset, GenerationSettings, ReferenceItem } from "../types";
+import type { AssetCategory, AssetKind, AuthState, AuthUser, CanvasAsset, GenerationSettings, ImageGenerationSettings, ReferenceItem } from "../types";
 
 const transport = new FetchApiTransport();
 const desktopTransport = new DesktopApiTransport();
@@ -87,6 +88,13 @@ export const companyApiFacade = {
     references: ReferenceItem[];
     settings: GenerationSettings;
   }) => generateVideoWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
+  generateImage: (input: {
+    projectId?: string;
+    nodeId?: string;
+    prompt: string;
+    settings: ImageGenerationSettings;
+    referenceImageUrls?: string[];
+  }) => generateImageWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
   createCompanyCanvas: () => createCompanyCanvasWithTransport(window.ovoDesktop ? desktopTransport : transport),
   logout: async () => {
     if (!window.ovoDesktop) {

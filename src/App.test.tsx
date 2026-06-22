@@ -12,6 +12,7 @@ vi.mock("./services/companyApiFacade", () => ({
     saveCanvasAsset: vi.fn(),
     deleteCanvasAsset: vi.fn(),
     generateVideo: vi.fn(),
+    generateImage: vi.fn(),
     removeSubtitles: vi.fn(),
     createCompanyCanvas: vi.fn(),
     logout: vi.fn(),
@@ -43,6 +44,7 @@ beforeEach(() => {
   vi.mocked(companyApiFacade.checkAuth).mockReset();
   vi.mocked(companyApiFacade.deleteCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.generateVideo).mockReset();
+  vi.mocked(companyApiFacade.generateImage).mockReset();
   vi.mocked(companyApiFacade.removeSubtitles).mockReset();
   vi.mocked(companyApiFacade.createCompanyCanvas).mockReset();
   vi.mocked(companyApiFacade.logout).mockReset();
@@ -824,6 +826,70 @@ describe("App shell", () => {
         webSearch: false
       }
     });
+  });
+
+  it("submits real image generation for a loaded canvas and adds the returned image", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+    vi.mocked(companyApiFacade.generateImage).mockResolvedValue({
+      taskId: "img-task-1",
+      imageUrl: "https://example.com/generated.png"
+    });
+    vi.mocked(companyApiFacade.saveCanvasAsset).mockResolvedValue({
+      ok: true,
+      asset: {
+        id: "generated-image-node",
+        name: "生成图片 1",
+        kind: "image",
+        category: "characters",
+        url: "https://example.com/generated.png",
+        sizeBytes: 999
+      },
+      snapshot: { snapshot: { nodes: [] } }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    fireEvent.click(screen.getByRole("tab", { name: "图片生成" }));
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "一个站立的女人" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /生成图片\(需要\d+积分\)/ }));
+
+    await waitFor(() => expect(companyApiFacade.generateImage).toHaveBeenCalled());
+    expect(companyApiFacade.generateImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        nodeId: expect.stringMatching(/^generated-image-/),
+        prompt: "一个站立的女人",
+        settings: expect.objectContaining({ model: "GPT-Image-2(兑吧)", category: "人物" })
+      })
+    );
+    await waitFor(() =>
+      expect(companyApiFacade.saveCanvasAsset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/generated.png"
+        })
+      )
+    );
+    expect(await screen.findByText(/已生成图片：生成图片 1/)).toBeInTheDocument();
   });
 
   it("updates the real generation activity item with the final elapsed time", async () => {
