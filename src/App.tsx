@@ -960,20 +960,6 @@ export function App() {
     }
   }
 
-  async function handleInspectCanvas() {
-    setCanvasLoading(true);
-    setCanvasError(undefined);
-
-    try {
-      const result = await companyApiFacade.inspectCanvas(canvasUrl);
-      addActivityMessage(`接口诊断已捕获 ${result.summaries?.length ?? 0} 个请求`);
-    } catch (error) {
-      setCanvasError(error instanceof Error ? error.message : "接口诊断失败");
-    } finally {
-      setCanvasLoading(false);
-    }
-  }
-
   function handleDropAsset(category: AssetCategory) {
     if (!draggedAsset || draggedAsset.kind !== "image" || !imageCategories.includes(category)) {
       return;
@@ -1472,7 +1458,6 @@ export function App() {
         onOpenLogin={handleOpenLogin}
         onCheckAuth={handleCheckAuth}
         onLoadCanvas={handleLoadCanvas}
-        onInspectCanvas={handleInspectCanvas}
       />
 
       <div className="asset-workspace">

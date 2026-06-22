@@ -1,4 +1,4 @@
-import { Bug, Check, Link, Loader2, LogIn, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Link, Loader2, LogIn, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { CanvasHistoryEntry } from "../lib/canvasHistory";
 import type { AuthState } from "../types";
 
@@ -19,7 +19,6 @@ interface CanvasControlsProps {
   onOpenLogin: (canvasUrl?: string) => void;
   onCheckAuth: () => void;
   onLoadCanvas: () => void;
-  onInspectCanvas: () => void;
 }
 
 export function CanvasControls({
@@ -38,8 +37,7 @@ export function CanvasControls({
   onCreateCompanyCanvas,
   onOpenLogin,
   onCheckAuth,
-  onLoadCanvas,
-  onInspectCanvas
+  onLoadCanvas
 }: CanvasControlsProps) {
   const authLabel =
     authState.status === "authenticated"
@@ -113,10 +111,6 @@ export function CanvasControls({
           <button type="button" className="secondary-button" onClick={onCheckAuth} disabled={loading}>
             {authState.status === "checking" ? <Loader2 size={16} /> : <LogIn size={16} />}
             <span>检查登录态</span>
-          </button>
-          <button type="button" className="secondary-button" onClick={onInspectCanvas} disabled={loading}>
-            {loading ? <Loader2 size={16} /> : <Bug size={16} />}
-            <span>接口诊断</span>
           </button>
           <button type="button" className="primary-button" onClick={onLoadCanvas} disabled={loading}>
             {loading ? <Loader2 size={16} /> : <RefreshCw size={16} />}

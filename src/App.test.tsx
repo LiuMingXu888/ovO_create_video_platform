@@ -628,23 +628,11 @@ describe("App shell", () => {
     expect(screen.getByText("分享链接已打开，请在窗口里点击查看，再复制进入后的画布地址重新加载")).toBeInTheDocument();
   });
 
-  it("runs the in-app canvas API diagnostic capture from the canvas controls", async () => {
-    vi.mocked(companyApiFacade.inspectCanvas).mockResolvedValue({
-      ok: true,
-      summaries: [
-        { method: "GET", path: "/api/projects/cmq/snapshot", family: "snapshot", status: 200 },
-        { method: "POST", path: "/api/gen-queue", family: "generation", status: 200 }
-      ],
-      sanitizedMapPath: "/Users/mac/Library/Application Support/ovO/storage/api/sanitized-api-map.json"
-    });
+  it("hides the standalone 接口诊断 entry now that it is folded into the login window", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "接口诊断" }));
-
-    await waitFor(() =>
-      expect(companyApiFacade.inspectCanvas).toHaveBeenCalledWith("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x")
-    );
-    expect(await screen.findByText("接口诊断已捕获 2 个请求")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "接口诊断" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登录公司账号" })).toBeInTheDocument();
   });
 
   it("hides the company canvas creation entry while keeping local canvas creation available", async () => {

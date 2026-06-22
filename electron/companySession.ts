@@ -72,6 +72,73 @@ function fetchWithCompanySession(url: string, init?: RequestInit) {
   });
 }
 
+interface ApiCaptureHandle {
+  detach: () => void;
+  rawCapturePath: string;
+  getSummaries: () => SanitizedApiSummary[];
+  getCaptures: () => RawApiCapture[];
+}
+
+// Attaches /api/* request+response listeners to the company session and persists
+// every captured call to the on-disk storage paths (captures/ + sanitized map).
+// Shared by both 登录公司账号 and the legacy 接口诊断 flow so login-time browsing
+// records the same diagnostics without a separate window.
+async function attachApiCapture(companySession: Electron.Session): Promise<ApiCaptureHandle> {
+  const paths = getStoragePaths();
+  await fs.mkdir(paths.capturesDir, { recursive: true });
+  const captures: RawApiCapture[] = [];
+  const pending = new Map<number, PendingCapture>();
+  const rawCapturePath = path.join(paths.capturesDir, `capture-${createTimestampFolderName(new Date())}.json`);
+
+  const requestListener = (details: Electron.OnBeforeRequestListenerDetails, callback: (response: Electron.CallbackResponse) => void) => {
+    if (isCompanyApiUrl(details.url)) {
+      const uploadData = details.uploadData?.find((item) => item.bytes)?.bytes;
+      pending.set(details.id, {
+        method: details.method,
+        url: details.url,
+        requestBody: buildCapturedRequestBody(undefined, uploadData)
+      });
+    }
+
+    callback({});
+  };
+
+  const responseListener = (details: Electron.OnCompletedListenerDetails) => {
+    const request = pending.get(details.id);
+    if (!request) {
+      return;
+    }
+
+    pending.delete(details.id);
+    captures.push({
+      method: request.method,
+      url: request.url,
+      status: details.statusCode,
+      requestBody: request.requestBody
+    });
+    void persistCurrentCaptures();
+  };
+
+  companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, requestListener);
+  companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, responseListener);
+
+  async function persistCurrentCaptures() {
+    const capturedAt = new Date().toISOString();
+    await fs.writeFile(rawCapturePath, JSON.stringify({ capturedAt, captures }, null, 2));
+    await fs.writeFile(paths.sanitizedApiMapPath, JSON.stringify({ capturedAt, captures: captures.map(summarizeCapture) }, null, 2));
+  }
+
+  return {
+    detach() {
+      companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
+      companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
+    },
+    rawCapturePath,
+    getSummaries: () => captures.map(summarizeCapture),
+    getCaptures: () => captures
+  };
+}
+
 function createLoginToolbarUrl(initialUrl: string, actionChannel: string, urlChannel: string) {
   const html = `<!doctype html>
 <html lang="zh-CN">
@@ -87,7 +154,7 @@ function createLoginToolbarUrl(initialUrl: string, actionChannel: string, urlCha
       }
       .bar {
         display: grid;
-        grid-template-columns: 32px 32px minmax(0, 1fr) 66px 42px;
+        grid-template-columns: 32px 32px minmax(0, 1fr) 52px 66px 42px;
         gap: 6px;
         align-items: center;
         height: 48px;
@@ -114,19 +181,40 @@ function createLoginToolbarUrl(initialUrl: string, actionChannel: string, urlCha
     <div class="bar">
       <button type="button" data-action="back" title="后退">←</button>
       <button type="button" data-action="forward" title="前进">→</button>
-      <input id="address" readonly value="${escapeHtml(initialUrl)}" aria-label="当前网址" />
+      <input id="address" value="${escapeHtml(initialUrl)}" placeholder="粘贴要查看的分享链接，回车前往" aria-label="当前网址" />
+      <button type="button" data-action="go" title="前往输入的网址">前往</button>
       <button type="button" data-action="copy" title="复制当前网址">复制</button>
       <button type="button" data-action="reload" title="刷新">↻</button>
     </div>
     <script>
       const { ipcRenderer } = require("electron");
       const address = document.getElementById("address");
+      function sendGo() {
+        const value = address.value.trim();
+        if (value) {
+          ipcRenderer.send(${JSON.stringify(actionChannel)}, "go:" + value);
+        }
+      }
       document.querySelectorAll("button[data-action]").forEach((button) => {
-        button.addEventListener("click", () => ipcRenderer.send(${JSON.stringify(actionChannel)}, button.dataset.action));
+        button.addEventListener("click", () => {
+          if (button.dataset.action === "go") {
+            sendGo();
+            return;
+          }
+          ipcRenderer.send(${JSON.stringify(actionChannel)}, button.dataset.action);
+        });
       });
-      address.addEventListener("click", () => address.select());
+      address.addEventListener("focus", () => address.select());
+      address.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          sendGo();
+        }
+      });
       ipcRenderer.on(${JSON.stringify(urlChannel)}, (_event, url) => {
-        address.value = url || "";
+        if (document.activeElement !== address) {
+          address.value = url || "";
+        }
       });
     </script>
   </body>
@@ -203,6 +291,12 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
       return;
     }
 
+    if (action.startsWith("go:")) {
+      const target = normalizeCompanyWindowUrl(action.slice(3));
+      void loginView.webContents.loadURL(target).catch(() => undefined);
+      return;
+    }
+
     if (action === "copy") {
       clipboard.writeText(loginView.webContents.getURL());
     }
@@ -215,6 +309,12 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
   loginView.webContents.on("did-navigate", updateToolbarUrl);
   loginView.webContents.on("did-navigate-in-page", updateToolbarUrl);
   loginView.webContents.on("did-start-navigation", updateToolbarUrl);
+
+  // 接口诊断 is now folded into the login window: record every /api/* call to the
+  // same on-disk storage paths and surface DevTools automatically, so logging in
+  // and browsing doubles as the diagnostic capture without a separate entry.
+  const apiCapture = await attachApiCapture(getCompanySession());
+  loginView.webContents.openDevTools({ mode: "detach" });
 
   resizeLoginView();
   await loginWindow.loadURL(createLoginToolbarUrl(initialUrl, actionChannel, urlChannel));
@@ -260,6 +360,7 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
 
     loginWindow.on("closed", () => {
       ipcMain.removeAllListeners(actionChannel);
+      apiCapture.detach();
       finish({ ok: false, message: "登录窗口已关闭" });
     });
 
@@ -437,12 +538,9 @@ export async function saveAssetsToDownloads(input: SaveAssetsInput) {
 
 export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
   const paths = getStoragePaths();
-  await fs.mkdir(paths.capturesDir, { recursive: true });
   const companySession = getCompanySession();
-  const captures: RawApiCapture[] = [];
-  const pending = new Map<number, PendingCapture>();
   const initialUrl = normalizeCompanyWindowUrl(canvasUrl);
-  const rawCapturePath = path.join(paths.capturesDir, `capture-${createTimestampFolderName(new Date())}.json`);
+  const apiCapture = await attachApiCapture(companySession);
   const inspectWindow = new BrowserWindow({
     width: 1400,
     height: 950,
@@ -471,38 +569,6 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
     inspectView.setBounds({ x: 0, y: 0, width, height });
   }
 
-  const requestListener = (details: Electron.OnBeforeRequestListenerDetails, callback: (response: Electron.CallbackResponse) => void) => {
-    if (isCompanyApiUrl(details.url)) {
-      const uploadData = details.uploadData?.find((item) => item.bytes)?.bytes;
-      pending.set(details.id, {
-        method: details.method,
-        url: details.url,
-        requestBody: buildCapturedRequestBody(undefined, uploadData)
-      });
-    }
-
-    callback({});
-  };
-
-  const responseListener = (details: Electron.OnCompletedListenerDetails) => {
-    const request = pending.get(details.id);
-    if (!request) {
-      return;
-    }
-
-    pending.delete(details.id);
-    const capture: RawApiCapture = {
-      method: request.method,
-      url: request.url,
-      status: details.statusCode,
-      requestBody: request.requestBody
-    };
-    captures.push(capture);
-    void persistCurrentCaptures();
-  };
-
-  companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, requestListener);
-  companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, responseListener);
   // The embedded company SPA occasionally errors on its first paint (the same
   // "white screen until you refresh" the web app shows). Auto-reload once on a
   // load failure or a render-process crash so 接口诊断 recovers without the user
@@ -537,8 +603,7 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   inspectWindow.on("maximize", resizeInspectView);
   inspectWindow.on("unmaximize", resizeInspectView);
   inspectWindow.on("closed", () => {
-    companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
-    companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
+    apiCapture.detach();
   });
   resizeInspectView();
   inspectView.webContents.openDevTools({ mode: "detach" });
@@ -555,44 +620,14 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   }
   await waitForNetworkCapture();
 
-  const fallbackProjectId = projectIdFromCanvasUrl(canvasUrl);
-  const fallbackSnapshotUrl = fallbackProjectId
-    ? `${COMPANY_ORIGIN}/api/projects/${encodeURIComponent(fallbackProjectId)}/snapshot`
-    : undefined;
-  if (fallbackSnapshotUrl && !captures.some((capture) => new URL(capture.url).pathname.endsWith("/snapshot"))) {
-    captures.push({
-      method: "GET",
-      url: fallbackSnapshotUrl,
-      status: undefined
-    });
-  }
-
-  await persistCurrentCaptures();
-  const summaries = captures.map(summarizeCapture);
+  const summaries = apiCapture.getSummaries();
 
   return {
     ok: true,
     summaries,
     sanitizedMapPath: paths.sanitizedApiMapPath,
-    rawCapturePath
+    rawCapturePath: apiCapture.rawCapturePath
   };
-
-  async function persistCurrentCaptures() {
-    const capturedAt = new Date().toISOString();
-    await fs.writeFile(rawCapturePath, JSON.stringify({ capturedAt, captures }, null, 2));
-    await fs.writeFile(paths.sanitizedApiMapPath, JSON.stringify({ capturedAt, captures: captures.map(summarizeCapture) }, null, 2));
-  }
-}
-
-function projectIdFromCanvasUrl(canvasUrl: string) {
-  try {
-    const url = new URL(canvasUrl);
-    const parts = url.pathname.split("/").filter(Boolean);
-    const canvasIndex = parts.indexOf("canvas");
-    return canvasIndex >= 0 ? parts[canvasIndex + 1] : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function isCompanyApiUrl(value: string) {
