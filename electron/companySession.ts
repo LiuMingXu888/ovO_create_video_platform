@@ -503,6 +503,35 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
 
   companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, requestListener);
   companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, responseListener);
+  // The embedded company SPA occasionally errors on its first paint (the same
+  // "white screen until you refresh" the web app shows). Auto-reload once on a
+  // load failure or a render-process crash so 接口诊断 recovers without the user
+  // having to close and reopen the window. A guard caps retries to avoid loops.
+  const MAX_AUTO_RELOADS = 2;
+  let autoReloadCount = 0;
+  function autoReload(reason: string) {
+    if (inspectWindow.isDestroyed() || inspectView.webContents.isDestroyed()) {
+      return;
+    }
+    if (autoReloadCount >= MAX_AUTO_RELOADS) {
+      return;
+    }
+    autoReloadCount += 1;
+    console.warn(`[接口诊断] ${reason}，自动重新加载 (第 ${autoReloadCount} 次)`);
+    void inspectView.webContents.loadURL(initialUrl).catch(() => undefined);
+  }
+
+  inspectView.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    // -3 (ERR_ABORTED) fires for normal client-side navigations; ignore it.
+    if (!isMainFrame || errorCode === -3) {
+      return;
+    }
+    autoReload(`页面加载失败 (${errorCode} ${errorDescription} @ ${validatedURL})`);
+  });
+  inspectView.webContents.on("render-process-gone", (_event, details) => {
+    autoReload(`渲染进程退出 (${details.reason})`);
+  });
+
   inspectWindow.setBrowserView(inspectView);
   inspectWindow.on("resize", resizeInspectView);
   inspectWindow.on("maximize", resizeInspectView);
@@ -514,7 +543,16 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   resizeInspectView();
   inspectView.webContents.openDevTools({ mode: "detach" });
 
-  await inspectView.webContents.loadURL(initialUrl);
+  try {
+    await inspectView.webContents.loadURL(initialUrl);
+  } catch (error) {
+    // Initial load rejected (network blip / aborted). Retry once before giving
+    // up so a transient failure doesn't surface as an empty diagnosis window.
+    console.warn("[接口诊断] 首次加载失败，重试一次：", error);
+    if (!inspectView.webContents.isDestroyed()) {
+      await inspectView.webContents.loadURL(initialUrl).catch(() => undefined);
+    }
+  }
   await waitForNetworkCapture();
 
   const fallbackProjectId = projectIdFromCanvasUrl(canvasUrl);
