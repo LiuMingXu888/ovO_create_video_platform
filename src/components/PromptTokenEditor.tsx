@@ -38,27 +38,36 @@ export function PromptTokenEditor({ prompt, onPromptChange }: PromptTokenEditorP
     };
   }, []);
 
+  function beginResize(event: React.PointerEvent<HTMLElement>) {
+    event.preventDefault();
+    if (!Number.isFinite(event.clientY)) {
+      return;
+    }
+
+    dragStateRef.current = {
+      startY: event.clientY,
+      startHeight: height
+    };
+    if (Number.isFinite(event.pointerId)) {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
+  }
+
   return (
     <div className="prompt-token-editor" style={{ height }}>
+      {/* Full-width top strip: hovering anywhere along the top edge shows the
+          ns-resize cursor and lets the user drag to change height (UI问题1). */}
+      <div
+        className="prompt-resize-edge"
+        aria-hidden="true"
+        onPointerDown={beginResize}
+      />
       <button
         type="button"
         className="prompt-resize-handle"
         aria-label="调整提示词高度"
         title="调整提示词高度"
-        onPointerDown={(event) => {
-          event.preventDefault();
-          if (!Number.isFinite(event.clientY)) {
-            return;
-          }
-
-          dragStateRef.current = {
-            startY: event.clientY,
-            startHeight: height
-          };
-          if (Number.isFinite(event.pointerId)) {
-            event.currentTarget.setPointerCapture?.(event.pointerId);
-          }
-        }}
+        onPointerDown={beginResize}
       >
         <GripVertical size={14} />
       </button>

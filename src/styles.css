@@ -782,12 +782,28 @@ button {
   min-height: 0;
   max-height: 90vh;
   overflow: auto;
+  /* Keep wheel scrolling inside the prompt box — don't chain to the asset
+     list underneath, even when the textarea is already at its top/bottom
+     (UI问题2). */
+  overscroll-behavior: contain;
   resize: none;
   border: 0;
   outline: none;
   background: transparent;
   color: #202734;
   padding: 14px;
+}
+
+/* Full-width top drag strip: hovering the top edge of the prompt box shows
+   the resize cursor and drags height, matching the corner grip (UI问题1). */
+.prompt-resize-edge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  height: 10px;
+  cursor: ns-resize;
 }
 
 .prompt-resize-handle {
@@ -818,13 +834,52 @@ button {
   position: relative;
   display: grid;
   height: 154px;
-  grid-template-rows: 20px 28px 22px 22px 32px;
-  gap: 4px;
+  grid-template-rows: 20px 28px 28px 32px;
+  gap: 6px;
   border: 1px solid #d7d4cc;
   border-radius: 8px;
   background: #ffffff;
   padding: 8px;
   transition: box-shadow 160ms ease;
+}
+
+.generate-panel-image {
+  grid-template-rows: 28px 28px 28px 32px;
+}
+
+/* Two side-by-side fields (比例 + 画质, 摄像机 + 类别, 联网 + 时长). */
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-pair-duration {
+  grid-template-columns: auto 1fr;
+}
+
+/* 视频/图片 生成切换 tab. */
+.generate-mode-tabs {
+  display: flex;
+  width: min(96vw, 1800px);
+  gap: 18px;
+  padding: 0 2px;
+}
+
+.generate-mode-tab {
+  border: 0;
+  background: transparent;
+  color: #9aa19a;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 2px 4px 6px;
+  cursor: pointer;
+}
+
+.generate-mode-tab-active {
+  color: #d94c54;
+  border-bottom: 2px solid #d94c54;
 }
 
 .generate-panel-fixed {
@@ -885,6 +940,14 @@ button {
   font-size: 12px;
 }
 
+.field-line-wide {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.field-line-range {
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
 .field-line-nowrap span {
   white-space: nowrap;
 }
@@ -923,6 +986,23 @@ button {
 
 .generate-button:hover {
   background: #c93d46;
+}
+
+/* White generate button (用户要求把生成按钮颜色换成白色). */
+.generate-button-light {
+  border-color: #d94c54;
+  background: #ffffff;
+  color: #d94c54;
+}
+
+.generate-button-light:hover {
+  background: #fff4f4;
+}
+
+.generate-button-light:disabled {
+  border-color: #e3b6ba;
+  color: #e3b6ba;
+  background: #ffffff;
 }
 
 .prompt-note-panel {
