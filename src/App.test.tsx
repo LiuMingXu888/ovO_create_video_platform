@@ -830,7 +830,7 @@ describe("App shell", () => {
         })
       ],
       settings: {
-        aspectRatio: "9:16",
+        aspectRatio: "9:16", resolution: "720p",
         durationSeconds: 15,
         omnireference: true,
         webSearch: false
@@ -2241,8 +2241,13 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: false }}
+        generationSettings={{ aspectRatio: "9:16", resolution: "720p", durationSeconds: 5, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
+        generateMode="video"
+        onGenerateModeChange={() => undefined}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        onImageGenerationSettingsChange={() => undefined}
+        onGenerateImage={() => undefined}
       />
     );
 
@@ -2269,8 +2274,13 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "16:9", durationSeconds: 5, omnireference: true, webSearch: false }}
+        generationSettings={{ aspectRatio: "16:9", resolution: "720p", durationSeconds: 5, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
+        generateMode="video"
+        onGenerateModeChange={() => undefined}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        onImageGenerationSettingsChange={() => undefined}
+        onGenerateImage={() => undefined}
       />
     );
 
@@ -2289,8 +2299,13 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: false }}
+        generationSettings={{ aspectRatio: "9:16", resolution: "720p", durationSeconds: 5, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
+        generateMode="video"
+        onGenerateModeChange={() => undefined}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        onImageGenerationSettingsChange={() => undefined}
+        onGenerateImage={() => undefined}
       />
     );
 
@@ -2341,8 +2356,13 @@ describe("PromptDock", () => {
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
         onGenerate={() => undefined}
-        generationSettings={{ aspectRatio: "9:16", durationSeconds: 15, omnireference: true, webSearch: false }}
+        generationSettings={{ aspectRatio: "9:16", resolution: "720p", durationSeconds: 15, omnireference: true, webSearch: false }}
         onGenerationSettingsChange={() => undefined}
+        generateMode="video"
+        onGenerateModeChange={() => undefined}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        onImageGenerationSettingsChange={() => undefined}
+        onGenerateImage={() => undefined}
         activityMessages={["请输入提示词", "已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"]}
       />
     );
@@ -2359,5 +2379,71 @@ describe("PromptDock", () => {
       "已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"
     ]);
     expect(screen.getByText("已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口")).toBeInTheDocument();
+  });
+
+  function renderDock(overrides: Partial<React.ComponentProps<typeof PromptDock>> = {}) {
+    const props: React.ComponentProps<typeof PromptDock> = {
+      prompt: "",
+      references: [],
+      onPromptChange: () => undefined,
+      onRemoveReference: () => undefined,
+      onLocalFilesSelected: () => undefined,
+      onGenerate: () => undefined,
+      generationSettings: { aspectRatio: "9:16", resolution: "720p", durationSeconds: 15, omnireference: true, webSearch: false },
+      onGenerationSettingsChange: () => undefined,
+      generateMode: "video",
+      onGenerateModeChange: () => undefined,
+      imageGenerationSettings: { model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" },
+      onImageGenerationSettingsChange: () => undefined,
+      onGenerateImage: () => undefined,
+      ...overrides
+    };
+    return render(<PromptDock {...props} />);
+  }
+
+  it("renders a video resolution selector defaulting to 720p with white generate button", () => {
+    renderDock();
+
+    const resolution = screen.getByLabelText("画质") as HTMLSelectElement;
+    expect(resolution.value).toBe("720p");
+    expect(Array.from(resolution.options).map((option) => option.value)).toEqual(["480p", "720p", "1080p"]);
+    expect(screen.getByRole("button", { name: /生成视频/ })).toHaveClass("generate-button-light");
+  });
+
+  it("switches to the image generation tab and shows the image panel options", () => {
+    const onGenerateModeChange = vi.fn();
+    const { rerender } = renderDock({ onGenerateModeChange });
+
+    fireEvent.click(screen.getByRole("tab", { name: "图片生成" }));
+    expect(onGenerateModeChange).toHaveBeenCalledWith("image");
+
+    rerender(
+      <PromptDock
+        prompt=""
+        references={[]}
+        onPromptChange={() => undefined}
+        onRemoveReference={() => undefined}
+        onLocalFilesSelected={() => undefined}
+        onGenerate={() => undefined}
+        generationSettings={{ aspectRatio: "9:16", resolution: "720p", durationSeconds: 15, omnireference: true, webSearch: false }}
+        onGenerationSettingsChange={() => undefined}
+        generateMode="image"
+        onGenerateModeChange={onGenerateModeChange}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        onImageGenerationSettingsChange={() => undefined}
+        onGenerateImage={() => undefined}
+      />
+    );
+
+    expect((screen.getByLabelText("生图模型") as HTMLSelectElement).value).toBe("GPT-Image-2(兑吧)");
+    expect((screen.getByLabelText("质量") as HTMLSelectElement).value).toBe("4k");
+    expect((screen.getByLabelText("摄像机") as HTMLSelectElement).value).toBe("暂不选择");
+    expect((screen.getByLabelText("类别") as HTMLSelectElement).value).toBe("人物");
+    expect(screen.getByRole("button", { name: /生成图片/ })).toHaveClass("generate-button-light");
+  });
+
+  it("exposes a full-width top edge for resizing the prompt box", () => {
+    renderDock();
+    expect(document.querySelector(".prompt-token-editor .prompt-resize-edge")).toBeInTheDocument();
   });
 });

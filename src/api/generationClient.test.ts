@@ -55,7 +55,7 @@ describe("buildGenerateVideoPayload", () => {
     const payload: any = buildCompanyGenerateVideoPayload({
       prompt: "p",
       references: imageOnly,
-      settings: { aspectRatio: "9:16", durationSeconds: 5, omnireference: true, webSearch: true }
+      settings: { aspectRatio: "9:16", resolution: "720p", durationSeconds: 5, omnireference: true, webSearch: true }
     });
     expect(payload.webSearch).toBe(true);
     expect(payload.referenceMode).toBe("omnireference");
@@ -74,7 +74,7 @@ describe("buildGenerateVideoPayload", () => {
         prompt: "生成一段视频",
         references: refs,
         settings: {
-          aspectRatio: "9:16",
+          aspectRatio: "9:16", resolution: "720p",
           durationSeconds: 15,
           omnireference: true,
           webSearch: false

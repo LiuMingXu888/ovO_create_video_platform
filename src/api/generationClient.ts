@@ -18,6 +18,7 @@ export const SEEDANCE_MODEL_NAME = "Seedance 2.0";
 export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
   const settings: GenerationSettings = input.settings ?? {
     aspectRatio: "9:16",
+    resolution: "720p",
     durationSeconds: 15,
     omnireference: true,
     webSearch: false
@@ -39,6 +40,7 @@ export function buildGenerateVideoPayload(input: BuildGenerateVideoPayloadInput)
 export function buildCompanyGenerateVideoPayload(input: BuildGenerateVideoPayloadInput) {
   const settings: GenerationSettings = input.settings ?? {
     aspectRatio: "9:16",
+    resolution: "720p",
     durationSeconds: 15,
     omnireference: true,
     webSearch: false
@@ -84,7 +86,7 @@ function buildCompanyGenerateVideoParams(input: BuildGenerateVideoPayloadInput, 
     prompt: input.prompt,
     model: SEEDANCE_MODEL_ID,
     ratio: settings.aspectRatio,
-    resolution: "720p",
+    resolution: settings.resolution ?? "720p",
     duration: settings.durationSeconds,
     generateAudio: true,
     // 网页用 webSearch 控制联网/全网搜索；默认关。

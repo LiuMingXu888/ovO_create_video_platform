@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GeneratePanel } from "./GeneratePanel";
 import type { GenerationSettings } from "../types";
 
-const base: GenerationSettings = { aspectRatio: "9:16", durationSeconds: 15, omnireference: true, webSearch: false };
+const base: GenerationSettings = { aspectRatio: "9:16", resolution: "720p", durationSeconds: 15, omnireference: true, webSearch: false };
 
 describe("GeneratePanel toggles", () => {
   it("renders 联网搜索 off and 全能参考 on, and toggles them", () => {

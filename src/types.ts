@@ -14,11 +14,28 @@ export type AssetAction =
 
 export type SortMode = "default" | "generated-asc" | "generated-desc" | "name-asc" | "name-desc";
 
+export type GenerateMode = "video" | "image";
+
+export type VideoResolution = "480p" | "720p" | "1080p";
+
 export interface GenerationSettings {
   aspectRatio: "9:16" | "16:9" | "1:1";
+  resolution: VideoResolution;
   durationSeconds: number;
   omnireference: boolean;
   webSearch: boolean;
+}
+
+export type ImageAspectRatio = "9:16" | "1:1" | "3:4" | "16:9" | "4:3" | "2:3" | "3:2" | "21:9";
+
+export type ImageQuality = "1k" | "2k" | "4k";
+
+export interface ImageGenerationSettings {
+  model: string;
+  aspectRatio: ImageAspectRatio;
+  quality: ImageQuality;
+  camera: string;
+  category: string;
 }
 
 export interface CanvasAsset {

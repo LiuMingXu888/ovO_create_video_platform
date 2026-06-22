@@ -1,8 +1,9 @@
 import { ImagePlus, X } from "lucide-react";
 import { useState } from "react";
 import { validateReferenceItems } from "../lib/referenceValidation";
-import type { GenerationSettings, ReferenceItem } from "../types";
+import type { GenerateMode, GenerationSettings, ImageGenerationSettings, ReferenceItem } from "../types";
 import { GeneratePanel } from "./GeneratePanel";
+import { ImageGeneratePanel } from "./ImageGeneratePanel";
 import { PromptTokenEditor } from "./PromptTokenEditor";
 
 interface PromptDockProps {
@@ -13,8 +14,13 @@ interface PromptDockProps {
   onRemoveReference: (id: string) => void;
   onLocalFilesSelected: (files: FileList) => void;
   onGenerate: () => void;
+  generateMode: GenerateMode;
+  onGenerateModeChange: (mode: GenerateMode) => void;
   generationSettings: GenerationSettings;
   onGenerationSettingsChange: (settings: GenerationSettings) => void;
+  imageGenerationSettings: ImageGenerationSettings;
+  onImageGenerationSettingsChange: (settings: ImageGenerationSettings) => void;
+  onGenerateImage: () => void;
   generateDisabled?: boolean;
   activityMessages?: string[];
 }
@@ -41,8 +47,13 @@ export function PromptDock({
   onRemoveReference,
   onLocalFilesSelected,
   onGenerate,
+  generateMode,
+  onGenerateModeChange,
   generationSettings,
   onGenerationSettingsChange,
+  imageGenerationSettings,
+  onImageGenerationSettingsChange,
+  onGenerateImage,
   generateDisabled,
   activityMessages = []
 }: PromptDockProps) {
@@ -53,6 +64,27 @@ export function PromptDock({
 
   return (
     <div className="prompt-dock">
+      <div className="generate-mode-tabs" role="tablist" aria-label="生成类型">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={generateMode === "video"}
+          className={`generate-mode-tab${generateMode === "video" ? " generate-mode-tab-active" : ""}`}
+          onClick={() => onGenerateModeChange("video")}
+        >
+          视频生成
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={generateMode === "image"}
+          className={`generate-mode-tab${generateMode === "image" ? " generate-mode-tab-active" : ""}`}
+          onClick={() => onGenerateModeChange("image")}
+        >
+          图片生成
+        </button>
+      </div>
+
       <div className="reference-strip" aria-label="参考素材">
         <label className="reference-add" title="添加参考素材">
           <input
@@ -101,12 +133,21 @@ export function PromptDock({
           prompt={prompt}
           onPromptChange={onPromptChange}
         />
-        <GeneratePanel
-          settings={generationSettings}
-          onSettingsChange={onGenerationSettingsChange}
-          onGenerate={onGenerate}
-          disabled={generateDisabled}
-        />
+        {generateMode === "video" ? (
+          <GeneratePanel
+            settings={generationSettings}
+            onSettingsChange={onGenerationSettingsChange}
+            onGenerate={onGenerate}
+            disabled={generateDisabled}
+          />
+        ) : (
+          <ImageGeneratePanel
+            settings={imageGenerationSettings}
+            onSettingsChange={onImageGenerationSettingsChange}
+            onGenerate={onGenerateImage}
+            disabled={generateDisabled}
+          />
+        )}
         <section className="prompt-note-panel" aria-label="提示记录">
           <ul aria-label="提示记录列表">
             {activityMessages.map((message, index) => (

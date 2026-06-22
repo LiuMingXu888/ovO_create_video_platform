@@ -20,6 +20,7 @@ import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
 import { getCategoryForAssetName } from "./lib/assetCategory";
 import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
+import { DEFAULT_IMAGE_GENERATION_SETTINGS } from "./lib/imageGenOptions";
 import { companyApiFacade } from "./services/companyApiFacade";
 import { SEEDANCE_MODEL_NAME } from "./api/generationClient";
 import { chooseSubtitleRemovalRoute } from "./api/subtitleClient";
@@ -30,7 +31,9 @@ import type {
   AuthState,
   CanvasAsset,
   CanvasProject,
+  GenerateMode,
   GenerationSettings,
+  ImageGenerationSettings,
   ReferenceItem,
   SortMode
 } from "./types";
@@ -242,10 +245,15 @@ export function App() {
   const [prompt, setPrompt] = useState("");
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     aspectRatio: "9:16",
+    resolution: "720p",
     durationSeconds: 15,
     omnireference: true,
     webSearch: false
   });
+  const [generateMode, setGenerateMode] = useState<GenerateMode>("video");
+  const [imageGenerationSettings, setImageGenerationSettings] = useState<ImageGenerationSettings>(
+    DEFAULT_IMAGE_GENERATION_SETTINGS
+  );
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
@@ -1407,6 +1415,22 @@ export function App() {
     await refreshAuthState();
   }
 
+  async function handleGenerateImage() {
+    // Image generation UI is in place, but the real company endpoint + camera
+    // list still need a 接口诊断 capture of the image flow. Until that lands we
+    // surface a clear, honest message instead of silently no-op'ing or charging
+    // credits. Wire the actual request here once the endpoint is known.
+    const promptText = prompt.trim();
+    if (!promptText) {
+      addActivityMessage("请输入图片提示词");
+      return;
+    }
+
+    addActivityMessage(
+      `图片生成接口尚未接入（${imageGenerationSettings.model} · ${imageGenerationSettings.aspectRatio} · ${imageGenerationSettings.quality.toUpperCase()} · ${imageGenerationSettings.camera} · ${imageGenerationSettings.category}）。请先在该流程上跑一次「接口诊断」，把抓包发我以接入真实接口。`
+    );
+  }
+
   return (
     <main className="app-shell">
       <AppHeader
@@ -1487,8 +1511,13 @@ export function App() {
         onLocalFilesSelected={handleReferenceFilesSelected}
         onGenerate={handleGeneratePreview}
         activityMessages={activityMessages.map((message) => message.text)}
+        generateMode={generateMode}
+        onGenerateModeChange={setGenerateMode}
         generationSettings={generationSettings}
         onGenerationSettingsChange={setGenerationSettings}
+        imageGenerationSettings={imageGenerationSettings}
+        onImageGenerationSettingsChange={setImageGenerationSettings}
+        onGenerateImage={handleGenerateImage}
       />
 
       <PreviewModal
