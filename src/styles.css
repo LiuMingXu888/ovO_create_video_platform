@@ -891,7 +891,6 @@ button {
 }
 
 .generate-panel-fixed {
-  align-self: end;
   height: 154px;
 }
 
@@ -1015,7 +1014,7 @@ button {
 
 .prompt-note-panel {
   align-self: end;
-  height: 128px;
+  height: 154px;
   overflow: auto;
   /* 鼠标在这个悬浮记录区滚动时,不要把滚动链给下层 canvas/素材列表. */
   overscroll-behavior: contain;
