@@ -1462,6 +1462,7 @@ export function App() {
 
     const assetCategory = imageCategoryToAssetCategory(imageGenerationSettings.category);
     const placeholder = createGeneratedImagePlaceholder(assetCategory);
+    const submittedReferences = references;
     const assetsWithPlaceholder = [...assets, placeholder];
     setAssets(assetsWithPlaceholder);
     persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
@@ -1470,6 +1471,8 @@ export function App() {
       [assetCategory]: [...current[assetCategory], placeholder.id]
     }));
     setPrompt("");
+    setReferences([]);
+    setReferenceIssues([]);
 
     const startTime = Date.now();
     const generationActivityId = addActivityMessage(`正在生成图片：${placeholder.name}（已等待 0分0秒）`);
@@ -1480,7 +1483,7 @@ export function App() {
     try {
       // Only already-remote image references can be sent to the company API; the
       // panel's local-file references are not uploaded here.
-      const referenceImageUrls = references
+      const referenceImageUrls = submittedReferences
         .filter((reference) => reference.kind === "image")
         .map((reference) => reference.url)
         .filter((url): url is string => typeof url === "string" && /^https?:/i.test(url));

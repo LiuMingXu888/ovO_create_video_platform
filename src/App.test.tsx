@@ -892,6 +892,57 @@ describe("App shell", () => {
     expect(await screen.findByText(/已生成图片：生成图片 1/)).toBeInTheDocument();
   });
 
+  it("clears prompt and references immediately after submitting image generation", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "ref-image-1",
+          name: "参考图",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/ref.png",
+          createdAt: "2026-02-01T00:00:00.000Z"
+        }
+      ]
+    });
+    // Never resolves: assert clearing happens at submit time, before completion.
+    vi.mocked(companyApiFacade.generateImage).mockReturnValue(new Promise(() => {}));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    // Add an image reference, then type a prompt.
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    expect(referenceChips()).toHaveLength(1);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "一个站立的女人" }
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "图片生成" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
+
+    await waitFor(() => expect(companyApiFacade.generateImage).toHaveBeenCalled());
+    // Submitted reference urls must still reflect the pre-clear selection.
+    expect(companyApiFacade.generateImage).toHaveBeenCalledWith(
+      expect.objectContaining({ referenceImageUrls: expect.arrayContaining([expect.stringMatching(/^https?:/)]) })
+    );
+    expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("");
+    expect(referenceChips()).toHaveLength(0);
+  });
+
   it("updates the real generation activity item with the final elapsed time", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1_000);
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
