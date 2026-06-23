@@ -108,6 +108,8 @@ export async function generateImage(
       if (recoveredUrl) {
         return { taskId: input.nodeId, imageUrl: recoveredUrl };
       }
+      // 当前轮询契约下不可达: pollImageQueueUntilComplete 只在拿到带 URL 的
+      // succeeded 任务时返回, 否则先抛 "任务轮询超时"。保留为防御性兜底。
       throw new Error("生成请求网关超时，且队列未返回结果，请稍后在画布查看或重试");
     }
 
