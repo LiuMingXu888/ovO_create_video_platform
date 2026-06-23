@@ -69,6 +69,8 @@ describe("loadCanvasResources", () => {
   });
 
   it("still returns normalized assets when the prefix-sync save fails", async () => {
+    // 前缀同步保存失败是非阻断的:会 console.warn 一次。用 spy 吞掉噪声并断言它确实被调用。
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     let putCount = 0;
     const transport: ApiTransport = {
       request: vi.fn(async (path: string, options?: { method?: string }) => {
@@ -91,6 +93,8 @@ describe("loadCanvasResources", () => {
       expect.objectContaining({ id: "image-1", name: "人物-苏晚晴", category: "characters" })
     ]);
     expect(putCount).toBe(1);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
   });
 
   it("returns a readable error for invalid canvas URLs", async () => {
