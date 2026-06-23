@@ -1,25 +1,81 @@
 import type { ImageAspectRatio, ImageGenerationSettings, ImageQuality, VideoResolution } from "../types";
 
-// Image-generation option lists. These mirror the company web UI. The model /
-// ratio / quality lists and the request shape are confirmed from a real
-// 接口诊断 capture of the image-generation flow (POST /api/generate-image).
-// Seedream 5.0 appears in the web dropdown but its API model id has not been
-// captured yet, so it is intentionally omitted until we have it.
+// Image-generation option lists. Model / ratio / quality field shapes are
+// confirmed from real 接口诊断 captures of POST /api/generate-image:
+//   gpt-image-2-duiba 发 quality(low/medium/high)
+//   gpt-image-2       发 size(1K/2K/4K)
+//   gemini-*          不发画质字段(后端固定 4K)
+// 香蕉后缀仅用于下拉 label;value 保持公司端规范名以兼容快照。
 
-export const IMAGE_MODELS = [
-  "GPT-Image-2(兑吧)",
-  "GPT-Image-2",
-  "Gemini 3 Pro",
-  "Gemini 3.1 Flash"
-] as const;
+export interface ImageQualityOption {
+  value: ImageQuality;
+  label: string;
+}
 
-// Display name → API model id sent in the generate-image payload.
-export const IMAGE_MODEL_IDS: Record<string, string> = {
-  "GPT-Image-2(兑吧)": "gpt-image-2-duiba",
-  "GPT-Image-2": "gpt-image-2",
-  "Gemini 3 Pro": "gemini-3-pro-image-preview",
-  "Gemini 3.1 Flash": "gemini-3.1-flash-image-preview"
-};
+export interface ImageModelOption {
+  label: string;
+  value: string;
+  apiId: string;
+  qualityField: "size" | "quality" | null;
+  qualityOptions: ImageQualityOption[];
+  defaultQuality: ImageQuality;
+}
+
+const GEMINI_QUALITY: ImageQualityOption[] = [{ value: "4k", label: "4K" }];
+
+export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
+  {
+    label: "GPT-Image-2(兑吧)",
+    value: "GPT-Image-2(兑吧)",
+    apiId: "gpt-image-2-duiba",
+    qualityField: "quality",
+    qualityOptions: [
+      { value: "low", label: "低" },
+      { value: "medium", label: "中" },
+      { value: "high", label: "高" }
+    ],
+    defaultQuality: "high"
+  },
+  {
+    label: "GPT-Image-2",
+    value: "GPT-Image-2",
+    apiId: "gpt-image-2",
+    qualityField: "size",
+    qualityOptions: [
+      { value: "1k", label: "1K" },
+      { value: "2k", label: "2K" },
+      { value: "4k", label: "4K" }
+    ],
+    defaultQuality: "4k"
+  },
+  {
+    label: "Gemini 3 Pro(香蕉pro)",
+    value: "Gemini 3 Pro",
+    apiId: "gemini-3-pro-image-preview",
+    qualityField: null,
+    qualityOptions: GEMINI_QUALITY,
+    defaultQuality: "4k"
+  },
+  {
+    label: "Gemini 3.1 Flash(香蕉2)",
+    value: "Gemini 3.1 Flash",
+    apiId: "gemini-3.1-flash-image-preview",
+    qualityField: null,
+    qualityOptions: GEMINI_QUALITY,
+    defaultQuality: "4k"
+  }
+];
+
+export function getImageModelOption(value: string): ImageModelOption | undefined {
+  return IMAGE_MODEL_OPTIONS.find((m) => m.value === value || m.label === value || m.apiId === value);
+}
+
+// Backward-compatible derived exports (consumed by client + tests).
+export const IMAGE_MODELS: string[] = IMAGE_MODEL_OPTIONS.map((m) => m.value);
+
+export const IMAGE_MODEL_IDS: Record<string, string> = Object.fromEntries(
+  IMAGE_MODEL_OPTIONS.map((m) => [m.value, m.apiId])
+);
 
 export const IMAGE_ASPECT_RATIOS: ImageAspectRatio[] = [
   "9:16",
@@ -101,7 +157,7 @@ export const IMAGE_GENERATION_CREDIT_COST = 10;
 export const DEFAULT_IMAGE_GENERATION_SETTINGS: ImageGenerationSettings = {
   model: "GPT-Image-2(兑吧)",
   aspectRatio: "9:16",
-  quality: "4k",
+  quality: "high",
   camera: "暂不选择",
   category: "人物"
 };

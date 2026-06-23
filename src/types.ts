@@ -28,7 +28,7 @@ export interface GenerationSettings {
 
 export type ImageAspectRatio = "9:16" | "1:1" | "3:4" | "16:9" | "4:3" | "2:3" | "3:2" | "21:9";
 
-export type ImageQuality = "1k" | "2k" | "4k";
+export type ImageQuality = "1k" | "2k" | "4k" | "low" | "medium" | "high";
 
 export interface ImageGenerationSettings {
   model: string;
