@@ -32,13 +32,15 @@ describe("buildGenerateImagePayload", () => {
     expect(payload.quality).toBeUndefined();
   });
 
-  it("sends `quality` for gpt-image-2-duiba and never `size`", () => {
-    const high = buildGenerateImagePayload({ prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)", quality: "4k" } });
+  it("sends `quality` (low/medium/high) for gpt-image-2-duiba and never `size`", () => {
+    const high = buildGenerateImagePayload({ prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)", quality: "high" } });
     expect(high.model).toBe("gpt-image-2-duiba");
     expect(high.quality).toBe("high");
     expect(high.size).toBeUndefined();
 
-    const medium = buildGenerateImagePayload({ prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)", quality: "2k" } });
+    const low = buildGenerateImagePayload({ prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)", quality: "low" } });
+    expect(low.quality).toBe("low");
+    const medium = buildGenerateImagePayload({ prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)", quality: "medium" } });
     expect(medium.quality).toBe("medium");
   });
 

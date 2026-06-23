@@ -1,6 +1,6 @@
 import type { ImageGenerationSettings } from "../types";
 import { endpoints } from "./endpoints";
-import { IMAGE_CAMERA_PROMPT_SUFFIX, IMAGE_MODEL_IDS } from "../lib/imageGenOptions";
+import { IMAGE_CAMERA_PROMPT_SUFFIX, IMAGE_MODEL_IDS, getImageModelOption } from "../lib/imageGenOptions";
 import type { ApiTransport } from "./transport";
 
 export const DEFAULT_IMAGE_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 600 };
@@ -23,11 +23,6 @@ export interface GenerateImageResult {
   imageUrl: string;
 }
 
-// Model ids that carry an OpenAI-style `size` field ("1K"/"2K"/"4K").
-const SIZE_MODEL_IDS = new Set(["gpt-image-2"]);
-// Model ids that carry a `quality` field ("high"/"medium").
-const QUALITY_MODEL_IDS = new Set(["gpt-image-2-duiba"]);
-
 export function resolveImageModelId(displayName: string) {
   return IMAGE_MODEL_IDS[displayName] ?? displayName;
 }
@@ -47,13 +42,13 @@ export function buildGenerateImagePayload(input: BuildGenerateImagePayloadInput)
     aspectRatio: input.settings.aspectRatio
   };
 
-  // The size / quality field is model-dependent (confirmed from capture):
-  // gpt-image-2 sends `size`, gpt-image-2-duiba sends `quality`, gemini sends
-  // neither.
-  if (SIZE_MODEL_IDS.has(modelId)) {
+  // 画质字段按模型而定(来自真实抓包):gpt-image-2 发 size、gpt-image-2-duiba
+  // 发 quality(low/medium/high)、gemini 两者都不发。
+  const qualityField = getImageModelOption(input.settings.model)?.qualityField ?? null;
+  if (qualityField === "size") {
     payload.size = input.settings.quality.toUpperCase();
-  } else if (QUALITY_MODEL_IDS.has(modelId)) {
-    payload.quality = input.settings.quality === "4k" ? "high" : "medium";
+  } else if (qualityField === "quality") {
+    payload.quality = input.settings.quality;
   }
 
   const referenceImageUrls = (input.referenceImageUrls ?? []).filter((url): url is string => Boolean(url));
