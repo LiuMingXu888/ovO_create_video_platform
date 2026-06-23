@@ -19,6 +19,7 @@
     "release:patch": "node scripts/release-patch.mjs",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "devtools": "react-devtools",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
     "electron-builder": "^26.15.3",
     "js-yaml": "^4.2.0",
     "jsdom": "^25.0.1",
+    "react-devtools": "7.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "vitest": "^3.2.4",

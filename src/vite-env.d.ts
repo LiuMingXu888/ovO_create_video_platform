@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 type OvoUpdateProgress = {
   percent: number;
   transferred: number;
