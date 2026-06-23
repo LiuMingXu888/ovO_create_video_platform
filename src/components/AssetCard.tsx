@@ -1,4 +1,4 @@
-import { CaptionsOff, Check, Download, Film, Maximize2, Package, Pause, Pencil, Play, Plus, RefreshCcw, Trash2, UserRound, X } from "lucide-react";
+import { CaptionsOff, Check, Download, Film, Maximize2, Package, Pause, Pencil, Play, Plus, RefreshCcw, RotateCw, Trash2, UserRound, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { AssetAction, AssetCategory, CanvasAsset } from "../types";
 
@@ -47,6 +47,8 @@ export function AssetCard({
 }: AssetCardProps) {
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(asset.name);
+  const [mediaError, setMediaError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const mediaElementRef = useRef<HTMLMediaElement | null>(null);
   const isPlaying = playingAssetId === asset.id;
   const canDragCard = draggable && !editingName;
@@ -59,6 +61,18 @@ export function AssetCard({
       onRename(asset.id, nextName);
     }
     setEditingName(false);
+  }
+
+  function withRetry(url: string) {
+    if (reloadKey === 0) {
+      return url;
+    }
+    return url.includes("?") ? `${url}&retry=${reloadKey}` : `${url}?retry=${reloadKey}`;
+  }
+
+  function retryMedia() {
+    setMediaError(false);
+    setReloadKey((value) => value + 1);
   }
 
   function cancelEdit() {
@@ -137,7 +151,9 @@ export function AssetCard({
         </label>
       )}
       <div className="asset-media">
-        {asset.kind === "image" && <img src={asset.thumbnailUrl ?? asset.url} alt={asset.name} />}
+        {asset.kind === "image" && (
+          <img src={withRetry(asset.thumbnailUrl ?? asset.url)} alt={asset.name} onError={() => setMediaError(true)} />
+        )}
         {asset.kind === "video" && isGenerating && (
           <div className="video-generating">{asset.statusLabel ?? "生成中"}</div>
         )}
@@ -147,19 +163,29 @@ export function AssetCard({
         {asset.kind === "video" && !isGenerating && !isFailed && (
           <video
             ref={setMediaElement}
-            src={asset.url}
+            src={withRetry(asset.url)}
             poster={asset.thumbnailUrl}
             muted={false}
             playsInline
             preload="metadata"
+            onError={() => setMediaError(true)}
             onEnded={() => onMediaEnded?.(asset.id)}
           />
         )}
         {asset.kind === "audio" && (
           <>
-            <audio ref={setMediaElement} src={asset.url} muted={false} preload="metadata" onEnded={() => onMediaEnded?.(asset.id)} />
+            <audio ref={setMediaElement} src={withRetry(asset.url)} muted={false} preload="metadata" onError={() => setMediaError(true)} onEnded={() => onMediaEnded?.(asset.id)} />
             <div className="audio-wave">音频</div>
           </>
+        )}
+        {mediaError && (
+          <div className="asset-media-error">
+            <span>资源加载失败</span>
+            <button type="button" onClick={retryMedia} aria-label={`重新获取 ${asset.name}`}>
+              <RotateCw size={14} />
+              重新获取
+            </button>
+          </div>
         )}
       </div>
 
