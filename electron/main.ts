@@ -12,6 +12,7 @@ import {
   uploadCompanyFile
 } from "./companySession.js";
 import type { SaveAssetInput } from "./downloadPaths.js";
+import { readCanvasStore, writeCanvasStore } from "./canvasStore.js";
 import { createGiteeReleaseUpdater } from "./giteeReleaseUpdater.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +61,10 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:file:save-asset", (_event, input: { url: string; fileName: string }) => saveAssetToDownloads(input));
   ipcMain.handle("ovo:file:save-assets", (_event, input: { assets: SaveAssetInput[] }) =>
     saveAssetsToDownloads(input)
+  );
+  ipcMain.handle("ovo:local-store:read", (_event, projectId: string) => readCanvasStore(projectId));
+  ipcMain.handle("ovo:local-store:write", (_event, projectId: string, data: unknown) =>
+    writeCanvasStore(projectId, data)
   );
 
   const updater = createGiteeReleaseUpdater({

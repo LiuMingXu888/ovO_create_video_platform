@@ -47,5 +47,9 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
   file: {
     saveAsset: (input: { url: string; fileName: string }) => ipcRenderer.invoke("ovo:file:save-asset", input),
     saveAssets: (input: { assets: SaveAssetInput[] }) => ipcRenderer.invoke("ovo:file:save-assets", input)
+  },
+  localStore: {
+    read: (projectId: string) => ipcRenderer.invoke("ovo:local-store:read", projectId),
+    write: (projectId: string, data: unknown) => ipcRenderer.invoke("ovo:local-store:write", projectId, data)
   }
 });

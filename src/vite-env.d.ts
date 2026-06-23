@@ -124,5 +124,9 @@ interface Window {
         message?: string;
       }>;
     };
+    localStore?: {
+      read: (projectId: string) => Promise<unknown | null>;
+      write: (projectId: string, data: unknown) => Promise<{ ok: boolean }>;
+    };
   };
 }

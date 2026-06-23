@@ -34,5 +34,8 @@ describe("Electron preload build contract", () => {
     expect(preloadSource).toContain('ipcRenderer.invoke("ovo:updater:download-update")');
     expect(preloadSource).toContain('ipcRenderer.invoke("ovo:updater:install-update")');
     expect(preloadSource).toContain('ipcRenderer.on("ovo:updater:progress"');
+    expect(preloadSource).toContain("localStore:");
+    expect(preloadSource).toContain('ipcRenderer.invoke("ovo:local-store:read"');
+    expect(preloadSource).toContain('ipcRenderer.invoke("ovo:local-store:write"');
   });
 });
