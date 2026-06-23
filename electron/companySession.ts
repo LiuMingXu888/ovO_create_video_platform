@@ -1,7 +1,7 @@
 import { app, BrowserView, BrowserWindow, clipboard, ipcMain, session } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { buildCapturedRequestBody, summarizeCapture, type RawApiCapture, type SanitizedApiSummary } from "./apiDiscovery.js";
+import { summarizeCapture, type RawApiCapture, type SanitizedApiSummary } from "./apiDiscovery.js";
 import {
   checkCompanySession,
   COMPANY_ORIGIN,
@@ -30,6 +30,7 @@ interface PendingCapture {
   method: string;
   url: string;
   requestBody?: unknown;
+  status?: number;
 }
 
 export interface CompanyApiRequestOptions {
@@ -79,48 +80,121 @@ interface ApiCaptureHandle {
   getCaptures: () => RawApiCapture[];
 }
 
-// Attaches /api/* request+response listeners to the company session and persists
-// every captured call to the on-disk storage paths (captures/ + sanitized map).
-// Shared by both 登录公司账号 and the legacy 接口诊断 flow so login-time browsing
-// records the same diagnostics without a separate window.
-async function attachApiCapture(companySession: Electron.Session): Promise<ApiCaptureHandle> {
+function parseMaybeJson(text: string | undefined): unknown {
+  if (text === undefined || text === "") {
+    return undefined;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+// Attaches the Chrome DevTools Protocol Network domain to the company page's
+// webContents and persists every captured /api/* call — including the full
+// request and RESPONSE bodies — to the on-disk storage paths (captures/ +
+// sanitized map). The older session.webRequest listener could only see
+// status/headers, never the response body, which is why diagnosis files used to
+// record requests with no response content. CDP's Network.getResponseBody is the
+// only reliable way to read response bodies in Electron.
+//
+// NOTE: a webContents can host only ONE debugger client at a time, so attaching
+// here is mutually exclusive with an open DevTools window on the same page. We
+// prioritise capture: callers should not auto-open DevTools on the captured page.
+async function attachApiCapture(webContents: Electron.WebContents): Promise<ApiCaptureHandle> {
   const paths = getStoragePaths();
   await fs.mkdir(paths.capturesDir, { recursive: true });
   const captures: RawApiCapture[] = [];
-  const pending = new Map<number, PendingCapture>();
+  const pending = new Map<string, PendingCapture>();
   const rawCapturePath = path.join(paths.capturesDir, `capture-${createTimestampFolderName(new Date())}.json`);
 
-  const requestListener = (details: Electron.OnBeforeRequestListenerDetails, callback: (response: Electron.CallbackResponse) => void) => {
-    if (isCompanyApiUrl(details.url)) {
-      const uploadData = details.uploadData?.find((item) => item.bytes)?.bytes;
-      pending.set(details.id, {
-        method: details.method,
-        url: details.url,
-        requestBody: buildCapturedRequestBody(undefined, uploadData)
-      });
-    }
+  let attached = false;
+  try {
+    webContents.debugger.attach("1.3");
+    attached = true;
+  } catch (error) {
+    console.warn("[接口诊断] 无法挂载调试器（可能 DevTools 已打开），将无法记录响应内容：", error);
+  }
 
-    callback({});
+  const messageListener = (_event: Electron.Event, method: string, params: Record<string, unknown>) => {
+    void handleDebuggerMessage(method, params);
   };
 
-  const responseListener = (details: Electron.OnCompletedListenerDetails) => {
-    const request = pending.get(details.id);
-    if (!request) {
+  async function handleDebuggerMessage(method: string, params: Record<string, unknown>) {
+    if (method === "Network.requestWillBeSent") {
+      const request = params.request as { url?: string; method?: string; postData?: string } | undefined;
+      const requestId = params.requestId as string | undefined;
+      if (!requestId || !request?.url || !isCompanyApiUrl(request.url)) {
+        return;
+      }
+      pending.set(requestId, {
+        method: request.method ?? "GET",
+        url: request.url,
+        requestBody: parseMaybeJson(request.postData)
+      });
       return;
     }
 
-    pending.delete(details.id);
-    captures.push({
-      method: request.method,
-      url: request.url,
-      status: details.statusCode,
-      requestBody: request.requestBody
-    });
-    void persistCurrentCaptures();
-  };
+    if (method === "Network.responseReceived") {
+      const requestId = params.requestId as string | undefined;
+      const response = params.response as { status?: number } | undefined;
+      if (!requestId) {
+        return;
+      }
+      const entry = pending.get(requestId);
+      if (entry) {
+        entry.status = response?.status;
+      }
+      return;
+    }
 
-  companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, requestListener);
-  companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, responseListener);
+    if (method === "Network.loadingFinished" || method === "Network.loadingFailed") {
+      const requestId = params.requestId as string | undefined;
+      if (!requestId) {
+        return;
+      }
+      const entry = pending.get(requestId);
+      if (!entry) {
+        return;
+      }
+      pending.delete(requestId);
+
+      let responseBody: unknown;
+      try {
+        const result = (await webContents.debugger.sendCommand("Network.getResponseBody", { requestId })) as {
+          body?: string;
+          base64Encoded?: boolean;
+        };
+        if (result.base64Encoded) {
+          responseBody = { "[binary-base64]": result.body ?? "" };
+        } else {
+          responseBody = parseMaybeJson(result.body);
+        }
+      } catch {
+        // 204 / redirects / aborted requests have no retrievable body — record the call anyway.
+        responseBody = undefined;
+      }
+
+      captures.push({
+        method: entry.method,
+        url: entry.url,
+        status: entry.status,
+        requestBody: entry.requestBody,
+        responseBody
+      });
+      void persistCurrentCaptures();
+    }
+  }
+
+  if (attached) {
+    webContents.debugger.on("message", messageListener);
+    try {
+      await webContents.debugger.sendCommand("Network.enable");
+    } catch (error) {
+      console.warn("[接口诊断] 启用 Network 域失败：", error);
+    }
+  }
 
   async function persistCurrentCaptures() {
     const capturedAt = new Date().toISOString();
@@ -130,8 +204,17 @@ async function attachApiCapture(companySession: Electron.Session): Promise<ApiCa
 
   return {
     detach() {
-      companySession.webRequest.onBeforeRequest({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
-      companySession.webRequest.onCompleted({ urls: [`${COMPANY_ORIGIN}/api/*`] }, null);
+      if (!attached) {
+        return;
+      }
+      try {
+        webContents.debugger.off("message", messageListener);
+        if (webContents.debugger.isAttached()) {
+          webContents.debugger.detach();
+        }
+      } catch {
+        // already detached (e.g. DevTools took over the slot)
+      }
     },
     rawCapturePath,
     getSummaries: () => captures.map(summarizeCapture),
@@ -310,11 +393,12 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
   loginView.webContents.on("did-navigate-in-page", updateToolbarUrl);
   loginView.webContents.on("did-start-navigation", updateToolbarUrl);
 
-  // 接口诊断 is now folded into the login window: record every /api/* call to the
-  // same on-disk storage paths and surface DevTools automatically, so logging in
-  // and browsing doubles as the diagnostic capture without a separate entry.
-  const apiCapture = await attachApiCapture(getCompanySession());
-  loginView.webContents.openDevTools({ mode: "detach" });
+  // 接口诊断 is now folded into the login window: record every /api/* call —
+  // including full request and response bodies — to the same on-disk storage
+  // paths via the CDP Network domain. The debugger and an open DevTools window
+  // are mutually exclusive on one page, so we no longer auto-open DevTools here:
+  // capturing the response bodies is the whole point of this window.
+  const apiCapture = await attachApiCapture(loginView.webContents);
 
   resizeLoginView();
   await loginWindow.loadURL(createLoginToolbarUrl(initialUrl, actionChannel, urlChannel));
@@ -538,9 +622,7 @@ export async function saveAssetsToDownloads(input: SaveAssetsInput) {
 
 export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
   const paths = getStoragePaths();
-  const companySession = getCompanySession();
   const initialUrl = normalizeCompanyWindowUrl(canvasUrl);
-  const apiCapture = await attachApiCapture(companySession);
   const inspectWindow = new BrowserWindow({
     width: 1400,
     height: 950,
@@ -602,11 +684,16 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   inspectWindow.on("resize", resizeInspectView);
   inspectWindow.on("maximize", resizeInspectView);
   inspectWindow.on("unmaximize", resizeInspectView);
+  resizeInspectView();
+
+  // Attach the CDP-based capture now that the page's webContents exists. This
+  // records full request AND response bodies. The debugger is mutually exclusive
+  // with an open DevTools window on the same page, so we don't auto-open DevTools
+  // here — capturing the responses is the purpose of this window.
+  const apiCapture = await attachApiCapture(inspectView.webContents);
   inspectWindow.on("closed", () => {
     apiCapture.detach();
   });
-  resizeInspectView();
-  inspectView.webContents.openDevTools({ mode: "detach" });
 
   try {
     await inspectView.webContents.loadURL(initialUrl);
