@@ -657,7 +657,8 @@ export function App() {
       createdAt: new Date().toISOString(),
       status: "generating",
       statusLabel: "生成中",
-      generationPrompt: prompt
+      generationPrompt: prompt,
+      generationReferences: references.map(cloneReferenceForReuse)
     };
   }
 
@@ -1494,7 +1495,8 @@ export function App() {
         url: result.imageUrl,
         generationStartedAt: new Date(startTime).toISOString(),
         model: imageGenerationSettings.model,
-        generationPrompt: promptText
+        generationPrompt: promptText,
+        generationReferences: placeholder.generationReferences
       });
 
       const completedAsset = {

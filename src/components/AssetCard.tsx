@@ -228,6 +228,17 @@ export function AssetCard({
               {renderCategoryIcon(action.icon)}
             </button>
           ))}
+          {asset.kind === "image" && (
+            <button
+              type="button"
+              title={asset.generationPrompt ? "复用提示词和资源" : "暂无可复用的生成提示词"}
+              aria-label={`复用提示词和资源 ${asset.name}`}
+              disabled={!asset.generationPrompt}
+              onClick={() => onAction(asset, "reuse-generation")}
+            >
+              <RefreshCcw size={15} />
+            </button>
+          )}
           {asset.kind !== "image" && (
             <button
               type="button"
@@ -243,8 +254,8 @@ export function AssetCard({
             <>
               <button
                 type="button"
-                title={asset.generationPrompt ? "复用生成" : "暂无可复用的生成提示词"}
-                aria-label={`复用生成 ${asset.name}`}
+                title={asset.generationPrompt ? "复用提示词和资源" : "暂无可复用的生成提示词"}
+                aria-label={`复用提示词和资源 ${asset.name}`}
                 disabled={!asset.generationPrompt}
                 onClick={() => onAction(asset, "reuse-generation")}
               >

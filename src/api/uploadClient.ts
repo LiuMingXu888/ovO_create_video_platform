@@ -151,7 +151,11 @@ function withNodePosition(node: CompanyNode, position: { x: number; y: number })
 
 export function createCompanyImageNode(asset: CanvasAsset): CompanyNode {
   return baseNode(asset, {
-    imageUrl: asset.url
+    imageUrl: asset.url,
+    generationPrompt: asset.generationPrompt,
+    prompt: asset.generationPrompt,
+    generationReferences: asset.generationReferences,
+    referenceImages: getReferenceUrls(asset, "image")
   });
 }
 

@@ -1406,7 +1406,7 @@ describe("App shell", () => {
     expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("");
     expect(referenceChips()).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "复用生成 生成视频 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "复用提示词和资源 生成视频 1" }));
 
     expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("镜头缓慢推进，人物回头");
     expect(referenceChips()).toHaveLength(1);
@@ -1682,7 +1682,7 @@ describe("App shell", () => {
 
     expect(screen.queryByLabelText("去除字幕")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "去除字幕 开场参考视频" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "复用生成 开场参考视频" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "复用提示词和资源 开场参考视频" })).toBeDisabled();
   });
 
   it("shows generation controls for ratio, duration, and omnireference mode", async () => {
@@ -2005,6 +2005,7 @@ describe("App shell", () => {
       "加入提示词 小区楼道",
       "设为场景图片 小区楼道",
       "设为道具图片 小区楼道",
+      "复用提示词和资源 小区楼道",
       "删除 小区楼道"
     ]);
 
@@ -2031,7 +2032,7 @@ describe("App shell", () => {
       "下载资源 开场参考视频",
       "加入提示词 开场参考视频",
       "播放 开场参考视频",
-      "复用生成 开场参考视频",
+      "复用提示词和资源 开场参考视频",
       "去除字幕 开场参考视频",
       "删除 开场参考视频"
     ]);

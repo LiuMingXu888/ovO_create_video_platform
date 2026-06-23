@@ -21,7 +21,7 @@ describe("AssetCard reuse-generation button", () => {
       generationPrompt: "提示词"
     } as CanvasAsset;
     renderCard(asset);
-    expect(screen.getByLabelText("复用生成 成片")).not.toBeDisabled();
+    expect(screen.getByLabelText("复用提示词和资源 成片")).not.toBeDisabled();
   });
 
   it("disables reuse button when no generationPrompt", () => {
@@ -33,7 +33,7 @@ describe("AssetCard reuse-generation button", () => {
       url: "https://cdn.example.com/v2.mp4"
     } as CanvasAsset;
     renderCard(asset);
-    expect(screen.getByLabelText("复用生成 无提示")).toBeDisabled();
+    expect(screen.getByLabelText("复用提示词和资源 无提示")).toBeDisabled();
   });
 });
 
@@ -63,5 +63,42 @@ describe("AssetCard media error retry", () => {
     // 重载后图片重新挂载,src 带 cache-bust 查询
     const reloaded = screen.getByAltText("人物-坏图") as HTMLImageElement;
     expect(reloaded.getAttribute("src")).toContain("retry=");
+  });
+});
+
+describe("AssetCard image reuse button", () => {
+  it("renders enabled reuse button for image with generationPrompt", () => {
+    const asset = {
+      id: "img1",
+      name: "人物A",
+      kind: "image",
+      category: "characters",
+      url: "https://cdn.example.com/a.png",
+      status: "ready",
+      generationPrompt: "一个角色"
+    } as CanvasAsset;
+    const onAction = vi.fn();
+    render(
+      <AssetCard asset={asset} onAction={onAction} onRename={() => {}} onChangeCategory={() => {}} />
+    );
+    const btn = screen.getByLabelText("复用提示词和资源 人物A");
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    expect(onAction).toHaveBeenCalledWith(asset, "reuse-generation");
+  });
+
+  it("disables image reuse button when no generationPrompt", () => {
+    const asset = {
+      id: "img2",
+      name: "人物B",
+      kind: "image",
+      category: "scenes",
+      url: "https://cdn.example.com/b.png",
+      status: "ready"
+    } as CanvasAsset;
+    render(
+      <AssetCard asset={asset} onAction={vi.fn()} onRename={() => {}} onChangeCategory={() => {}} />
+    );
+    expect(screen.getByLabelText("复用提示词和资源 人物B")).toBeDisabled();
   });
 });
