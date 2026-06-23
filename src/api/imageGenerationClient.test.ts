@@ -3,7 +3,9 @@ import {
   applyCameraSuffix,
   buildGenerateImagePayload,
   generateImage,
-  resolveImageModelId
+  pollImageResult,
+  resolveImageModelId,
+  DEFAULT_IMAGE_GENERATION_POLL_OPTIONS
 } from "./imageGenerationClient";
 import { IMAGE_CAMERA_PROMPT_SUFFIX } from "../lib/imageGenOptions";
 import type { ApiTransport, ApiRequestOptions } from "./transport";
@@ -180,5 +182,61 @@ describe("generateImage", () => {
     await expect(
       generateImage(transport, { projectId: "p", nodeId: "n", prompt: "x", settings: baseSettings }, { intervalMs: 0, maxAttempts: 3 })
     ).rejects.toThrow("内容违规");
+  });
+});
+
+describe("DEFAULT_IMAGE_GENERATION_POLL_OPTIONS", () => {
+  it("defaults to 30 minutes (1.5s × 1200)", () => {
+    expect(DEFAULT_IMAGE_GENERATION_POLL_OPTIONS).toEqual({ intervalMs: 1500, maxAttempts: 1200 });
+  });
+});
+
+describe("pollImageResult", () => {
+  it("polls the queue until an image url appears without re-submitting generate-image", async () => {
+    let queueCalls = 0;
+    const transport = new StubTransport((path, options) => {
+      if (options?.method === "POST" && path.endsWith("/generate-image")) {
+        throw new Error("不应重新提交 generate-image");
+      }
+
+      if (path.includes("/gen-queue")) {
+        queueCalls += 1;
+        if (queueCalls < 2) {
+          return { tasks: [{ nodeId: "node-1", status: "running" }] };
+        }
+        return { tasks: [{ nodeId: "node-1", status: "succeeded", imageUrl: "https://example.com/resumed.png" }] };
+      }
+
+      return {};
+    });
+
+    const result = await pollImageResult(
+      transport,
+      { projectId: "proj-1", nodeId: "node-1", taskId: "task-1" },
+      { intervalMs: 0, maxAttempts: 5 }
+    );
+
+    expect(result).toEqual({ taskId: "task-1", imageUrl: "https://example.com/resumed.png" });
+    const submitCalls = transport.calls.filter(
+      (call) => call.options?.method === "POST" && call.path.endsWith("/generate-image")
+    );
+    expect(submitCalls).toHaveLength(0);
+  });
+
+  it("falls back to nodeId as queue task id when taskId is missing", async () => {
+    const transport = new StubTransport((path) => {
+      if (path.includes("/gen-queue")) {
+        return { tasks: [{ nodeId: "node-1", status: "succeeded", imageUrl: "https://example.com/done.png" }] };
+      }
+      return {};
+    });
+
+    const result = await pollImageResult(
+      transport,
+      { projectId: "proj-1", nodeId: "node-1" },
+      { intervalMs: 0, maxAttempts: 3 }
+    );
+
+    expect(result).toEqual({ taskId: "node-1", imageUrl: "https://example.com/done.png" });
   });
 });

@@ -3,7 +3,7 @@ import { endpoints } from "./endpoints";
 import { IMAGE_CAMERA_PROMPT_SUFFIX, IMAGE_MODEL_IDS, getImageModelOption } from "../lib/imageGenOptions";
 import type { ApiTransport } from "./transport";
 
-export const DEFAULT_IMAGE_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 600 };
+export const DEFAULT_IMAGE_GENERATION_POLL_OPTIONS: PollOptions = { intervalMs: 1500, maxAttempts: 1200 };
 
 export interface PollOptions {
   intervalMs: number;
@@ -187,6 +187,13 @@ async function pollImageQueueUntilComplete(
     const queueResult = await requestQueueStatus(transport, projectId, taskId);
     const taskResult = findQueueTask(queueResult, taskId, nodeId);
 
+    console.log("[图片生成] 轮询", {
+      attempt: attempt + 1,
+      status: taskResult?.status ?? "pending",
+      nodeId,
+      taskId
+    });
+
     if (taskResult?.status === "failed") {
       throw new Error(taskResult.errorMessage ?? getPollErrorMessage(taskResult.error) ?? "图片生成失败");
     }
@@ -208,6 +215,28 @@ async function pollImageQueueUntilComplete(
   }
 
   throw new Error("任务轮询超时");
+}
+
+// 应用重开后续轮询用: 只查询队列, 不重新提交 generate-image (避免重复扣积分)。
+export async function pollImageResult(
+  transport: ApiTransport,
+  input: { projectId: string; nodeId: string; taskId?: string },
+  options: PollOptions = DEFAULT_IMAGE_GENERATION_POLL_OPTIONS
+): Promise<GenerateImageResult> {
+  const queueTaskId = input.taskId ?? input.nodeId;
+  const pollResult = await pollImageQueueUntilComplete(
+    transport,
+    input.projectId,
+    input.nodeId,
+    queueTaskId,
+    options,
+    input.taskId
+  );
+  const imageUrl = extractImageUrl(pollResult);
+  if (!imageUrl) {
+    throw new Error("续轮询成功但接口未返回图片地址");
+  }
+  return { taskId: queueTaskId, imageUrl };
 }
 
 async function requestProviderTaskStatus(
