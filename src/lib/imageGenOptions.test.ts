@@ -49,9 +49,9 @@ describe("imageGenOptions", () => {
     }
   });
 
-  it("defaults to 兑吧 model with high quality", () => {
-    expect(DEFAULT_IMAGE_GENERATION_SETTINGS.model).toBe("GPT-Image-2(兑吧)");
-    expect(DEFAULT_IMAGE_GENERATION_SETTINGS.quality).toBe("high");
+  it("defaults to the GPT-Image-2 model (size param, ~15s) which works under the 60s gateway", () => {
+    expect(DEFAULT_IMAGE_GENERATION_SETTINGS.model).toBe("GPT-Image-2");
+    expect(DEFAULT_IMAGE_GENERATION_SETTINGS.quality).toBe("4k");
   });
 
   it("offers the confirmed camera presets with prompt suffixes", () => {

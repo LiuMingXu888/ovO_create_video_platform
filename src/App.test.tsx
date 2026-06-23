@@ -879,7 +879,7 @@ describe("App shell", () => {
         projectId: "cmq6fwhft0bg5m2l5u78zby8x",
         nodeId: expect.stringMatching(/^generated-image-/),
         prompt: "一个站立的女人",
-        settings: expect.objectContaining({ model: "GPT-Image-2(兑吧)", category: "人物" })
+        settings: expect.objectContaining({ model: "GPT-Image-2", category: "人物" })
       })
     );
     await waitFor(() =>

@@ -155,9 +155,9 @@ export const VIDEO_RESOLUTIONS: VideoResolution[] = ["480p", "720p", "1080p"];
 export const IMAGE_GENERATION_CREDIT_COST = 10;
 
 export const DEFAULT_IMAGE_GENERATION_SETTINGS: ImageGenerationSettings = {
-  model: "GPT-Image-2(兑吧)",
+  model: "GPT-Image-2",
   aspectRatio: "9:16",
-  quality: "high",
+  quality: "4k",
   camera: "暂不选择",
   category: "人物"
 };

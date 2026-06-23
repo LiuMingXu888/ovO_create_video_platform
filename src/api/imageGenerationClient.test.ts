@@ -93,17 +93,16 @@ class StubTransport implements ApiTransport {
 }
 
 describe("generateImage", () => {
-  it("submits then resolves the image url from the queue", async () => {
+  it("resolves directly from the POST response for sync models (imageUrl in body)", async () => {
     const transport = new StubTransport((path, options) => {
       if (options?.method === "POST" && path.endsWith("/generate-image")) {
-        return { taskId: "task-1" };
+        return {
+          imageUrl: "https://example.com/sync.png",
+          images: ["https://example.com/sync.png"],
+          created: 123
+        };
       }
-
-      if (path.includes("/gen-queue")) {
-        return { tasks: [{ taskId: "task-1", status: "succeeded", imageUrl: "https://example.com/out.png" }] };
-      }
-
-      return {};
+      throw new Error(`unexpected call: ${path}`);
     });
 
     const result = await generateImage(
@@ -112,131 +111,133 @@ describe("generateImage", () => {
       { intervalMs: 0, maxAttempts: 3 }
     );
 
-    expect(result).toEqual({ taskId: "task-1", imageUrl: "https://example.com/out.png" });
+    expect(result.imageUrl).toBe("https://example.com/sync.png");
+    // 同步模型不应再轮询 per-task 接口。
+    const pollCalls = transport.calls.filter((call) => call.path.includes("/generate-image/"));
+    expect(pollCalls).toHaveLength(0);
   });
 
-  it("recovers from a submit 504 by polling the queue with nodeId", async () => {
+  it("submits then polls the per-task endpoint for async models (taskId in body)", async () => {
+    let pollCalls = 0;
     const transport = new StubTransport((path, options) => {
       if (options?.method === "POST" && path.endsWith("/generate-image")) {
-        throw { status: 504, message: "请求失败 (504)" };
+        return { taskId: "apimart:task_1", status: "submitted" };
       }
-
-      if (path.includes("/gen-queue")) {
-        return { tasks: [{ nodeId: "node-1", status: "succeeded", resultUrl: "https://example.com/recovered.png" }] };
+      if (path.includes("/generate-image/")) {
+        expect(path).toContain(encodeURIComponent("apimart:task_1"));
+        pollCalls += 1;
+        if (pollCalls < 2) {
+          return { taskId: "apimart:task_1", status: "running" };
+        }
+        return { taskId: "apimart:task_1", status: "succeeded", imageUrl: "https://example.com/out.png" };
       }
-
-      return {};
+      throw new Error(`unexpected call: ${path}`);
     });
 
     const result = await generateImage(
       transport,
       { projectId: "proj-1", nodeId: "node-1", prompt: "人物", settings: baseSettings },
-      { intervalMs: 0, maxAttempts: 3 }
+      { intervalMs: 0, maxAttempts: 5 }
     );
 
-    expect(result).toEqual({ taskId: "node-1", imageUrl: "https://example.com/recovered.png" });
+    expect(result).toEqual({ taskId: "apimart:task_1", imageUrl: "https://example.com/out.png" });
+    // 图片任务不进 gen-queue, 不应查询队列接口。
+    expect(transport.calls.some((call) => call.path.includes("/gen-queue"))).toBe(false);
   });
 
-  it("does not surface the raw 504 when a 504 submit leaves nothing in the queue", async () => {
+  it("throws when neither imageUrl nor taskId is returned", async () => {
     const transport = new StubTransport((path, options) => {
       if (options?.method === "POST" && path.endsWith("/generate-image")) {
-        throw { status: 504, message: "请求失败 (504)" };
+        return { status: "submitted" };
       }
-
-      return { tasks: [] };
+      throw new Error(`unexpected call: ${path}`);
     });
 
-    // 504 后转队列轮询; 队列始终为空时, 轮询自身超时, 而不是把原始 "请求失败 (504)" 抛给用户。
     await expect(
       generateImage(
         transport,
         { projectId: "proj-1", nodeId: "node-1", prompt: "人物", settings: baseSettings },
-        { intervalMs: 0, maxAttempts: 2 }
+        { intervalMs: 0, maxAttempts: 3 }
       )
-    ).rejects.toThrow("轮询超时");
-  });
-
-  it("re-throws a 504 when project/node are absent (no queue to recover from)", async () => {
-    const transport = new StubTransport((_path, options) => {
-      if (options?.method === "POST") {
-        throw { status: 504, message: "请求失败 (504)" };
-      }
-
-      return {};
-    });
-
-    await expect(
-      generateImage(transport, { prompt: "x", settings: baseSettings }, { intervalMs: 0, maxAttempts: 2 })
-    ).rejects.toMatchObject({ status: 504 });
+    ).rejects.toThrow("未返回任务 ID 或图片地址");
   });
 
   it("throws a clear error when the task fails", async () => {
     const transport = new StubTransport((path, options) => {
       if (options?.method === "POST") {
-        return { taskId: "task-2" };
+        return { taskId: "apimart:task_2", status: "submitted" };
       }
-
-      return { tasks: [{ taskId: "task-2", status: "failed", errorMessage: "内容违规" }] };
+      return { taskId: "apimart:task_2", status: "failed", errorMessage: "内容违规" };
     });
 
     await expect(
       generateImage(transport, { projectId: "p", nodeId: "n", prompt: "x", settings: baseSettings }, { intervalMs: 0, maxAttempts: 3 })
     ).rejects.toThrow("内容违规");
   });
+
+  it("tolerates transient poll errors and keeps polling", async () => {
+    let pollCalls = 0;
+    const transport = new StubTransport((path, options) => {
+      if (options?.method === "POST") {
+        return { taskId: "apimart:task_3", status: "submitted" };
+      }
+      pollCalls += 1;
+      if (pollCalls <= 2) {
+        throw new Error("网络抖动");
+      }
+      return { taskId: "apimart:task_3", status: "succeeded", imageUrl: "https://example.com/ok.png" };
+    });
+
+    const result = await generateImage(
+      transport,
+      { projectId: "p", nodeId: "n", prompt: "x", settings: baseSettings },
+      { intervalMs: 0, maxAttempts: 6 }
+    );
+    expect(result.imageUrl).toBe("https://example.com/ok.png");
+  });
 });
 
 describe("DEFAULT_IMAGE_GENERATION_POLL_OPTIONS", () => {
-  it("defaults to 30 minutes (1.5s × 1200)", () => {
-    expect(DEFAULT_IMAGE_GENERATION_POLL_OPTIONS).toEqual({ intervalMs: 1500, maxAttempts: 1200 });
+  it("matches the company contract: 15s initial delay then 4s interval, 30-min budget", () => {
+    expect(DEFAULT_IMAGE_GENERATION_POLL_OPTIONS).toEqual({ intervalMs: 4000, maxAttempts: 450, initialDelayMs: 15000 });
   });
 });
 
 describe("pollImageResult", () => {
-  it("polls the queue until an image url appears without re-submitting generate-image", async () => {
-    let queueCalls = 0;
+  it("polls the per-task endpoint until an image url appears without re-submitting generate-image", async () => {
+    let pollCalls = 0;
     const transport = new StubTransport((path, options) => {
       if (options?.method === "POST" && path.endsWith("/generate-image")) {
         throw new Error("不应重新提交 generate-image");
       }
-
-      if (path.includes("/gen-queue")) {
-        queueCalls += 1;
-        if (queueCalls < 2) {
-          return { tasks: [{ nodeId: "node-1", status: "running" }] };
+      if (path.includes("/generate-image/")) {
+        pollCalls += 1;
+        if (pollCalls < 2) {
+          return { taskId: "apimart:task_1", status: "running" };
         }
-        return { tasks: [{ nodeId: "node-1", status: "succeeded", imageUrl: "https://example.com/resumed.png" }] };
+        return { taskId: "apimart:task_1", status: "succeeded", imageUrl: "https://example.com/resumed.png" };
       }
-
       return {};
     });
 
     const result = await pollImageResult(
       transport,
-      { projectId: "proj-1", nodeId: "node-1", taskId: "task-1" },
+      { projectId: "proj-1", nodeId: "node-1", taskId: "apimart:task_1" },
       { intervalMs: 0, maxAttempts: 5 }
     );
 
-    expect(result).toEqual({ taskId: "task-1", imageUrl: "https://example.com/resumed.png" });
+    expect(result).toEqual({ taskId: "apimart:task_1", imageUrl: "https://example.com/resumed.png" });
     const submitCalls = transport.calls.filter(
       (call) => call.options?.method === "POST" && call.path.endsWith("/generate-image")
     );
     expect(submitCalls).toHaveLength(0);
   });
 
-  it("falls back to nodeId as queue task id when taskId is missing", async () => {
-    const transport = new StubTransport((path) => {
-      if (path.includes("/gen-queue")) {
-        return { tasks: [{ nodeId: "node-1", status: "succeeded", imageUrl: "https://example.com/done.png" }] };
-      }
-      return {};
-    });
+  it("throws when there is no taskId to resume with (image tasks are not in gen-queue)", async () => {
+    const transport = new StubTransport(() => ({}));
 
-    const result = await pollImageResult(
-      transport,
-      { projectId: "proj-1", nodeId: "node-1" },
-      { intervalMs: 0, maxAttempts: 3 }
-    );
-
-    expect(result).toEqual({ taskId: "node-1", imageUrl: "https://example.com/done.png" });
+    await expect(
+      pollImageResult(transport, { projectId: "proj-1", nodeId: "node-1" }, { intervalMs: 0, maxAttempts: 3 })
+    ).rejects.toThrow("缺少任务 ID");
   });
 });

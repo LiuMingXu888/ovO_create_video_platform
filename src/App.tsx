@@ -1009,8 +1009,9 @@ export function App() {
   }
 
   // After reopening, resume polling for image tasks that were still running.
-  // Tasks past the 30-minute window are marked failed; tasks with no taskId
-  // fall back to polling the queue by nodeId.
+  // Tasks past the 30-minute window are marked failed. Image tasks are NOT in
+  // gen-queue, so resuming requires the real provider taskId; tasks that never
+  // got one (interrupted before submit returned) are marked failed.
   function resumePendingImageTasks(loadedProject: CanvasProject) {
     if (!loadedProject?.projectId) {
       return;
@@ -1026,6 +1027,20 @@ export function App() {
           current.map((asset) =>
             asset.id === task.nodeId
               ? { ...asset, status: "failed" as const, errorMessage: "生成超时（超过30分钟），请检查网络或重试" }
+              : asset
+          )
+        );
+        pendingTasksRef.current = pendingTasksRef.current.filter((item) => item.nodeId !== task.nodeId);
+        persistLocalCanvasFull();
+        continue;
+      }
+
+      if (!task.taskId) {
+        // 没拿到 taskId 就中断了(例如提交时网关超时), 无法续轮询, 直接置失败。
+        setAssets((current) =>
+          current.map((asset) =>
+            asset.id === task.nodeId
+              ? { ...asset, status: "failed" as const, errorMessage: "生成已中断，请重新生成" }
               : asset
           )
         );

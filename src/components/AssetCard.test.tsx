@@ -66,6 +66,43 @@ describe("AssetCard media error retry", () => {
   });
 });
 
+describe("AssetCard image generation status", () => {
+  it("shows a 生成中 indicator and renders no <img> while an image is generating (no empty src)", () => {
+    const asset = {
+      id: "img-gen",
+      name: "生成图片 1",
+      kind: "image" as const,
+      category: "characters" as const,
+      url: "",
+      status: "generating" as const,
+      statusLabel: "生成中"
+    };
+    const { container } = render(
+      <AssetCard asset={asset as never} onAction={vi.fn()} onRename={vi.fn()} onChangeCategory={vi.fn()} />
+    );
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    // 关键: 生成中不渲染 <img>, 避免 src="" 触发浏览器重复下载整页的告警。
+    expect(container.querySelector("img")).toBeNull();
+  });
+
+  it("shows the failure reason on a failed image card and renders no <img>", () => {
+    const asset = {
+      id: "img-fail",
+      name: "生成图片 2",
+      kind: "image" as const,
+      category: "characters" as const,
+      url: "",
+      status: "failed" as const,
+      errorMessage: "该模型生成超时"
+    };
+    const { container } = render(
+      <AssetCard asset={asset as never} onAction={vi.fn()} onRename={vi.fn()} onChangeCategory={vi.fn()} />
+    );
+    expect(screen.getByText("该模型生成超时")).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
+  });
+});
+
 describe("AssetCard image reuse button", () => {
   it("renders enabled reuse button for image with generationPrompt", () => {
     const asset = {

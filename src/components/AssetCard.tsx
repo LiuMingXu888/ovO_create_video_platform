@@ -151,7 +151,13 @@ export function AssetCard({
         </label>
       )}
       <div className="asset-media">
-        {asset.kind === "image" && (
+        {asset.kind === "image" && isGenerating && (
+          <div className="video-generating">{asset.statusLabel ?? "生成中"}</div>
+        )}
+        {asset.kind === "image" && isFailed && (
+          <div className="video-generating video-failed">{asset.errorMessage ?? asset.statusLabel ?? "生成失败"}</div>
+        )}
+        {asset.kind === "image" && !isGenerating && !isFailed && (asset.thumbnailUrl || asset.url) && (
           <img src={withRetry(asset.thumbnailUrl ?? asset.url)} alt={asset.name} onError={() => setMediaError(true)} />
         )}
         {asset.kind === "video" && isGenerating && (
