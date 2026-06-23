@@ -11,7 +11,7 @@ import {
   validateCompanyApiPath,
   type CompanySessionResult
 } from "./companySessionClient.js";
-import { createCategorizedDownloadPlan, sanitizePathPart, type SaveAssetInput } from "./downloadPaths.js";
+import { createCategorizedDownloadPlan, createDownloadFolderName, sanitizePathPart, type SaveAssetInput } from "./downloadPaths.js";
 import { createStoragePaths } from "./storagePaths.js";
 
 const LOGIN_POLL_INTERVAL_MS = 2000;
@@ -500,7 +500,7 @@ export async function saveAssetToDownloads(input: SaveAssetInput) {
 }
 
 export async function saveAssetsToDownloads(input: SaveAssetsInput) {
-  const directoryName = createTimestampFolderName(new Date());
+  const directoryName = createDownloadFolderName(new Date());
   const plan = createCategorizedDownloadPlan({
     downloadsPath: app.getPath("downloads"),
     timestampFolderName: directoryName,

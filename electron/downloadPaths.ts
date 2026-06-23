@@ -58,3 +58,11 @@ export function sanitizePathPart(value: string) {
   const trimmed = value.trim() || "asset";
   return trimmed.replace(/[/:*?"<>|]/g, "_");
 }
+
+export function createDownloadFolderName(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const yy = pad(date.getFullYear() % 100);
+  return `资源文件(${yy}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}.${pad(
+    date.getMinutes()
+  )}.${pad(date.getSeconds())})`;
+}

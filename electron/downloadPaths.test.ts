@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createCategorizedDownloadPlan } from "./downloadPaths.js";
+import { createCategorizedDownloadPlan, createDownloadFolderName } from "./downloadPaths.js";
 
 describe("createCategorizedDownloadPlan", () => {
   it("plans selected assets into timestamp and category folders", () => {
@@ -39,5 +39,13 @@ describe("createCategorizedDownloadPlan", () => {
         destinationPath: path.join(downloadsPath, "2026-06-17-172100", "视频", "开场参考视频.mp4")
       }
     ]);
+  });
+});
+
+describe("createDownloadFolderName", () => {
+  it("names the batch folder 资源文件(YY-MM-DD-HH.mm.ss) with filesystem-safe chars", () => {
+    const name = createDownloadFolderName(new Date(2026, 5, 22, 11, 27, 9));
+    expect(name).toBe("资源文件(26-06-22-11.27.09)");
+    expect(name).not.toMatch(/[/:*?"<>|]/);
   });
 });
