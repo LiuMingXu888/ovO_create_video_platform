@@ -42,10 +42,10 @@ import { manualUpdateReducer, type ManualUpdateState } from "./update/manualUpda
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
 const mb = 1024 * 1024;
 const defaultSortModes: Record<AssetCategory, SortMode> = {
-  characters: "default",
-  scenes: "default",
-  props: "default",
-  audio: "default",
+  characters: "generated-desc",
+  scenes: "generated-desc",
+  props: "generated-desc",
+  audio: "generated-desc",
   video: "generated-desc"
 };
 const manualUpdateBridgeErrorMessage = "更新失败，请稍后重试";
@@ -175,9 +175,9 @@ function getCanvasUrlFromProject(project?: CanvasProject | null) {
   return project?.canvasUrl ?? "";
 }
 
-function getGeneratedTime(asset: CanvasAsset, defaultIndex: number) {
+function getGeneratedTime(asset: CanvasAsset) {
   const timestamp = asset.createdAt ? Date.parse(asset.createdAt) : Number.NaN;
-  return Number.isFinite(timestamp) ? timestamp : defaultIndex;
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function sortCategoryAssets(assets: CanvasAsset[], category: AssetCategory, mode: SortMode, defaultOrder: string[]) {
@@ -189,6 +189,8 @@ function sortCategoryAssets(assets: CanvasAsset[], category: AssetCategory, mode
   }
 
   const collator = new Intl.Collator("zh-Hans-CN");
+  const defaultRank = new Map(defaultOrder.map((assetId, index) => [assetId, index]));
+  const defaultRankOf = (asset: CanvasAsset) => defaultRank.get(asset.id) ?? assets.indexOf(asset);
   return assets.slice().sort((left, right) => {
     if (mode === "name-asc") {
       return collator.compare(left.name, right.name);
@@ -198,11 +200,23 @@ function sortCategoryAssets(assets: CanvasAsset[], category: AssetCategory, mode
       return collator.compare(right.name, left.name);
     }
 
-    const leftDefaultIndex = defaultOrder.includes(left.id) ? defaultOrder.indexOf(left.id) : assets.indexOf(left);
-    const rightDefaultIndex = defaultOrder.includes(right.id) ? defaultOrder.indexOf(right.id) : assets.indexOf(right);
-    const leftTime = getGeneratedTime(left, leftDefaultIndex);
-    const rightTime = getGeneratedTime(right, rightDefaultIndex);
-    return mode === "generated-asc" ? leftTime - rightTime : rightTime - leftTime;
+    // generated-asc / generated-desc: 有有效生成时间的按时间排序;缺 createdAt 的
+    // 存量资产统一沉到末尾,彼此保持默认顺序,避免被反转或顶到最前。
+    const leftTime = getGeneratedTime(left);
+    const rightTime = getGeneratedTime(right);
+    if (leftTime !== null && rightTime !== null) {
+      if (leftTime !== rightTime) {
+        return mode === "generated-asc" ? leftTime - rightTime : rightTime - leftTime;
+      }
+      return defaultRankOf(left) - defaultRankOf(right);
+    }
+    if (leftTime !== null) {
+      return -1;
+    }
+    if (rightTime !== null) {
+      return 1;
+    }
+    return defaultRankOf(left) - defaultRankOf(right);
   });
 }
 

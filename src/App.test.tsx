@@ -1615,7 +1615,7 @@ describe("App shell", () => {
     const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
     const beforeSortNames = Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent);
 
-    expect(screen.getByLabelText("人物排序")).toHaveValue("default");
+    expect(screen.getByLabelText("人物排序")).toHaveValue("generated-desc");
     expect(screen.getByLabelText("视频排序")).toHaveValue("generated-desc");
     fireEvent.change(screen.getByLabelText("人物排序"), { target: { value: "name-asc" } });
     expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual([
@@ -1658,6 +1658,48 @@ describe("App shell", () => {
     expect(Array.from(videoSection.querySelectorAll(".asset-name")).map((node) => node.textContent).slice(0, 2)).toEqual([
       "生成视频 2",
       "生成视频 1"
+    ]);
+  });
+
+  it("defaults non-video categories to generated-desc, newest createdAt first", async () => {
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: [
+        {
+          id: "char-old",
+          name: "较早角色",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/old.png",
+          createdAt: "2026-01-01T00:00:00.000Z"
+        },
+        {
+          id: "char-new",
+          name: "较晚角色",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/new.png",
+          createdAt: "2026-02-01T00:00:00.000Z"
+        }
+      ]
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    expect(screen.getByLabelText("人物排序")).toHaveValue("generated-desc");
+    const charactersSection = screen.getByRole("button", { name: "人物" }).closest("section") as HTMLElement;
+    expect(Array.from(charactersSection.querySelectorAll(".asset-name")).map((node) => node.textContent)).toEqual([
+      "较晚角色",
+      "较早角色"
     ]);
   });
 
