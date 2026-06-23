@@ -16,6 +16,13 @@ import {
   upsertCanvasHistoryEntry
 } from "./lib/canvasHistory";
 import { downloadAsset, downloadAssets } from "./lib/downloadAsset";
+import {
+  readLocalCanvas,
+  writeLocalCanvas,
+  buildLocalCanvasStore,
+  mergeCanvasState,
+  type PendingTask
+} from "./lib/localCanvasStore";
 import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
 import { getCategoryForAssetName } from "./lib/assetCategory";
 import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
@@ -40,6 +47,8 @@ import type {
 import { manualUpdateReducer, type ManualUpdateState } from "./update/manualUpdateState";
 
 const imageCategories: AssetCategory[] = ["characters", "scenes", "props"];
+
+const IMAGE_GENERATION_TIMEOUT_MS = 30 * 60 * 1000; // 图片生成 30 分钟超时
 const mb = 1024 * 1024;
 const defaultSortModes: Record<AssetCategory, SortMode> = {
   characters: "generated-desc",
@@ -319,6 +328,10 @@ export function App() {
     assetsRef.current = assets;
   }, [assets]);
 
+  // In-progress generation tasks, mirrored to the Electron local file so they
+  // can be resumed (polled to completion) after the app is reopened.
+  const pendingTasksRef = useRef<PendingTask[]>([]);
+
   // On startup: restore the persistent session without requiring a manual
   // "检查登录态" click. The company session uses a persist: partition so
   // cookies survive app restarts; we just need to verify them once.
@@ -445,6 +458,33 @@ export function App() {
       });
       return nextEntries;
     });
+    // Every layout/content change also mirrors to the Electron local file so
+    // reopening restores content (and in-progress tasks) without a fetch.
+    persistLocalCanvasFull(nextProject, nextName, nextUrl, nextAssets);
+  }
+
+  // Mirror the full canvas (asset content + in-progress tasks) to the Electron
+  // local file so reopening the app restores content without a server fetch.
+  // Fire-and-forget: failures are swallowed inside writeLocalCanvas.
+  function persistLocalCanvasFull(
+    nextProject = project,
+    nextName = canvasName,
+    nextUrl = canvasUrl,
+    nextAssets = assetsRef.current
+  ) {
+    if (!nextProject?.projectId) {
+      return;
+    }
+
+    void writeLocalCanvas(
+      buildLocalCanvasStore({
+        projectId: nextProject.projectId,
+        canvasName: nextName,
+        canvasUrl: nextUrl,
+        assets: nextAssets,
+        pendingTasks: pendingTasksRef.current
+      })
+    );
   }
 
   function handleCanvasUrlChange(value: string) {
@@ -968,6 +1008,65 @@ export function App() {
     await loadCanvasFromUrl(canvasUrl);
   }
 
+  // After reopening, resume polling for image tasks that were still running.
+  // Tasks past the 30-minute window are marked failed; tasks with no taskId
+  // fall back to polling the queue by nodeId.
+  function resumePendingImageTasks(loadedProject: CanvasProject) {
+    if (!loadedProject?.projectId) {
+      return;
+    }
+
+    for (const task of pendingTasksRef.current) {
+      if (task.kind !== "image") {
+        continue;
+      }
+
+      if (Date.now() - task.startTime > IMAGE_GENERATION_TIMEOUT_MS) {
+        setAssets((current) =>
+          current.map((asset) =>
+            asset.id === task.nodeId
+              ? { ...asset, status: "failed" as const, errorMessage: "生成超时（超过30分钟），请检查网络或重试" }
+              : asset
+          )
+        );
+        pendingTasksRef.current = pendingTasksRef.current.filter((item) => item.nodeId !== task.nodeId);
+        persistLocalCanvasFull();
+        continue;
+      }
+
+      const activityId = addActivityMessage(`正在恢复图片生成：${task.nodeId}`);
+      void companyApiFacade
+        .pollImageResult({ projectId: loadedProject.projectId, nodeId: task.nodeId, taskId: task.taskId })
+        .then((result) => {
+          if (!mounted.current) {
+            return;
+          }
+          setAssets((current) =>
+            current.map((asset) =>
+              asset.id === task.nodeId ? { ...asset, url: result.imageUrl, status: "ready" as const } : asset
+            )
+          );
+          pendingTasksRef.current = pendingTasksRef.current.filter((item) => item.nodeId !== task.nodeId);
+          persistLocalCanvasFull();
+          updateActivityMessage(activityId, `已恢复并完成图片生成：${task.nodeId}`);
+        })
+        .catch((error) => {
+          if (!mounted.current) {
+            return;
+          }
+          const errorMessage = error instanceof Error ? error.message : "续轮询失败";
+          setAssets((current) =>
+            current.map((asset) =>
+              asset.id === task.nodeId ? { ...asset, status: "failed" as const, errorMessage } : asset
+            )
+          );
+          pendingTasksRef.current = pendingTasksRef.current.filter((item) => item.nodeId !== task.nodeId);
+          persistLocalCanvasFull();
+          updateActivityMessage(activityId, errorMessage);
+        });
+    }
+  }
+
   async function loadCanvasFromUrl(targetCanvasUrl: string) {
     setCanvasLoading(true);
     setCanvasError(undefined);
@@ -981,8 +1080,15 @@ export function App() {
 
       const result = await companyApiFacade.loadCanvasResources(targetCanvasUrl);
       const historyEntry = canvasHistory.find((entry) => entry.url === result.project.canvasUrl || entry.projectId === result.project.projectId);
-      const nextAssets = applyCanvasAssetLayout(result.assets, historyEntry?.layout);
+      const remoteAssets = applyCanvasAssetLayout(result.assets, historyEntry?.layout);
       const nextCanvasName = historyEntry?.name ?? result.project.title ?? "未命名画布";
+
+      // 远端为准, 但补回本地仍在生成的占位资产, 并保留未完成的进行中任务以便续轮询。
+      const localStore = await readLocalCanvas(result.project.projectId);
+      const merged = mergeCanvasState(localStore, { assets: remoteAssets });
+      pendingTasksRef.current = merged.pendingTasks;
+      const nextAssets = merged.assets;
+
       setProject(result.project);
       setCanvasSnapshot(result.snapshot);
       setAssets(nextAssets);
@@ -997,7 +1103,9 @@ export function App() {
           layout: createCanvasAssetLayout(nextAssets)
         })
       );
+      persistLocalCanvasFull(result.project, nextCanvasName, result.project.canvasUrl, nextAssets);
       addActivityMessage(`已加载 ${result.assets.length} 个资源`);
+      void resumePendingImageTasks(result.project);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
     } finally {
@@ -1017,8 +1125,10 @@ export function App() {
   }
 
   async function renameAsset(assetId: string, name: string) {
-    setAssets((current) => current.map((asset) => (asset.id === assetId ? { ...asset, name } : asset)));
+    const renamedAssets = assetsRef.current.map((asset) => (asset.id === assetId ? { ...asset, name } : asset));
+    setAssets(renamedAssets);
     setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name } : item)));
+    persistLocalCanvasFull(project, canvasName, getCanvasUrlFromProject(project) || canvasUrl, renamedAssets);
 
     if (!project || !canvasSnapshot) {
       addActivityMessage(`已本地改名：${name}`);
@@ -1050,6 +1160,7 @@ export function App() {
     const nextAssets = assets.map((asset) => (asset.id === assetId ? nextAsset : asset));
     setAssets(nextAssets);
     setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name: nextName } : item)));
+    persistLocalCanvasFull(project, canvasName, getCanvasUrlFromProject(project) || canvasUrl, nextAssets);
     setCanvasHistory((history) =>
       updateCanvasHistoryLayout(history, {
         url: getCanvasUrlFromProject(project) || canvasUrl,
@@ -1463,6 +1574,7 @@ export function App() {
     const assetCategory = imageCategoryToAssetCategory(imageGenerationSettings.category);
     const placeholder = createGeneratedImagePlaceholder(assetCategory);
     const submittedReferences = references;
+    const startTime = Date.now();
     const assetsWithPlaceholder = [...assets, placeholder];
     setAssets(assetsWithPlaceholder);
     persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
@@ -1474,11 +1586,39 @@ export function App() {
     setReferences([]);
     setReferenceIssues([]);
 
-    const startTime = Date.now();
+    // 记录进行中任务并落盘, 这样生成途中退出 app 后重开仍能续轮询。
+    pendingTasksRef.current = [
+      ...pendingTasksRef.current,
+      {
+        nodeId: placeholder.id,
+        kind: "image",
+        category: assetCategory,
+        prompt: promptText,
+        startTime,
+        status: "submitting"
+      }
+    ];
+    persistLocalCanvasFull(project, canvasName, getCanvasUrlFromProject(project) || canvasUrl, assetsWithPlaceholder);
+
     const generationActivityId = addActivityMessage(`正在生成图片：${placeholder.name}（已等待 0分0秒）`);
     const progressInterval = setInterval(() => {
       updateActivityMessage(generationActivityId, `正在生成图片：${placeholder.name}（已等待 ${formatElapsedTime(startTime, Date.now())}）`);
     }, 1000);
+
+    // 30 分钟超时: 置占位为失败并移除进行中任务。
+    const timeoutId = setTimeout(() => {
+      clearInterval(progressInterval);
+      pendingTasksRef.current = pendingTasksRef.current.filter((task) => task.nodeId !== placeholder.id);
+      setAssets((current) =>
+        current.map((asset) =>
+          asset.id === placeholder.id
+            ? { ...asset, status: "failed" as const, errorMessage: "生成超时（超过30分钟），请检查网络或重试" }
+            : asset
+        )
+      );
+      updateActivityMessage(generationActivityId, "生成超时（超过30分钟），请检查网络或重试");
+      persistLocalCanvasFull();
+    }, IMAGE_GENERATION_TIMEOUT_MS);
 
     try {
       // Only already-remote image references can be sent to the company API; the
@@ -1496,11 +1636,18 @@ export function App() {
         referenceImageUrls
       });
 
+      clearTimeout(timeoutId);
       clearInterval(progressInterval);
 
       if (!mounted.current) {
         return;
       }
+
+      // 回填 taskId, 这样即便随后崩溃, 落盘里已带 taskId 可精确续轮询。
+      pendingTasksRef.current = pendingTasksRef.current.map((task) =>
+        task.nodeId === placeholder.id ? { ...task, taskId: result.taskId, status: "running" } : task
+      );
+      persistLocalCanvasFull();
 
       const savedResult = await companyApiFacade.saveCanvasAsset({
         projectId: project.projectId,
@@ -1523,12 +1670,15 @@ export function App() {
         status: "ready" as const
       };
       const completedAssets = assetsRef.current.map((asset) => (asset.id === placeholder.id ? completedAsset : asset));
+      pendingTasksRef.current = pendingTasksRef.current.filter((task) => task.nodeId !== placeholder.id);
       setCanvasSnapshot(savedResult.snapshot);
       setAssets(completedAssets);
       persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
+      persistLocalCanvasFull(project, canvasName, getCanvasUrlFromProject(project) || canvasUrl, completedAssets);
       updateActivityMessage(generationActivityId, `已生成图片：${placeholder.name}（用时 ${formatElapsedTime(startTime, Date.now())}）`);
       await refreshAuthState();
     } catch (error) {
+      clearTimeout(timeoutId);
       clearInterval(progressInterval);
 
       if (!mounted.current) {
@@ -1537,6 +1687,7 @@ export function App() {
 
       const errorMessage = error instanceof Error ? error.message : "图片生成失败";
       console.error("[图片生成] 错误:", error);
+      pendingTasksRef.current = pendingTasksRef.current.filter((task) => task.nodeId !== placeholder.id);
       setAssets((current) =>
         current.map((asset) =>
           asset.id === placeholder.id
@@ -1548,6 +1699,7 @@ export function App() {
             : asset
         )
       );
+      persistLocalCanvasFull();
       updateActivityMessage(generationActivityId, errorMessage);
       await refreshAuthState();
     }

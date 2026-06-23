@@ -13,6 +13,7 @@ vi.mock("./services/companyApiFacade", () => ({
     deleteCanvasAsset: vi.fn(),
     generateVideo: vi.fn(),
     generateImage: vi.fn(),
+    pollImageResult: vi.fn(),
     removeSubtitles: vi.fn(),
     createCompanyCanvas: vi.fn(),
     logout: vi.fn(),
@@ -45,6 +46,7 @@ beforeEach(() => {
   vi.mocked(companyApiFacade.deleteCanvasAsset).mockReset();
   vi.mocked(companyApiFacade.generateVideo).mockReset();
   vi.mocked(companyApiFacade.generateImage).mockReset();
+  vi.mocked(companyApiFacade.pollImageResult).mockReset();
   vi.mocked(companyApiFacade.removeSubtitles).mockReset();
   vi.mocked(companyApiFacade.createCompanyCanvas).mockReset();
   vi.mocked(companyApiFacade.logout).mockReset();
@@ -941,6 +943,79 @@ describe("App shell", () => {
     );
     expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("");
     expect(referenceChips()).toHaveLength(0);
+  });
+
+  it("resumes polling for an unfinished image task after reopening (load)", async () => {
+    const projectId = "cmq6fwhft0bg5m2l5u78zby8x";
+    // Simulate the Electron local store holding a still-running image task.
+    window.ovoDesktop = {
+      version: "test",
+      localStore: {
+        read: vi.fn().mockResolvedValue({
+          schemaVersion: 1,
+          projectId,
+          canvasName: "接口项目",
+          canvasUrl: `http://qijing.kjjhz.cn/canvas/${projectId}`,
+          assets: [
+            {
+              id: "generated-image-resume",
+              name: "生成图片 1",
+              kind: "image",
+              category: "characters",
+              url: "",
+              status: "generating"
+            }
+          ],
+          pendingTasks: [
+            {
+              nodeId: "generated-image-resume",
+              taskId: "img-task-resume",
+              kind: "image",
+              category: "characters",
+              prompt: "续轮询",
+              startTime: Date.now(),
+              status: "running"
+            }
+          ],
+          updatedAt: new Date().toISOString()
+        }),
+        write: vi.fn().mockResolvedValue({ ok: true })
+      }
+    } as unknown as Window["ovoDesktop"];
+
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    // Remote does not yet have the node (still generating server-side).
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId,
+        canvasUrl: `http://qijing.kjjhz.cn/canvas/${projectId}`,
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+    vi.mocked(companyApiFacade.pollImageResult).mockResolvedValue({
+      taskId: "img-task-resume",
+      imageUrl: "https://example.com/resumed-done.png"
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    await waitFor(() =>
+      expect(companyApiFacade.pollImageResult).toHaveBeenCalledWith({
+        projectId,
+        nodeId: "generated-image-resume",
+        taskId: "img-task-resume"
+      })
+    );
+    expect(await screen.findByText(/已恢复并完成图片生成/)).toBeInTheDocument();
   });
 
   it("updates the real generation activity item with the final elapsed time", async () => {
