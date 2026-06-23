@@ -113,6 +113,61 @@ describe("generateImage", () => {
     expect(result).toEqual({ taskId: "task-1", imageUrl: "https://example.com/out.png" });
   });
 
+  it("recovers from a submit 504 by polling the queue with nodeId", async () => {
+    const transport = new StubTransport((path, options) => {
+      if (options?.method === "POST" && path.endsWith("/generate-image")) {
+        throw { status: 504, message: "请求失败 (504)" };
+      }
+
+      if (path.includes("/gen-queue")) {
+        return { tasks: [{ nodeId: "node-1", status: "succeeded", resultUrl: "https://example.com/recovered.png" }] };
+      }
+
+      return {};
+    });
+
+    const result = await generateImage(
+      transport,
+      { projectId: "proj-1", nodeId: "node-1", prompt: "人物", settings: baseSettings },
+      { intervalMs: 0, maxAttempts: 3 }
+    );
+
+    expect(result).toEqual({ taskId: "node-1", imageUrl: "https://example.com/recovered.png" });
+  });
+
+  it("does not surface the raw 504 when a 504 submit leaves nothing in the queue", async () => {
+    const transport = new StubTransport((path, options) => {
+      if (options?.method === "POST" && path.endsWith("/generate-image")) {
+        throw { status: 504, message: "请求失败 (504)" };
+      }
+
+      return { tasks: [] };
+    });
+
+    // 504 后转队列轮询; 队列始终为空时, 轮询自身超时, 而不是把原始 "请求失败 (504)" 抛给用户。
+    await expect(
+      generateImage(
+        transport,
+        { projectId: "proj-1", nodeId: "node-1", prompt: "人物", settings: baseSettings },
+        { intervalMs: 0, maxAttempts: 2 }
+      )
+    ).rejects.toThrow("轮询超时");
+  });
+
+  it("re-throws a 504 when project/node are absent (no queue to recover from)", async () => {
+    const transport = new StubTransport((_path, options) => {
+      if (options?.method === "POST") {
+        throw { status: 504, message: "请求失败 (504)" };
+      }
+
+      return {};
+    });
+
+    await expect(
+      generateImage(transport, { prompt: "x", settings: baseSettings }, { intervalMs: 0, maxAttempts: 2 })
+    ).rejects.toMatchObject({ status: 504 });
+  });
+
   it("throws a clear error when the task fails", async () => {
     const transport = new StubTransport((path, options) => {
       if (options?.method === "POST") {

@@ -89,7 +89,30 @@ export async function generateImage(
   input: BuildGenerateImagePayloadInput,
   options: PollOptions = DEFAULT_IMAGE_GENERATION_POLL_OPTIONS
 ): Promise<GenerateImageResult> {
-  const submitResult = await requestGenerateImage(transport, input);
+  let submitResult: Awaited<ReturnType<typeof requestGenerateImage>>;
+  try {
+    submitResult = await requestGenerateImage(transport, input);
+  } catch (error) {
+    // 桌面端主进程对 POST /api/generate-image 有 60s 硬超时, 超时抛 504。
+    // 但任务此时已进 gen-queue 并最终成功, 因此 504 时转入按 nodeId 轮询队列兜底,
+    // 而不是直接失败。不重提交 POST (避免重复扣积分)。
+    if (isGatewayTimeoutError(error) && input.projectId && input.nodeId) {
+      const recovered = await pollImageQueueUntilComplete(
+        transport,
+        input.projectId,
+        input.nodeId,
+        input.nodeId,
+        options
+      );
+      const recoveredUrl = extractImageUrl(recovered);
+      if (recoveredUrl) {
+        return { taskId: input.nodeId, imageUrl: recoveredUrl };
+      }
+      throw new Error("生成请求网关超时，且队列未返回结果，请稍后在画布查看或重试");
+    }
+
+    throw error;
+  }
 
   if (!submitResult.taskId) {
     throw new Error("生成接口未返回任务 ID");
@@ -366,6 +389,10 @@ function getPollErrorMessage(error: unknown) {
   }
 
   return undefined;
+}
+
+function isGatewayTimeoutError(error: unknown) {
+  return isRecord(error) && error.status === 504;
 }
 
 function isAuthExpiredError(error: unknown) {
