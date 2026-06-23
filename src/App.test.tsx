@@ -869,7 +869,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "一个站立的女人" }
     });
-    fireEvent.click(screen.getByRole("button", { name: /生成图片\(需要\d+积分\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
 
     await waitFor(() => expect(companyApiFacade.generateImage).toHaveBeenCalled());
     expect(companyApiFacade.generateImage).toHaveBeenCalledWith(
@@ -2299,7 +2299,7 @@ describe("PromptDock", () => {
         onGenerationSettingsChange={() => undefined}
         generateMode="video"
         onGenerateModeChange={() => undefined}
-        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "high", camera: "暂不选择", category: "人物" }}
         onImageGenerationSettingsChange={() => undefined}
         onGenerateImage={() => undefined}
       />
@@ -2332,7 +2332,7 @@ describe("PromptDock", () => {
         onGenerationSettingsChange={() => undefined}
         generateMode="video"
         onGenerateModeChange={() => undefined}
-        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "high", camera: "暂不选择", category: "人物" }}
         onImageGenerationSettingsChange={() => undefined}
         onGenerateImage={() => undefined}
       />
@@ -2357,7 +2357,7 @@ describe("PromptDock", () => {
         onGenerationSettingsChange={() => undefined}
         generateMode="video"
         onGenerateModeChange={() => undefined}
-        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "high", camera: "暂不选择", category: "人物" }}
         onImageGenerationSettingsChange={() => undefined}
         onGenerateImage={() => undefined}
       />
@@ -2414,7 +2414,7 @@ describe("PromptDock", () => {
         onGenerationSettingsChange={() => undefined}
         generateMode="video"
         onGenerateModeChange={() => undefined}
-        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "high", camera: "暂不选择", category: "人物" }}
         onImageGenerationSettingsChange={() => undefined}
         onGenerateImage={() => undefined}
         activityMessages={["请输入提示词", "已生成 9:16 · 15s · 全能参考 请求预览，未提交公司接口"]}
@@ -2451,7 +2451,7 @@ describe("PromptDock", () => {
       onGenerationSettingsChange: () => undefined,
       generateMode: "video",
       onGenerateModeChange: () => undefined,
-      imageGenerationSettings: { model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" },
+      imageGenerationSettings: { model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "high", camera: "暂不选择", category: "人物" },
       onImageGenerationSettingsChange: () => undefined,
       onGenerateImage: () => undefined,
       ...overrides
@@ -2487,14 +2487,14 @@ describe("PromptDock", () => {
         onGenerationSettingsChange={() => undefined}
         generateMode="image"
         onGenerateModeChange={onGenerateModeChange}
-        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "4k", camera: "暂不选择", category: "人物" }}
+        imageGenerationSettings={{ model: "GPT-Image-2(兑吧)", aspectRatio: "9:16", quality: "high", camera: "暂不选择", category: "人物" }}
         onImageGenerationSettingsChange={() => undefined}
         onGenerateImage={() => undefined}
       />
     );
 
     expect((screen.getByLabelText("生图模型") as HTMLSelectElement).value).toBe("GPT-Image-2(兑吧)");
-    expect((screen.getByLabelText("质量") as HTMLSelectElement).value).toBe("4k");
+    expect((screen.getByLabelText("质量") as HTMLSelectElement).value).toBe("high");
     expect((screen.getByLabelText("摄像机") as HTMLSelectElement).value).toBe("暂不选择");
     expect((screen.getByLabelText("类别") as HTMLSelectElement).value).toBe("人物");
     expect(screen.getByRole("button", { name: /生成图片/ })).toHaveClass("generate-button-light");

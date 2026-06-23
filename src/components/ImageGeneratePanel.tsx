@@ -3,9 +3,8 @@ import {
   IMAGE_ASPECT_RATIOS,
   IMAGE_CAMERAS,
   IMAGE_CATEGORIES,
-  IMAGE_GENERATION_CREDIT_COST,
-  IMAGE_MODELS,
-  IMAGE_QUALITIES
+  IMAGE_MODEL_OPTIONS,
+  getImageModelOption
 } from "../lib/imageGenOptions";
 import type { ImageAspectRatio, ImageGenerationSettings, ImageQuality } from "../types";
 
@@ -17,6 +16,9 @@ interface ImageGeneratePanelProps {
 }
 
 export function ImageGeneratePanel({ settings, onSettingsChange, onGenerate, disabled = false }: ImageGeneratePanelProps) {
+  const modelOption = getImageModelOption(settings.model) ?? IMAGE_MODEL_OPTIONS[0];
+  const qualityLocked = modelOption.qualityField === null;
+
   return (
     <aside className="generate-panel generate-panel-image" aria-label="图片生成设置">
       <label className="field-line field-line-wide">
@@ -24,11 +26,14 @@ export function ImageGeneratePanel({ settings, onSettingsChange, onGenerate, dis
         <select
           aria-label="生图模型"
           value={settings.model}
-          onChange={(event) => onSettingsChange({ ...settings, model: event.currentTarget.value })}
+          onChange={(event) => {
+            const next = getImageModelOption(event.currentTarget.value) ?? IMAGE_MODEL_OPTIONS[0];
+            onSettingsChange({ ...settings, model: next.value, quality: next.defaultQuality });
+          }}
         >
-          {IMAGE_MODELS.map((model) => (
-            <option key={model} value={model}>
-              {model}
+          {IMAGE_MODEL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -55,11 +60,12 @@ export function ImageGeneratePanel({ settings, onSettingsChange, onGenerate, dis
           <select
             aria-label="质量"
             value={settings.quality}
+            disabled={qualityLocked}
             onChange={(event) => onSettingsChange({ ...settings, quality: event.currentTarget.value as ImageQuality })}
           >
-            {IMAGE_QUALITIES.map((quality) => (
-              <option key={quality} value={quality}>
-                {quality.toUpperCase()}
+            {modelOption.qualityOptions.map((quality) => (
+              <option key={quality.value} value={quality.value}>
+                {quality.label}
               </option>
             ))}
           </select>
@@ -97,7 +103,7 @@ export function ImageGeneratePanel({ settings, onSettingsChange, onGenerate, dis
       </div>
       <button type="button" className="generate-button generate-button-light" onClick={onGenerate} disabled={disabled}>
         <Sparkles size={18} />
-        <span>生成图片(需要{IMAGE_GENERATION_CREDIT_COST}积分)</span>
+        <span>生成图片</span>
       </button>
     </aside>
   );
