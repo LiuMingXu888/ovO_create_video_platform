@@ -65,7 +65,32 @@ describe("loadCanvasResources", () => {
       expect.objectContaining({ id: "image-1", name: "人物-苏晚晴", category: "characters" }),
       expect.objectContaining({ id: "audio-1", name: "音频-旁白", category: "audio" })
     ]);
-    expect(requests.filter((request) => isPutRequest(request.options))).toHaveLength(2);
+    expect(requests.filter((request) => isPutRequest(request.options))).toHaveLength(1);
+  });
+
+  it("still returns normalized assets when the prefix-sync save fails", async () => {
+    let putCount = 0;
+    const transport: ApiTransport = {
+      request: vi.fn(async (path: string, options?: { method?: string }) => {
+        if (options?.method === "PUT") {
+          putCount += 1;
+          throw new Error("PUT failed");
+        }
+        return {
+          snapshot: {
+            nodes: [
+              { id: "image-1", type: "image", data: { id: "image-1", assetId: "image-1", name: "苏晚晴", imageUrl: "https://example.com/su.png" } }
+            ]
+          }
+        } as never;
+      })
+    };
+
+    const result = await loadCanvasResources(transport, "http://qijing.kjjhz.cn/canvas/project-1");
+    expect(result.assets).toEqual([
+      expect.objectContaining({ id: "image-1", name: "人物-苏晚晴", category: "characters" })
+    ]);
+    expect(putCount).toBe(1);
   });
 
   it("returns a readable error for invalid canvas URLs", async () => {

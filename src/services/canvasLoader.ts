@@ -48,6 +48,7 @@ export function normalizeLoadedAssetsWithPrefixes(assets: CanvasAsset[]) {
 async function normalizeAndSyncAssetPrefixes(transport: ApiTransport, projectId: string, snapshot: unknown) {
   const rawAssets = normalizeSnapshotAssets(snapshot);
   let nextSnapshot = snapshot;
+  let pendingSync = false;
   const assets: CanvasAsset[] = [];
 
   for (const rawAsset of rawAssets) {
@@ -57,9 +58,20 @@ async function normalizeAndSyncAssetPrefixes(transport: ApiTransport, projectId:
     if (normalized.renamed) {
       const renamed = renameAssetInSnapshot(nextSnapshot, rawAsset.id, normalized.name);
       if (renamed.updated) {
-        await saveProjectSnapshot(transport, projectId, renamed.snapshot);
         nextSnapshot = renamed.snapshot;
+        pendingSync = true;
       }
+    }
+  }
+
+  // 把所有前缀改名一次性写回(大画布上百个改名时,单次 PUT 代替逐个 PUT,
+  // 避免串行风暴导致整体加载失败)。保存失败不阻断:资源已在内存,下次加载再同步。
+  if (pendingSync) {
+    try {
+      await saveProjectSnapshot(transport, projectId, nextSnapshot);
+    } catch (error) {
+      console.warn("[画布加载] 前缀同步保存失败,跳过(下次加载重试):", error);
+      nextSnapshot = snapshot;
     }
   }
 
