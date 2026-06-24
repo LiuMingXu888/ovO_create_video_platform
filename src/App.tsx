@@ -1828,6 +1828,13 @@ export function App() {
             setPreviewAsset(previewAssets[previewIndex + 1]);
           }
         }}
+        onRename={renameAsset}
+        onAction={(asset, action) => {
+          if (action === "delete") {
+            setPreviewAsset(null);
+          }
+          handleAssetAction(asset, action);
+        }}
       />
     </main>
   );

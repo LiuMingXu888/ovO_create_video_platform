@@ -1060,36 +1060,71 @@ button {
 }
 
 .preview-modal-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
   padding: 0 52px;
 }
 
-.preview-modal h2 {
-  grid-column: 2;
+.preview-modal h2,
+.preview-title,
+.preview-name-editor {
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: min(560px, 100%);
+}
+
+.preview-title {
   margin: 0;
   color: #202734;
   font-size: 20px;
   letter-spacing: 0;
   overflow: hidden;
-  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.preview-nav-group {
+.preview-name-editor input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d7d4cc;
+  border-radius: 8px;
+  font-size: 18px;
+  color: #202734;
+}
+
+.preview-actions {
   display: inline-flex;
   flex: 0 0 auto;
-  grid-column: 3;
   align-items: center;
-  justify-self: end;
   gap: 6px;
-  margin-right: 42px;
+}
+
+.preview-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  border: 1px solid #d7d4cc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2c3442;
+  cursor: pointer;
+}
+
+.preview-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.preview-action-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 2px;
+  background: #d7d4cc;
 }
 
 .modal-close {
@@ -1163,16 +1198,12 @@ button {
   }
 
   .preview-modal-header {
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     padding: 0 42px;
   }
 
-  .preview-modal h2 {
+  .preview-modal h2,
+  .preview-title {
     font-size: 17px;
-  }
-
-  .preview-nav-group {
-    margin-right: 36px;
   }
 }
 

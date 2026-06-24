@@ -1927,10 +1927,10 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "放大预览 小区楼道" }));
 
-    const navGroup = screen.getByLabelText("预览切换");
-    expect(navGroup).toContainElement(screen.getByRole("button", { name: "查看上一个节点" }));
-    expect(navGroup).toContainElement(screen.getByRole("button", { name: "查看下一个节点" }));
-    expect(navGroup).toHaveClass("preview-nav-group");
+    const actions = screen.getByLabelText("预览操作");
+    expect(actions).toContainElement(screen.getByRole("button", { name: "查看上一个节点" }));
+    expect(actions).toContainElement(screen.getByRole("button", { name: "查看下一个节点" }));
+    expect(actions).toHaveClass("preview-actions");
   });
 
   it("marks preview videos for full containment inside the modal", async () => {
