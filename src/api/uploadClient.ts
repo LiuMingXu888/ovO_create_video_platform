@@ -33,7 +33,17 @@ type CompanyNode = {
   x: number;
   y: number;
   position: { x: number; y: number };
+  measured: { width: number; height: number };
   data: Record<string, unknown>;
+};
+
+// React Flow 必须拿到 measured(量到的宽高)才会布局并显示节点——这是 9333 CDP
+// 实证的真因:缺 measured 的 app 节点进了快照但完全不渲染。这里按公司端各类型节点
+// 的真实 measured 预填,使 app 写入的节点首次加载即可显示。
+const MEASURED_BY_KIND: Record<AssetKind, { width: number; height: number }> = {
+  image: { width: 288, height: 162 },
+  video: { width: 320, height: 587 },
+  audio: { width: 224, height: 122 }
 };
 
 export function getUploadPrefix(file: File) {
@@ -246,12 +256,18 @@ function matchesAssetNode(value: unknown, assetId: string) {
 }
 
 function baseNode(asset: CanvasAsset, fields: Record<string, unknown>): CompanyNode {
+  const isImage = asset.kind === "image";
+  // 渲染由 measured 决定，与 status 无关；但 status 仍要贴合画布枚举。
+  // 已完成/上传(ready 或无 status)→ completed（公司端完成节点用的值）；
+  // 进行中/失败的占位保留自身 status，避免把生成中的节点误标成已完成。
+  const status = !asset.status || asset.status === "ready" ? "completed" : asset.status;
   return {
     id: asset.id,
     type: asset.kind,
     x: 0,
     y: 0,
     position: { x: 0, y: 0 },
+    measured: MEASURED_BY_KIND[asset.kind],
     data: compactRecord({
       id: asset.id,
       assetId: asset.id,
@@ -265,7 +281,8 @@ function baseNode(asset: CanvasAsset, fields: Record<string, unknown>): CompanyN
       assetStatus: "Active",
       thumbnailUrl: asset.thumbnailUrl,
       createdAt: asset.createdAt,
-      status: asset.status,
+      status,
+      imageSource: isImage ? "upload" : undefined,
       sizeBytes: asset.sizeBytes
     })
   };

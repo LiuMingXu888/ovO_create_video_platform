@@ -57,6 +57,7 @@ describe("uploadClient payload builders", () => {
       x: 0,
       y: 0,
       position: { x: 0, y: 0 },
+      measured: { width: 288, height: 162 },
       data: {
         id: "asset-image",
         assetId: "asset-image",
@@ -68,6 +69,8 @@ describe("uploadClient payload builders", () => {
         imageUrl: "https://example.com/scene.png",
         assetUri: "https://example.com/scene.png",
         assetStatus: "Active",
+        status: "completed",
+        imageSource: "upload",
         sizeBytes: 12
       }
     });
@@ -90,6 +93,7 @@ describe("uploadClient payload builders", () => {
       x: 0,
       y: 0,
       position: { x: 0, y: 0 },
+      measured: { width: 224, height: 122 },
       data: {
         id: "asset-audio",
         assetId: "asset-audio",
@@ -101,6 +105,7 @@ describe("uploadClient payload builders", () => {
         audioUrl: "https://example.com/audio.mp3",
         assetUri: "https://example.com/audio.mp3",
         assetStatus: "Active",
+        status: "completed",
         duration: 8,
         durationSeconds: 8,
         sizeBytes: 12
@@ -128,6 +133,7 @@ describe("uploadClient payload builders", () => {
       x: 0,
       y: 0,
       position: { x: 0, y: 0 },
+      measured: { width: 320, height: 587 },
       data: {
         id: "asset-video",
         assetId: "asset-video",
@@ -140,6 +146,7 @@ describe("uploadClient payload builders", () => {
         seedanceProviderUrl: "https://provider.example.com/video.mp4",
         assetUri: "https://example.com/video.mp4",
         assetStatus: "Active",
+        status: "completed",
         videoPersisted: true,
         duration: 15,
         durationSeconds: 15,
@@ -180,6 +187,7 @@ describe("uploadClient payload builders", () => {
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
+            measured: { width: 224, height: 122 },
             data: {
               id: "asset-audio",
               assetId: "asset-audio",
@@ -191,6 +199,7 @@ describe("uploadClient payload builders", () => {
               audioUrl: "https://example.com/audio.mp3",
               assetUri: "https://example.com/audio.mp3",
               assetStatus: "Active",
+              status: "completed",
               sizeBytes: 12
             }
           }
@@ -220,6 +229,7 @@ describe("uploadClient payload builders", () => {
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
+            measured: { width: 320, height: 587 },
               data: {
                 id: "asset-video",
                 assetId: "asset-video",
@@ -231,6 +241,7 @@ describe("uploadClient payload builders", () => {
                 videoUrl: "https://example.com/video.mp4",
                 assetUri: "https://example.com/video.mp4",
                 assetStatus: "Active",
+                status: "completed",
                 videoPersisted: true,
                 resolution: "720p",
                 generateAudio: true,
@@ -268,6 +279,7 @@ describe("uploadClient payload builders", () => {
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
+            measured: { width: 288, height: 162 },
             data: {
               id: "asset-scene",
               assetId: "asset-scene",
@@ -279,6 +291,8 @@ describe("uploadClient payload builders", () => {
               imageUrl: "https://example.com/scene.png",
               assetUri: "https://example.com/scene.png",
               assetStatus: "Active",
+              status: "completed",
+              imageSource: "upload",
               sizeBytes: 12
             }
           }

@@ -280,7 +280,7 @@ describe("loadCanvasResources", () => {
               {
                 id: "subtitle-video-1",
                 data: {
-                  status: "ready",
+                  status: "completed",
                   videoUrl: "https://example.com/no-subtitles.mp4"
                 }
               }
