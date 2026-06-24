@@ -1327,11 +1327,17 @@ export function App() {
           return;
         }
 
-        const normalizedAssets = normalizeSnapshotAssets(nextSnapshot);
+        // Rebuilding from the server snapshot drops local placeholders that the
+        // server doesn't know about yet (status:"generating"), so merge any
+        // in-flight generation placeholders back in to keep them visible.
+        const rebuiltAssets = normalizeSnapshotAssets(nextSnapshot);
+        const generatingPlaceholders = assetsRef.current.filter((asset) => asset.status === "generating");
+        const mergedAssets = [...rebuiltAssets, ...generatingPlaceholders];
         setCanvasSnapshot(nextSnapshot);
-        setAssets(normalizedAssets);
-        setDefaultAssetOrder(createAssetOrder(normalizedAssets));
-        persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, normalizedAssets);
+        assetsRef.current = mergedAssets;
+        setAssets(mergedAssets);
+        setDefaultAssetOrder(createAssetOrder(mergedAssets));
+        persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, mergedAssets);
         addActivityMessage(`已同步上传 ${uploadedAssets.length} 个资源`);
       } catch (error) {
         if (!mounted.current) {

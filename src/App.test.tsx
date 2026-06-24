@@ -830,6 +830,84 @@ describe("App shell", () => {
     });
   });
 
+  it("keeps in-flight generating placeholders after a local upload", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    const originalSnapshot = { snapshot: { nodes: [] } };
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: originalSnapshot,
+      assets: [
+        {
+          id: "api-image",
+          name: "小区楼道",
+          kind: "image",
+          category: "characters",
+          url: "https://example.com/image.png"
+        }
+      ]
+    });
+    // Video generation stays pending so the "生成中" placeholder remains in-flight.
+    vi.mocked(companyApiFacade.generateVideo).mockReturnValue(new Promise(() => {}));
+    // The upload returns a snapshot that does NOT contain the generating placeholder.
+    vi.mocked(companyApiFacade.uploadCanvasAsset).mockResolvedValue({
+      ok: true,
+      snapshot: {
+        snapshot: {
+          nodes: [
+            {
+              id: "uploaded-scene-node",
+              type: "image",
+              data: {
+                name: "场景-百家老宅",
+                imageUrl: "https://example.com/scene.png"
+              }
+            }
+          ]
+        }
+      },
+      asset: {
+        id: "uploaded-scene-node",
+        name: "场景-百家老宅",
+        kind: "image",
+        category: "scenes",
+        url: "https://example.com/scene.png"
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    // 1) Start a video generation that stays pending → "生成中" placeholder appears.
+    fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "镜头缓慢推进" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: generateButtonName }));
+    expect(await screen.findByText("生成中")).toBeInTheDocument();
+
+    // 2) Trigger a successful local image upload whose snapshot lacks the placeholder.
+    const file = new File(["image"], "百家老宅.png", { type: "image/png" });
+    const scenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
+    const scenesInput = scenesSection.querySelector("input") as HTMLInputElement;
+    fireEvent.change(scenesInput, { target: { files: [file] } });
+
+    expect(await screen.findByText("场景-百家老宅")).toBeInTheDocument();
+
+    // 3) The in-flight generating placeholder must survive the snapshot rebuild.
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    expect(screen.getByText("已同步上传 1 个资源")).toBeInTheDocument();
+  });
+
   it("submits real image generation for a loaded canvas and adds the returned image", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
