@@ -294,6 +294,7 @@ button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 36px;
   gap: 8px;
+  max-width: 50%;
 }
 
 .canvas-name-row input {
@@ -316,6 +317,7 @@ button {
   border-radius: 8px;
   background: #ffffff;
   padding: 10px 12px;
+  max-width: 50%;
 }
 
 .canvas-url-field input {
