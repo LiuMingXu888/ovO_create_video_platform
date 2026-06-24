@@ -28,6 +28,7 @@ import { getCategoryForAssetName } from "./lib/assetCategory";
 import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { DEFAULT_IMAGE_GENERATION_SETTINGS } from "./lib/imageGenOptions";
+import { decodeNodeIdTime } from "./lib/nodeIdTime";
 import { companyApiFacade } from "./services/companyApiFacade";
 import { SEEDANCE_MODEL_NAME } from "./api/generationClient";
 import { chooseSubtitleRemovalRoute } from "./api/subtitleClient";
@@ -186,7 +187,11 @@ function getCanvasUrlFromProject(project?: CanvasProject | null) {
 
 function getGeneratedTime(asset: CanvasAsset) {
   const timestamp = asset.createdAt ? Date.parse(asset.createdAt) : Number.NaN;
-  return Number.isFinite(timestamp) ? timestamp : null;
+  if (Number.isFinite(timestamp)) {
+    return timestamp;
+  }
+  // 画布快照节点不带 createdAt，回退到从节点 ID 解码 base36 时间戳。
+  return decodeNodeIdTime(asset.id);
 }
 
 function sortCategoryAssets(assets: CanvasAsset[], category: AssetCategory, mode: SortMode, defaultOrder: string[]) {
