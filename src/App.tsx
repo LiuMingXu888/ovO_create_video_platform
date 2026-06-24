@@ -688,7 +688,7 @@ export function App() {
     const placeholderId = createId("generated-video");
     return {
       id: placeholderId,
-      name: `生成视频 ${assets.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`,
+      name: `生成视频 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`,
       kind: "video" as const,
       category: "video" as const,
       url: "",
@@ -752,7 +752,8 @@ export function App() {
     }
 
     const placeholder = createSubtitlePlaceholder(asset);
-    const assetsWithPlaceholder = [...assets, placeholder];
+    const assetsWithPlaceholder = [...assetsRef.current, placeholder];
+    assetsRef.current = assetsWithPlaceholder;
     setAssets(assetsWithPlaceholder);
     setDefaultAssetOrder((current) => ({
       ...current,
@@ -1475,7 +1476,8 @@ export function App() {
           sizeBytes: 6_000_000,
           status: "ready"
         };
-    const assetsWithPlaceholder = [...assets, generatedAsset];
+    const assetsWithPlaceholder = [...assetsRef.current, generatedAsset];
+    assetsRef.current = assetsWithPlaceholder;
 
     setAssets(assetsWithPlaceholder);
     persistCanvasHistoryEntry(canvasUrl, canvasName, project, assetsWithPlaceholder);
@@ -1618,6 +1620,7 @@ export function App() {
     const submittedReferences = references;
     const startTime = Date.now();
     const assetsWithPlaceholder = [...assetsRef.current, placeholder];
+    assetsRef.current = assetsWithPlaceholder;
     setAssets(assetsWithPlaceholder);
     persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
     setDefaultAssetOrder((current) => ({

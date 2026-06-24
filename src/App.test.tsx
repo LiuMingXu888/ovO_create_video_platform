@@ -1449,6 +1449,45 @@ describe("App shell", () => {
     expect(screen.queryByText("去字幕中")).not.toBeInTheDocument();
   });
 
+  it("keeps both image placeholders when two image tasks are submitted back-to-back", async () => {
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+    // Both submissions stay pending so the generating placeholders remain visible.
+    vi.mocked(companyApiFacade.generateImage).mockReturnValue(new Promise(() => {}));
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    fireEvent.click(screen.getByRole("tab", { name: "图片生成" }));
+    fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
+      target: { value: "一个站立的女人" }
+    });
+
+    // Fire two submissions back-to-back within the same render cycle. The second
+    // handler reads assetsRef before React flushes the first setAssets effect, so
+    // without an immediate ref sync the second placeholder overwrites the first.
+    fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
+    fireEvent.click(screen.getByRole("button", { name: "生成图片" }));
+
+    await waitFor(() => expect(screen.getAllByText("生成中")).toHaveLength(2));
+    expect(screen.getByText("生成图片 1")).toBeInTheDocument();
+    expect(screen.getByText("生成图片 2")).toBeInTheDocument();
+  });
+
   it("shows the real generation failure reason on the failed video card", async () => {
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
