@@ -707,7 +707,7 @@ export function App() {
     const placeholderId = createId("generated-image");
     return {
       id: placeholderId,
-      name: `生成图片 ${assets.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`,
+      name: `生成图片 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`,
       kind: "image",
       category,
       url: "",
@@ -1595,7 +1595,7 @@ export function App() {
     const placeholder = createGeneratedImagePlaceholder(assetCategory);
     const submittedReferences = references;
     const startTime = Date.now();
-    const assetsWithPlaceholder = [...assets, placeholder];
+    const assetsWithPlaceholder = [...assetsRef.current, placeholder];
     setAssets(assetsWithPlaceholder);
     persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, assetsWithPlaceholder);
     setDefaultAssetOrder((current) => ({
