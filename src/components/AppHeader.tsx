@@ -1,4 +1,4 @@
-import { Coins, Download, LogOut, MousePointer2, RefreshCw, SquareCheck, Trash2, UserRound, X } from "lucide-react";
+import { Coins, Download, LogIn, LogOut, MousePointer2, RefreshCw, SquareCheck, Trash2, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
 import { getManualUpdateButtonLabel, isManualUpdateBusy, type ManualUpdateState } from "../update/manualUpdateState";
 
@@ -16,6 +16,7 @@ interface AppHeaderProps {
   onDeleteSelected?: () => void;
   onCancelSelectionMode?: () => void;
   onUpdateClick?: () => void;
+  onOpenLogin?: () => void;
   onLogout?: () => void;
 }
 
@@ -33,6 +34,7 @@ export function AppHeader({
   onDeleteSelected,
   onCancelSelectionMode,
   onUpdateClick,
+  onOpenLogin,
   onLogout
 }: AppHeaderProps) {
   const accountLabel =
@@ -117,21 +119,42 @@ export function AppHeader({
           <RefreshCw size={16} />
           <span>{getManualUpdateButtonLabel(updateState)}</span>
         </button>
-        <button type="button" className="account-button" title="账户">
-          <UserRound size={18} />
-          <span>{accountLabel}</span>
-        </button>
-        <button
-          type="button"
-          className="header-tool-button"
-          aria-label="退出登录"
-          title="退出登录"
-          onClick={onLogout}
-          disabled={authState.status === "checking"}
-        >
-          <LogOut size={16} />
-          <span>退出登录</span>
-        </button>
+        {authState.status === "authenticated" && (
+          <div className="account-button" title="账户" aria-label={`已登录 ${accountLabel}`}>
+            <UserRound size={18} />
+            <span>{accountLabel}</span>
+          </div>
+        )}
+        {authState.status === "checking" && (
+          <div className="account-button" title="账户">
+            <UserRound size={18} />
+            <span>检查中</span>
+          </div>
+        )}
+        {authState.status === "authenticated" ? (
+          <button
+            type="button"
+            className="header-tool-button"
+            aria-label="退出账户"
+            title="退出账户"
+            onClick={onLogout}
+          >
+            <LogOut size={16} />
+            <span>退出账户</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="header-tool-button"
+            aria-label="登录账号"
+            title="登录账号"
+            onClick={onOpenLogin}
+            disabled={authState.status === "checking"}
+          >
+            <LogIn size={16} />
+            <span>登录账号</span>
+          </button>
+        )}
       </div>
     </header>
   );

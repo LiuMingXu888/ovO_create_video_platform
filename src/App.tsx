@@ -1749,6 +1749,7 @@ export function App() {
         onDownloadSelected={handleDownloadSelected}
         onDeleteSelected={handleDeleteSelected}
         onUpdateClick={handleManualUpdateClick}
+        onOpenLogin={() => handleOpenLogin()}
         onLogout={handleLogout}
       />
 
