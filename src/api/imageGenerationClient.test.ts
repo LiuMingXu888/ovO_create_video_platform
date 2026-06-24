@@ -4,6 +4,7 @@ import {
   applyAspectRatioSuffix,
   buildGenerateImagePayload,
   generateImage,
+  pollGenQueueByNodeId,
   pollImageResult,
   resolveImageModelId,
   DEFAULT_IMAGE_GENERATION_POLL_OPTIONS
@@ -226,6 +227,86 @@ describe("generateImage", () => {
       { intervalMs: 0, maxAttempts: 6 }
     );
     expect(result.imageUrl).toBe("https://example.com/ok.png");
+  });
+
+  it("falls back to gen-queue polling (by nodeId) when POST hits a 504 gateway timeout", async () => {
+    let queueCalls = 0;
+    const transport = new StubTransport((path, options) => {
+      if (options?.method === "POST" && path.endsWith("/generate-image")) {
+        throw { status: 504, message: "请求失败 (504)", detail: null };
+      }
+      if (path.includes("/gen-queue")) {
+        expect(path).toContain("projectId=proj-1");
+        queueCalls += 1;
+        if (queueCalls < 2) {
+          return { stats: {}, tasks: [{ id: "t1", nodeId: "node-1", status: "running", resultUrl: null, errorMessage: null }] };
+        }
+        return {
+          stats: {},
+          tasks: [{ id: "t1", nodeId: "node-1", status: "succeeded", resultUrl: "https://example.com/duiba.png", errorMessage: null }]
+        };
+      }
+      throw new Error(`unexpected call: ${path}`);
+    });
+
+    const result = await generateImage(
+      transport,
+      { projectId: "proj-1", nodeId: "node-1", prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)" } },
+      { intervalMs: 0, maxAttempts: 5, initialDelayMs: 0 }
+    );
+
+    expect(result.imageUrl).toBe("https://example.com/duiba.png");
+    expect(queueCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  it("throws when the gen-queue task ends in failed after a 504", async () => {
+    const transport = new StubTransport((path, options) => {
+      if (options?.method === "POST" && path.endsWith("/generate-image")) {
+        throw { status: 504, message: "请求失败 (504)", detail: null };
+      }
+      if (path.includes("/gen-queue")) {
+        return {
+          stats: {},
+          tasks: [{ id: "t1", nodeId: "node-1", status: "failed", resultUrl: null, errorMessage: "内容违规" }]
+        };
+      }
+      throw new Error(`unexpected call: ${path}`);
+    });
+
+    await expect(
+      generateImage(
+        transport,
+        { projectId: "proj-1", nodeId: "node-1", prompt: "人物", settings: { ...baseSettings, model: "GPT-Image-2(兑吧)" } },
+        { intervalMs: 0, maxAttempts: 5, initialDelayMs: 0 }
+      )
+    ).rejects.toThrow("内容违规");
+  });
+});
+
+describe("pollGenQueueByNodeId", () => {
+  it("returns the resultUrl of the matching nodeId task once it succeeds", async () => {
+    let calls = 0;
+    const transport = new StubTransport((path) => {
+      if (path.includes("/gen-queue")) {
+        calls += 1;
+        const status = calls < 2 ? "running" : "succeeded";
+        return {
+          stats: {},
+          tasks: [
+            { id: "other", nodeId: "someone-else", status: "succeeded", resultUrl: "https://example.com/nope.png" },
+            { id: "mine", nodeId: "node-9", status, resultUrl: status === "succeeded" ? "https://example.com/mine.png" : null }
+          ]
+        };
+      }
+      throw new Error(`unexpected call: ${path}`);
+    });
+
+    const result = await pollGenQueueByNodeId(
+      transport,
+      { projectId: "proj-1", nodeId: "node-9" },
+      { intervalMs: 0, maxAttempts: 5, initialDelayMs: 0 }
+    );
+    expect(result.imageUrl).toBe("https://example.com/mine.png");
   });
 });
 

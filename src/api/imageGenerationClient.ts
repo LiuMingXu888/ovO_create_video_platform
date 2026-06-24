@@ -106,7 +106,16 @@ export async function generateImage(
   input: BuildGenerateImagePayloadInput,
   options: PollOptions = DEFAULT_IMAGE_GENERATION_POLL_OPTIONS
 ): Promise<GenerateImageResult> {
-  const submitResult = await requestGenerateImage(transport, input);
+  let submitResult: Awaited<ReturnType<typeof requestGenerateImage>>;
+  try {
+    submitResult = await requestGenerateImage(transport, input);
+  } catch (error) {
+    // 504：POST 撞网关超时但任务已入队 gen-queue，按 nodeId 回退轮询恢复。
+    if (isGatewayTimeoutError(error) && input.projectId && input.nodeId) {
+      return pollGenQueueByNodeId(transport, { projectId: input.projectId, nodeId: input.nodeId }, options);
+    }
+    throw error;
+  }
 
   // 同步模型(gemini / nano-banana 等)直接在 POST 响应里返回图片地址。
   const directUrl = extractImageUrl(submitResult);
@@ -150,12 +159,7 @@ async function requestGenerateImage(transport: ApiTransport, input: BuildGenerat
       throw new Error("登录态已失效，请重新登录后再试");
     }
 
-    // 部分慢同步模型(如 gpt-image-2-duiba/兑吧)服务端生成耗时超过网关 60s 上限,
-    // nginx 直接返回 504 且不返回 taskId, 客户端无法续轮询。给出可操作提示。
-    if (isGatewayTimeoutError(error)) {
-      throw new Error("该模型生成超时（服务端网关 60 秒限制，未返回任务号无法续查）。请改用 Gemini 或 GPT-Image-2 等更快的模型重试。");
-    }
-
+    // 504 不在此终止：交给 generateImage 回退到 gen-queue 轮询（任务仍在服务端跑）。
     throw error;
   }
 }
@@ -203,6 +207,66 @@ async function pollImageTaskUntilComplete(transport: ApiTransport, path: string,
     }
   }
 
+  throw new Error("任务轮询超时");
+}
+
+interface GenQueueTask {
+  id?: string;
+  nodeId?: string;
+  status?: string;
+  resultUrl?: string | null;
+  imageUrl?: string | null;
+  errorMessage?: string | null;
+}
+
+interface GenQueueResponse {
+  tasks?: GenQueueTask[];
+}
+
+// 504 回退用：duiba 等慢模型 POST 撞 nginx 60s 网关超时返回 504，但任务在服务端
+// gen-queue 里继续跑到 succeeded（providerTaskId 全程可能为 null），靠 nodeId 匹配恢复。
+export async function pollGenQueueByNodeId(
+  transport: ApiTransport,
+  input: { projectId: string; nodeId: string },
+  options: PollOptions = DEFAULT_IMAGE_GENERATION_POLL_OPTIONS
+): Promise<GenerateImageResult> {
+  if (options.initialDelayMs && options.initialDelayMs > 0) {
+    await new Promise((resolve) => window.setTimeout(resolve, options.initialDelayMs));
+  }
+  let consecutiveErrors = 0;
+  for (let attempt = 0; attempt < options.maxAttempts; attempt += 1) {
+    let task: GenQueueTask | undefined;
+    try {
+      const response = await transport.request<GenQueueResponse>(endpoints.genQueue(input.projectId));
+      consecutiveErrors = 0;
+      task = (response.tasks ?? []).find((item) => item.nodeId === input.nodeId);
+    } catch (error) {
+      if (isAuthExpiredError(error)) {
+        throw new Error("登录态已失效，请重新登录后再试");
+      }
+      consecutiveErrors += 1;
+      console.warn(`[图片生成] gen-queue 轮询出错 (${consecutiveErrors}/5)`, error instanceof Error ? error.message : error);
+      if (consecutiveErrors >= 5) {
+        throw new Error("图片生成查询连续失败，请重试");
+      }
+    }
+
+    if (task) {
+      console.log("[图片生成] gen-queue 轮询", { attempt: attempt + 1, nodeId: input.nodeId, status: task.status ?? "pending" });
+      if (task.status === "failed") {
+        throw new Error(task.errorMessage ?? "图片生成失败");
+      }
+      const url = stringValue(task.resultUrl ?? undefined) ?? stringValue(task.imageUrl ?? undefined);
+      if (url) {
+        return { taskId: task.id ?? input.nodeId, imageUrl: url };
+      }
+    }
+    // task 暂时不在队列（入队延迟）或仍 running：继续轮询。
+
+    if (options.intervalMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, options.intervalMs));
+    }
+  }
   throw new Error("任务轮询超时");
 }
 
