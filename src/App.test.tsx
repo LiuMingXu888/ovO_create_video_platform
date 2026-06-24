@@ -1652,6 +1652,48 @@ describe("App shell", () => {
     });
   });
 
+  it("batch-deletes selected real canvas assets serially and threads the snapshot", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: {
+        projectId: "cmq6fwhft0bg5m2l5u78zby8x",
+        canvasUrl: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x",
+        title: "接口项目",
+        loadedAt: "2026-06-15T00:00:00.000Z"
+      },
+      snapshot: {
+        snapshot: {
+          nodes: [
+            { id: "node-a", type: "image", data: { name: "图A", imageUrl: "https://example.com/a.png" } },
+            { id: "node-b", type: "image", data: { name: "图B", imageUrl: "https://example.com/b.png" } }
+          ]
+        }
+      },
+      assets: [
+        { id: "node-a", name: "图A", kind: "image", category: "characters", url: "https://example.com/a.png" },
+        { id: "node-b", name: "图B", kind: "image", category: "characters", url: "https://example.com/b.png" }
+      ]
+    });
+    vi.mocked(companyApiFacade.deleteCanvasAsset)
+      .mockResolvedValueOnce({ ok: true, snapshot: { snapshot: { nodes: [{ id: "node-b" }] } } })
+      .mockResolvedValueOnce({ ok: true, snapshot: { snapshot: { nodes: [] } } });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    await screen.findByText("图A");
+
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("button", { name: "全选" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除选中 2" }));
+
+    expect(await screen.findByText("已删除 2 个资源")).toBeInTheDocument();
+    expect(companyApiFacade.deleteCanvasAsset).toHaveBeenCalledTimes(2);
+    // 第二次删除接力的是第一次返回的快照（只剩 node-b），证明 snapshot 串行接力。
+    expect(vi.mocked(companyApiFacade.deleteCanvasAsset).mock.calls[1][0].snapshot).toEqual({
+      snapshot: { nodes: [{ id: "node-b" }] }
+    });
+  });
+
   it("syncs renamed real canvas assets through the company API facade", async () => {
     vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
       project: {
@@ -2221,7 +2263,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "多选下载" }));
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择资源 小区楼道" }));
     fireEvent.click(screen.getByRole("button", { name: "下载选中 1" }));
 
@@ -2250,7 +2292,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "多选下载" }));
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     expect(screen.getByRole("button", { name: "全选" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "全选" }));

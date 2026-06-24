@@ -1,4 +1,4 @@
-import { Coins, Download, LogOut, MousePointer2, RefreshCw, SquareCheck, UserRound, X } from "lucide-react";
+import { Coins, Download, LogOut, MousePointer2, RefreshCw, SquareCheck, Trash2, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
 import { getManualUpdateButtonLabel, isManualUpdateBusy, type ManualUpdateState } from "../update/manualUpdateState";
 
@@ -13,6 +13,7 @@ interface AppHeaderProps {
   onToggleSelectionMode?: () => void;
   onSelectAllAssets?: () => void;
   onDownloadSelected?: () => void;
+  onDeleteSelected?: () => void;
   onCancelSelectionMode?: () => void;
   onUpdateClick?: () => void;
   onLogout?: () => void;
@@ -29,6 +30,7 @@ export function AppHeader({
   onToggleSelectionMode,
   onSelectAllAssets,
   onDownloadSelected,
+  onDeleteSelected,
   onCancelSelectionMode,
   onUpdateClick,
   onLogout
@@ -79,15 +81,25 @@ export function AppHeader({
               <Download size={16} />
               <span>下载选中 {selectedCount}</span>
             </button>
+            <button
+              type="button"
+              className="header-tool-button"
+              aria-label={`删除选中 ${selectedCount}`}
+              onClick={onDeleteSelected}
+              disabled={selectedCount === 0}
+            >
+              <Trash2 size={16} />
+              <span>删除选中 {selectedCount}</span>
+            </button>
             <button type="button" className="header-tool-button" aria-label="取消多选" onClick={onCancelSelectionMode}>
               <X size={16} />
               <span>取消</span>
             </button>
           </>
         ) : (
-          <button type="button" className="header-tool-button" aria-label="多选下载" onClick={onToggleSelectionMode}>
+          <button type="button" className="header-tool-button" aria-label="多选" onClick={onToggleSelectionMode}>
             <MousePointer2 size={16} />
-            <span>多选下载</span>
+            <span>多选</span>
           </button>
         )}
         <div className="credit-pill" title="剩余积分" aria-label={`剩余积分 ${creditLabel}`}>

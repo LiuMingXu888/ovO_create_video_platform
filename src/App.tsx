@@ -881,59 +881,81 @@ export function App() {
     }
   }
 
+  async function deleteAssetCore(asset: CanvasAsset, workingSnapshot: unknown): Promise<unknown> {
+    // 接收当前工作快照、返回删除后的新快照，批量串行删除时把上一次的快照接力给
+    // 下一次，避免各自读到同一份陈旧 canvasSnapshot 导致只有最后一个节点真正落库。
+    const removeFromOrder = (current: Record<AssetCategory, string[]>) =>
+      sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
+        (order, section) => {
+          order[section.id] = current[section.id].filter((id) => id !== asset.id);
+          return order;
+        },
+        { characters: [], scenes: [], props: [], audio: [], video: [] }
+      );
+
+    if (!project || !workingSnapshot) {
+      setAssets((current) => {
+        const nextAssets = current.filter((item) => item.id !== asset.id);
+        persistCanvasHistoryEntry(canvasUrl, canvasName, project, nextAssets);
+        return nextAssets;
+      });
+      setDefaultAssetOrder(removeFromOrder);
+      return workingSnapshot;
+    }
+
+    const result = await companyApiFacade.deleteCanvasAsset({
+      projectId: project.projectId,
+      snapshot: workingSnapshot,
+      assetId: asset.id
+    });
+    setCanvasSnapshot(result.snapshot);
+    setAssets((current) => {
+      const nextAssets = current.filter((item) => item.id !== asset.id);
+      persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, nextAssets);
+      return nextAssets;
+    });
+    setDefaultAssetOrder(removeFromOrder);
+    return result.snapshot;
+  }
+
   async function handleDeleteAsset(asset: CanvasAsset) {
     const confirmed = window.confirm(`确定要删除「${asset.name}」吗？`);
     if (!confirmed) {
       return;
     }
 
-    if (!project || !canvasSnapshot) {
-      setAssets((current) => {
-        const nextAssets = current.filter((item) => item.id !== asset.id);
-        persistCanvasHistoryEntry(canvasUrl, canvasName, project, nextAssets);
-        return nextAssets;
-      });
-      setDefaultAssetOrder((current) => {
-        const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
-          (order, section) => {
-            order[section.id] = current[section.id].filter((id) => id !== asset.id);
-            return order;
-          },
-          { characters: [], scenes: [], props: [], audio: [], video: [] }
-        );
-
-        return nextOrder;
-      });
-      return;
-    }
-
     try {
-      const result = await companyApiFacade.deleteCanvasAsset({
-        projectId: project.projectId,
-        snapshot: canvasSnapshot,
-        assetId: asset.id
-      });
-      setCanvasSnapshot(result.snapshot);
-      setAssets((current) => {
-        const nextAssets = current.filter((item) => item.id !== asset.id);
-        persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, nextAssets);
-        return nextAssets;
-      });
-      setDefaultAssetOrder((current) => {
-        const nextOrder = sectionDefinitions.reduce<Record<AssetCategory, string[]>>(
-          (order, section) => {
-            order[section.id] = current[section.id].filter((id) => id !== asset.id);
-            return order;
-          },
-          { characters: [], scenes: [], props: [], audio: [], video: [] }
-        );
-
-        return nextOrder;
-      });
+      await deleteAssetCore(asset, canvasSnapshot);
       addActivityMessage(`已删除「${asset.name}」`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "删除同步失败");
     }
+  }
+
+  async function handleDeleteSelected() {
+    const selectedAssets = assetsRef.current.filter((asset) => selectedAssetIds.has(asset.id));
+    if (selectedAssets.length === 0) {
+      return;
+    }
+    const confirmed = window.confirm(`确定要删除选中的 ${selectedAssets.length} 个资源吗？`);
+    if (!confirmed) {
+      return;
+    }
+    let ok = 0;
+    let failed = 0;
+    let workingSnapshot = canvasSnapshot;
+    // 串行删除并接力快照，避免并发 PUT 互相覆盖。
+    for (const asset of selectedAssets) {
+      try {
+        workingSnapshot = await deleteAssetCore(asset, workingSnapshot);
+        ok += 1;
+      } catch (error) {
+        failed += 1;
+        console.error("[批量删除] 失败:", asset.id, error);
+      }
+    }
+    addActivityMessage(failed === 0 ? `已删除 ${ok} 个资源` : `已删除 ${ok} 个，${failed} 个失败`);
+    cancelSelectionMode();
   }
 
   async function togglePlayback(asset: CanvasAsset) {
@@ -1739,6 +1761,7 @@ export function App() {
         onSelectAllAssets={selectAllAssets}
         onCancelSelectionMode={cancelSelectionMode}
         onDownloadSelected={handleDownloadSelected}
+        onDeleteSelected={handleDeleteSelected}
         onUpdateClick={handleManualUpdateClick}
         onLogout={handleLogout}
       />
