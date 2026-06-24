@@ -35,9 +35,17 @@ export function applyCameraSuffix(prompt: string, camera: string) {
   return suffix ? `${prompt}${suffix}` : prompt;
 }
 
+export function applyAspectRatioSuffix(prompt: string, aspectRatio: string) {
+  if (!aspectRatio) {
+    return prompt;
+  }
+  return `${prompt}，生成的比例为 ${aspectRatio}`;
+}
+
 export function buildGenerateImagePayload(input: BuildGenerateImagePayloadInput) {
   const modelId = resolveImageModelId(input.settings.model);
-  const prompt = applyCameraSuffix(input.prompt, input.settings.camera);
+  const withCamera = applyCameraSuffix(input.prompt, input.settings.camera);
+  const prompt = applyAspectRatioSuffix(withCamera, input.settings.aspectRatio);
 
   const payload: Record<string, unknown> = {
     prompt,

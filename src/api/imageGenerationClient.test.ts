@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCameraSuffix,
+  applyAspectRatioSuffix,
   buildGenerateImagePayload,
   generateImage,
   pollImageResult,
@@ -55,7 +56,38 @@ describe("buildGenerateImagePayload", () => {
 
   it("appends the camera preset phrase to the prompt", () => {
     const payload = buildGenerateImagePayload({ prompt: "一个女人", settings: { ...baseSettings, camera: "Sony FX3" } });
-    expect(payload.prompt).toBe(`一个女人${IMAGE_CAMERA_PROMPT_SUFFIX["Sony FX3"]}`);
+    expect(payload.prompt).toBe(
+      `一个女人${IMAGE_CAMERA_PROMPT_SUFFIX["Sony FX3"]}，生成的比例为 ${baseSettings.aspectRatio}`
+    );
+  });
+
+  it("appends the aspect-ratio phrase to the sent prompt", () => {
+    const payload = buildGenerateImagePayload({
+      prompt: "一个女人",
+      settings: { ...baseSettings, aspectRatio: "9:16", camera: "暂不选择" }
+    });
+    expect(payload.prompt).toBe("一个女人，生成的比例为 9:16");
+    expect(payload.aspectRatio).toBe("9:16"); // 字段仍照常发送
+  });
+
+  it("appends ratio AFTER the camera suffix, in order", () => {
+    const payload = buildGenerateImagePayload({
+      prompt: "一个女人",
+      settings: { ...baseSettings, aspectRatio: "1:1", camera: "Sony FX3" }
+    });
+    expect(payload.prompt).toBe(
+      `一个女人${IMAGE_CAMERA_PROMPT_SUFFIX["Sony FX3"]}，生成的比例为 1:1`
+    );
+  });
+
+  it("keeps _meta.label based on the original prompt (not polluted by suffixes)", () => {
+    const payload = buildGenerateImagePayload({
+      projectId: "p1",
+      nodeId: "n1",
+      prompt: "海边日落",
+      settings: { ...baseSettings, aspectRatio: "16:9", camera: "Sony FX3" }
+    });
+    expect((payload._meta as { label: string }).label).toBe("海边日落");
   });
 
   it("leaves the prompt unchanged for 暂不选择", () => {
