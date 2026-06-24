@@ -624,13 +624,18 @@ export async function saveAssetsToDownloads(input: SaveAssetsInput) {
   }
 }
 
-export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
+export async function openCanvasWindow(
+  canvasUrl = TARGET_CANVAS_URL,
+  mode: "plain" | "devtools" | "capture" = "capture"
+): Promise<InspectCanvasResult> {
   const paths = getStoragePaths();
   const initialUrl = normalizeCompanyWindowUrl(canvasUrl);
+  const windowTitle =
+    mode === "capture" ? "ovO 接口诊断" : mode === "devtools" ? "公司画布 (DevTools)" : "公司画布";
   const inspectWindow = new BrowserWindow({
     width: 1400,
     height: 950,
-    title: "ovO 接口诊断",
+    title: windowTitle,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -669,7 +674,7 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
       return;
     }
     autoReloadCount += 1;
-    console.warn(`[接口诊断] ${reason}，自动重新加载 (第 ${autoReloadCount} 次)`);
+    console.warn(`[公司画布] ${reason}，自动重新加载 (第 ${autoReloadCount} 次)`);
     void inspectView.webContents.loadURL(initialUrl).catch(() => undefined);
   }
 
@@ -690,13 +695,11 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   inspectWindow.on("unmaximize", resizeInspectView);
   resizeInspectView();
 
-  // Attach the CDP-based capture now that the page's webContents exists. This
-  // records full request AND response bodies. The debugger is mutually exclusive
-  // with an open DevTools window on the same page, so we don't auto-open DevTools
-  // here — capturing the responses is the purpose of this window.
-  const apiCapture = await attachApiCapture(inspectView.webContents);
+  // capture 与 DevTools 在同一 webContents 上互斥:只有 capture 模式挂 CDP,
+  // 只有 devtools 模式开 DevTools,plain 模式两者都不做。
+  const apiCapture = mode === "capture" ? await attachApiCapture(inspectView.webContents) : null;
   inspectWindow.on("closed", () => {
-    apiCapture.detach();
+    apiCapture?.detach();
   });
 
   try {
@@ -704,21 +707,34 @@ export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<Insp
   } catch (error) {
     // Initial load rejected (network blip / aborted). Retry once before giving
     // up so a transient failure doesn't surface as an empty diagnosis window.
-    console.warn("[接口诊断] 首次加载失败，重试一次：", error);
+    console.warn("[公司画布] 首次加载失败，重试一次：", error);
     if (!inspectView.webContents.isDestroyed()) {
       await inspectView.webContents.loadURL(initialUrl).catch(() => undefined);
     }
   }
+
+  if (mode === "devtools") {
+    inspectView.webContents.openDevTools({ mode: "detach" });
+  }
+
+  if (mode !== "capture") {
+    return { ok: true };
+  }
+
   await waitForNetworkCapture();
 
-  const summaries = apiCapture.getSummaries();
+  const summaries = apiCapture!.getSummaries();
 
   return {
     ok: true,
     summaries,
     sanitizedMapPath: paths.sanitizedApiMapPath,
-    rawCapturePath: apiCapture.rawCapturePath
+    rawCapturePath: apiCapture!.rawCapturePath
   };
+}
+
+export async function inspectCanvas(canvasUrl = TARGET_CANVAS_URL): Promise<InspectCanvasResult> {
+  return openCanvasWindow(canvasUrl, "capture");
 }
 
 function isCompanyApiUrl(value: string) {

@@ -5,6 +5,7 @@ import {
   checkSession,
   clearSession,
   inspectCanvas,
+  openCanvasWindow,
   openLoginWindow,
   requestCompanyApi,
   saveAssetToDownloads,
@@ -56,6 +57,9 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:auth:check-session", () => checkSession());
   ipcMain.handle("ovo:auth:clear-session", () => clearSession());
   ipcMain.handle("ovo:discovery:inspect-canvas", (_event, canvasUrl: string) => inspectCanvas(canvasUrl));
+  ipcMain.handle("ovo:canvas:open", (_event, canvasUrl: string, mode: "plain" | "devtools" | "capture") =>
+    openCanvasWindow(canvasUrl, mode)
+  );
   ipcMain.handle("ovo:company-api:request", (_event, pathname: string, options) => requestCompanyApi(pathname, options));
   ipcMain.handle("ovo:company-api:upload-file", (_event, pathname: string, input) => uploadCompanyFile(pathname, input));
   ipcMain.handle("ovo:file:save-asset", (_event, input: { url: string; fileName: string }) => saveAssetToDownloads(input));

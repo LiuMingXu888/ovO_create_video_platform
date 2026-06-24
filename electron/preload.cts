@@ -28,7 +28,9 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
     clearSession: () => ipcRenderer.invoke("ovo:auth:clear-session")
   },
   discovery: {
-    inspectCanvas: (canvasUrl: string) => ipcRenderer.invoke("ovo:discovery:inspect-canvas", canvasUrl)
+    inspectCanvas: (canvasUrl: string) => ipcRenderer.invoke("ovo:discovery:inspect-canvas", canvasUrl),
+    openCanvas: (canvasUrl: string, mode: "plain" | "devtools" | "capture") =>
+      ipcRenderer.invoke("ovo:canvas:open", canvasUrl, mode)
   },
   api: {
     request: (

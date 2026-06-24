@@ -2444,7 +2444,8 @@ describe("App shell", () => {
         clearSession: vi.fn()
       },
       discovery: {
-        inspectCanvas: vi.fn()
+        inspectCanvas: vi.fn(),
+        openCanvas: vi.fn()
       },
       api: {
         request: vi.fn(),
@@ -2494,7 +2495,8 @@ describe("App shell", () => {
         clearSession: vi.fn()
       },
       discovery: {
-        inspectCanvas: vi.fn()
+        inspectCanvas: vi.fn(),
+        openCanvas: vi.fn()
       },
       api: {
         request: vi.fn(),
@@ -2531,7 +2533,8 @@ describe("App shell", () => {
         clearSession: vi.fn()
       },
       discovery: {
-        inspectCanvas: vi.fn()
+        inspectCanvas: vi.fn(),
+        openCanvas: vi.fn()
       },
       api: {
         request: vi.fn(),
@@ -2583,7 +2586,8 @@ describe("App shell", () => {
         clearSession: vi.fn()
       },
       discovery: {
-        inspectCanvas: vi.fn()
+        inspectCanvas: vi.fn(),
+        openCanvas: vi.fn()
       },
       api: {
         request: vi.fn(),

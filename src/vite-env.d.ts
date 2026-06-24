@@ -74,6 +74,16 @@ interface Window {
         sanitizedMapPath?: string;
         rawCapturePath?: string;
       }>;
+      openCanvas: (
+        canvasUrl: string,
+        mode: "plain" | "devtools" | "capture"
+      ) => Promise<{
+        ok: boolean;
+        message?: string;
+        summaries?: unknown[];
+        sanitizedMapPath?: string;
+        rawCapturePath?: string;
+      }>;
     };
     api: {
       request: (
