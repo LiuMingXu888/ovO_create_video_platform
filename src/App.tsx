@@ -584,6 +584,22 @@ export function App() {
     }
   }
 
+  async function handleOpenCompanyCanvas(mode: "plain" | "devtools" | "capture") {
+    const targetUrl = getCanvasUrlFromProject(project) || canvasUrl || "http://qijing.kjjhz.cn/projects";
+    try {
+      const result = await companyApiFacade.openCanvas(targetUrl, mode);
+      if (mode === "capture") {
+        addActivityMessage(`已打开公司画布(API Fetch)并捕获 ${result.summaries?.length ?? 0} 个请求`);
+      } else if (mode === "devtools") {
+        addActivityMessage("已打开公司画布(DevTools)");
+      } else {
+        addActivityMessage("已打开公司画布");
+      }
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "打开公司画布失败");
+    }
+  }
+
   async function handleLogout() {
     setAuthState({ status: "checking" });
     const nextState = await companyApiFacade.logout();

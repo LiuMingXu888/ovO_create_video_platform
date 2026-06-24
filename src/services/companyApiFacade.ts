@@ -117,6 +117,18 @@ export const companyApiFacade = {
     }
 
     return result;
+  },
+  openCanvas: async (canvasUrl: string, mode: "plain" | "devtools" | "capture") => {
+    if (!window.ovoDesktop) {
+      throw new Error("请在 Electron 桌面端打开公司画布");
+    }
+
+    const result = await window.ovoDesktop.discovery.openCanvas(canvasUrl, mode);
+    if (!result.ok) {
+      throw new Error(result.message ?? "打开公司画布失败");
+    }
+
+    return result;
   }
 };
 
