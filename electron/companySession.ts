@@ -189,11 +189,15 @@ async function attachApiCapture(webContents: Electron.WebContents): Promise<ApiC
 
   if (attached) {
     webContents.debugger.on("message", messageListener);
-    try {
-      await webContents.debugger.sendCommand("Network.enable");
-    } catch (error) {
-      console.warn("[接口诊断] 启用 Network 域失败：", error);
-    }
+    // Fire-and-forget: do NOT await this. The caller invokes attachApiCapture
+    // BEFORE loadURL, and at that point the BrowserView's renderer process may
+    // not exist yet, so awaiting Network.enable can hang indefinitely and block
+    // the subsequent loadURL — leaving the whole window (toolbar + page) blank.
+    // CDP still captures every request once enable resolves, which happens long
+    // before the SPA fires its /api calls.
+    webContents.debugger
+      .sendCommand("Network.enable")
+      .catch((error) => console.warn("[接口诊断] 启用 Network 域失败：", error));
   }
 
   async function persistCurrentCaptures() {
