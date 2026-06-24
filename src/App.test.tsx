@@ -106,7 +106,7 @@ describe("App shell", () => {
 
     expect(screen.getByLabelText("ovO")).toBeInTheDocument();
     expect(screen.getByText("未命名项目")).toBeInTheDocument();
-    expect(screen.getByText("未登录")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登录账号" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "人物" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "场景" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "道具" })).toBeInTheDocument();
@@ -448,6 +448,7 @@ describe("App shell", () => {
   });
 
   it("checks auth state from the company API facade", async () => {
+    window.ovoDesktop = { version: "test" } as unknown as Window["ovoDesktop"];
     vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
       status: "authenticated",
       user: { account: "23176", creditBalance: 23136 }
@@ -455,11 +456,10 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "检查登录态" }));
-
-    expect(await screen.findByText("已登录：23176")).toBeInTheDocument();
-    expect(screen.getByText("23176")).toBeInTheDocument();
+    // 新契约: 鉴权在挂载时由 useEffect 自动触发, 不再有"检查登录态"手动按钮。
+    expect(await screen.findByText("23176")).toBeInTheDocument();
     expect(screen.getByLabelText("剩余积分 23,136")).toBeInTheDocument();
+    expect(companyApiFacade.checkAuth).toHaveBeenCalled();
   });
 
   it("opens the company login window and applies the returned auth state", async () => {
@@ -474,9 +474,9 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "登录公司账号" }));
+    fireEvent.click(screen.getByRole("button", { name: "登录账号" }));
 
-    expect(await screen.findByText("已登录：23176")).toBeInTheDocument();
+    expect(await screen.findByText("23176")).toBeInTheDocument();
     expect(screen.getByLabelText("剩余积分 23,136")).toBeInTheDocument();
     expect(companyApiFacade.openLogin).toHaveBeenCalledTimes(1);
   });
@@ -636,7 +636,7 @@ describe("App shell", () => {
     render(<App />);
 
     expect(screen.queryByRole("button", { name: "接口诊断" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "登录公司账号" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登录账号" })).toBeInTheDocument();
   });
 
   it("hides the company canvas creation entry while keeping local canvas creation available", async () => {
@@ -648,6 +648,11 @@ describe("App shell", () => {
   });
 
   it("logs out and clears loaded company canvas state", async () => {
+    window.ovoDesktop = { version: "test" } as unknown as Window["ovoDesktop"];
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({
+      status: "authenticated",
+      user: { account: "23176", creditBalance: 23136 }
+    });
     vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
       project: {
         projectId: "cmq6fwhft0bg5m2l5u78zby8x",
@@ -675,7 +680,7 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
     await screen.findByText("人物-接口图片");
-    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
+    fireEvent.click(screen.getByRole("button", { name: "退出账户" }));
 
     await waitFor(() => expect(companyApiFacade.logout).toHaveBeenCalledTimes(1));
     expect(screen.queryByText("人物-接口图片")).not.toBeInTheDocument();
@@ -2432,7 +2437,7 @@ describe("App shell", () => {
     window.ovoDesktop = {
       version: "0.1.0",
       updater: {
-        getCurrentVersion: vi.fn(async () => "0.1.7"),
+        getCurrentVersion: vi.fn(async () => "0.1.11"),
         checkForUpdates: vi.fn(),
         downloadUpdate: vi.fn(),
         installUpdate: vi.fn(),
@@ -2458,10 +2463,10 @@ describe("App shell", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("v0.1.7")).toBeInTheDocument();
+    expect(await screen.findByText("v0.1.11")).toBeInTheDocument();
     const headerText = document.querySelector(".header-actions")?.textContent ?? "";
     expect(headerText.indexOf("--")).toBeLessThan(headerText.indexOf("更新版本"));
-    expect(headerText.indexOf("更新版本")).toBeLessThan(headerText.indexOf("未登录"));
+    expect(headerText.indexOf("更新版本")).toBeLessThan(headerText.indexOf("登录账号"));
   });
 
   it("checks Gitee updates manually and switches to download state", async () => {
