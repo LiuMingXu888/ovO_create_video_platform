@@ -550,40 +550,6 @@ export function App() {
     setCanvasError(undefined);
   }
 
-  async function createCompanyCanvasSession() {
-    setCanvasLoading(true);
-    setCanvasError(undefined);
-
-    try {
-      const nextProject = await companyApiFacade.createCompanyCanvas();
-      setCanvasUrl(nextProject.canvasUrl);
-      setCanvasName(nextProject.title ?? "未命名画布");
-      setProject(nextProject);
-      setCanvasSnapshot(null);
-      setAssets([]);
-      setDefaultAssetOrder(createAssetOrder([]));
-      setCanvasHistory((current) =>
-        upsertCanvasHistoryEntry(current, {
-          url: nextProject.canvasUrl,
-          project: nextProject,
-          name: nextProject.title ?? "未命名画布",
-          layout: createCanvasAssetLayout([])
-        })
-      );
-      addActivityMessage("已新建公司画布");
-      await loadCanvasFromUrl(nextProject.canvasUrl);
-    } catch (error) {
-      try {
-        const result = await companyApiFacade.inspectCanvas("http://qijing.kjjhz.cn/projects");
-        addActivityMessage(`已打开公司新建流程并捕获 ${result.summaries?.length ?? 0} 个请求，请在内置浏览器完成新建后复制画布地址`);
-      } catch {
-        setCanvasError(error instanceof Error ? error.message : "新建公司画布失败");
-      }
-    } finally {
-      setCanvasLoading(false);
-    }
-  }
-
   async function handleOpenCompanyCanvas(mode: "plain" | "devtools" | "capture") {
     const targetUrl = getCanvasUrlFromProject(project) || canvasUrl || "http://qijing.kjjhz.cn/projects";
     try {
@@ -1026,11 +992,6 @@ export function App() {
       element.pause();
     }
     setPlayingAssetId((current) => (current === assetId ? null : current));
-  }
-
-  async function handleCheckAuth() {
-    setAuthState({ status: "checking" });
-    await refreshAuthState();
   }
 
   async function handleOpenLogin(targetUrl?: string) {
@@ -1810,9 +1771,7 @@ export function App() {
         onSelectCanvasHistory={selectCanvasHistory}
         onDeleteCanvasHistory={deleteCanvasHistory}
         onNewCanvas={createNewCanvasSession}
-        onCreateCompanyCanvas={createCompanyCanvasSession}
-        onOpenLogin={handleOpenLogin}
-        onCheckAuth={handleCheckAuth}
+        onOpenCompanyCanvas={handleOpenCompanyCanvas}
         onLoadCanvas={handleLoadCanvas}
       />
 

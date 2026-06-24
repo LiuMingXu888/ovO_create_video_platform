@@ -1,4 +1,4 @@
-import { Check, Link, Loader2, LogIn, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Check, ExternalLink, Link, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { CanvasHistoryEntry } from "../lib/canvasHistory";
 import type { AuthState } from "../types";
 
@@ -15,9 +15,7 @@ interface CanvasControlsProps {
   onSelectCanvasHistory: (entry: CanvasHistoryEntry) => void;
   onDeleteCanvasHistory: (entry: CanvasHistoryEntry) => void;
   onNewCanvas: () => void;
-  onCreateCompanyCanvas: () => void;
-  onOpenLogin: (canvasUrl?: string) => void;
-  onCheckAuth: () => void;
+  onOpenCompanyCanvas: (mode: "plain" | "devtools" | "capture") => void;
   onLoadCanvas: () => void;
 }
 
@@ -34,9 +32,7 @@ export function CanvasControls({
   onSelectCanvasHistory,
   onDeleteCanvasHistory,
   onNewCanvas,
-  onCreateCompanyCanvas,
-  onOpenLogin,
-  onCheckAuth,
+  onOpenCompanyCanvas,
   onLoadCanvas
 }: CanvasControlsProps) {
   const authLabel =
@@ -104,18 +100,29 @@ export function CanvasControls({
         </div>
 
         <div className="canvas-control-actions">
-          <button type="button" className="secondary-button" onClick={() => onOpenLogin()} disabled={loading || authState.status === "checking"}>
-            {authState.status === "checking" ? <Loader2 size={16} /> : <LogIn size={16} />}
-            <span>登录公司账号</span>
-          </button>
-          <button type="button" className="secondary-button" onClick={onCheckAuth} disabled={loading}>
-            {authState.status === "checking" ? <Loader2 size={16} /> : <LogIn size={16} />}
-            <span>检查登录态</span>
-          </button>
-          <button type="button" className="primary-button" onClick={onLoadCanvas} disabled={loading}>
-            {loading ? <Loader2 size={16} /> : <RefreshCw size={16} />}
-            <span>加载画布资源</span>
-          </button>
+          {(() => {
+            const canOpen = authState.status === "authenticated" && !loading;
+            return (
+              <>
+                <button type="button" className="secondary-button" onClick={() => onOpenCompanyCanvas("plain")} disabled={!canOpen}>
+                  <ExternalLink size={16} />
+                  <span>Open公司画布</span>
+                </button>
+                <button type="button" className="secondary-button" onClick={() => onOpenCompanyCanvas("devtools")} disabled={!canOpen}>
+                  <ExternalLink size={16} />
+                  <span>Open公司画布(DevTools)</span>
+                </button>
+                <button type="button" className="secondary-button" onClick={() => onOpenCompanyCanvas("capture")} disabled={!canOpen}>
+                  <ExternalLink size={16} />
+                  <span>Open公司画布(API Fetch)</span>
+                </button>
+                <button type="button" className="primary-button" onClick={onLoadCanvas} disabled={loading}>
+                  {loading ? <Loader2 size={16} /> : <RefreshCw size={16} />}
+                  <span>加载画布资源</span>
+                </button>
+              </>
+            );
+          })()}
         </div>
 
         <div className="canvas-status-line">{loading ? "正在连接公司接口" : authLabel}</div>
