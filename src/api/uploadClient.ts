@@ -42,7 +42,7 @@ type CompanyNode = {
 // 的真实 measured 预填,使 app 写入的节点首次加载即可显示。
 const MEASURED_BY_KIND: Record<AssetKind, { width: number; height: number }> = {
   image: { width: 288, height: 162 },
-  video: { width: 320, height: 587 },
+  video: { width: 320, height: 588 },
   audio: { width: 224, height: 122 }
 };
 
@@ -173,7 +173,12 @@ export function createCompanyAudioNode(asset: CanvasAsset): CompanyNode {
   return baseNode(asset, {
     audioUrl: asset.url,
     duration: asset.durationSeconds,
-    durationSeconds: asset.durationSeconds
+    durationSeconds: asset.durationSeconds,
+    isCustomUpload: true,
+    voicePresetId: null,
+    voiceName: null,
+    gender: null,
+    ageGroup: null
   });
 }
 
@@ -187,7 +192,7 @@ export function createCompanyVideoNode(asset: CanvasAsset & { providerVideoUrl?:
     resolution: "720p",
     generateAudio: true,
     genTab: "allref",
-    model: "ep-20260319213857-htd7q",
+    model: "Seedance 2.0",
     modelName: "Seedance 2.0",
     aspectRatio: "9:16",
     generationPrompt: asset.generationPrompt,
@@ -257,10 +262,14 @@ function matchesAssetNode(value: unknown, assetId: string) {
 
 function baseNode(asset: CanvasAsset, fields: Record<string, unknown>): CompanyNode {
   const isImage = asset.kind === "image";
-  // 渲染由 measured 决定，与 status 无关；但 status 仍要贴合画布枚举。
-  // 已完成/上传(ready 或无 status)→ completed（公司端完成节点用的值）；
-  // 进行中/失败的占位保留自身 status，避免把生成中的节点误标成已完成。
-  const status = !asset.status || asset.status === "ready" ? "completed" : asset.status;
+  // 完成态(ready/无 status)的渲染状态按公司端原生枚举区分:image→completed,
+  // audio/video→idle(公司端完成态用 idle);进行中/失败保留自身,避免误标完成。
+  const completedStatusByKind: Record<AssetKind, string> = {
+    image: "completed",
+    audio: "idle",
+    video: "idle"
+  };
+  const status = !asset.status || asset.status === "ready" ? completedStatusByKind[asset.kind] : asset.status;
   return {
     id: asset.id,
     type: asset.kind,

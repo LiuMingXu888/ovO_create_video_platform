@@ -105,9 +105,14 @@ describe("uploadClient payload builders", () => {
         audioUrl: "https://example.com/audio.mp3",
         assetUri: "https://example.com/audio.mp3",
         assetStatus: "Active",
-        status: "completed",
+        status: "idle",
         duration: 8,
         durationSeconds: 8,
+        isCustomUpload: true,
+        voicePresetId: null,
+        voiceName: null,
+        gender: null,
+        ageGroup: null,
         sizeBytes: 12
       }
     });
@@ -133,7 +138,7 @@ describe("uploadClient payload builders", () => {
       x: 0,
       y: 0,
       position: { x: 0, y: 0 },
-      measured: { width: 320, height: 587 },
+      measured: { width: 320, height: 588 },
       data: {
         id: "asset-video",
         assetId: "asset-video",
@@ -146,14 +151,14 @@ describe("uploadClient payload builders", () => {
         seedanceProviderUrl: "https://provider.example.com/video.mp4",
         assetUri: "https://example.com/video.mp4",
         assetStatus: "Active",
-        status: "completed",
+        status: "idle",
         videoPersisted: true,
         duration: 15,
         durationSeconds: 15,
         resolution: "720p",
         generateAudio: true,
         genTab: "allref",
-        model: "ep-20260319213857-htd7q",
+        model: "Seedance 2.0",
         modelName: "Seedance 2.0",
         aspectRatio: "9:16",
         sizeBytes: 12,
@@ -199,7 +204,12 @@ describe("uploadClient payload builders", () => {
               audioUrl: "https://example.com/audio.mp3",
               assetUri: "https://example.com/audio.mp3",
               assetStatus: "Active",
-              status: "completed",
+              status: "idle",
+              isCustomUpload: true,
+              voicePresetId: null,
+              voiceName: null,
+              gender: null,
+              ageGroup: null,
               sizeBytes: 12
             }
           }
@@ -229,7 +239,7 @@ describe("uploadClient payload builders", () => {
             x: 0,
             y: 0,
             position: { x: 0, y: 0 },
-            measured: { width: 320, height: 587 },
+            measured: { width: 320, height: 588 },
               data: {
                 id: "asset-video",
                 assetId: "asset-video",
@@ -241,12 +251,12 @@ describe("uploadClient payload builders", () => {
                 videoUrl: "https://example.com/video.mp4",
                 assetUri: "https://example.com/video.mp4",
                 assetStatus: "Active",
-                status: "completed",
+                status: "idle",
                 videoPersisted: true,
                 resolution: "720p",
                 generateAudio: true,
                 genTab: "allref",
-                model: "ep-20260319213857-htd7q",
+                model: "Seedance 2.0",
                 modelName: "Seedance 2.0",
                 aspectRatio: "9:16",
                 sizeBytes: 12
@@ -375,6 +385,30 @@ describe("uploadClient payload builders", () => {
     expect(a.position).toEqual({ x: 0, y: 0 });
     expect(b.position).not.toEqual(a.position);
     expect(b.position.y).toBeGreaterThan(a.position.y);
+  });
+
+  it("company node schema 对齐公司端原生: image 完成态 status=completed + imageSource=upload", () => {
+    const n = createCompanyImageNode({ id: "a1", name: "n", kind: "image", category: "scenes", url: "http://x/y", status: "ready" });
+    expect(n.data.status).toBe("completed");
+    expect(n.data.imageSource).toBe("upload");
+  });
+  it("company node schema 对齐公司端原生: audio 完成态 status=idle + isCustomUpload=true + 占位字段为 null", () => {
+    const n = createCompanyAudioNode({ id: "a1", name: "n", kind: "audio", category: "audio", url: "http://x/y", status: "ready" });
+    expect(n.data.status).toBe("idle");
+    expect(n.data.isCustomUpload).toBe(true);
+    expect(n.data.voicePresetId).toBeNull();
+    expect(n.data.voiceName).toBeNull();
+    expect(n.data.gender).toBeNull();
+    expect(n.data.ageGroup).toBeNull();
+  });
+  it("company node schema 对齐公司端原生: video 完成态 status=idle + model=Seedance 2.0", () => {
+    const n = createCompanyVideoNode({ id: "a1", name: "n", kind: "video", category: "video", url: "http://x/y", status: "ready" });
+    expect(n.data.status).toBe("idle");
+    expect(n.data.model).toBe("Seedance 2.0");
+  });
+  it("company node schema 对齐公司端原生: 生成中占位 status 不被强转为完成值", () => {
+    const n = createCompanyVideoNode({ id: "a1", name: "n", kind: "video", category: "video", url: "http://x/y", status: "generating" });
+    expect(n.data.status).toBe("generating");
   });
 
   it("preserves an existing node's position when it is updated in place", () => {
