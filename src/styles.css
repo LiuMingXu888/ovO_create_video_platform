@@ -1453,3 +1453,16 @@ button {
 .prompt-info-thumb span { font-size: 12px; padding: 4px; text-align: center; }
 .prompt-info-prompt { margin: 0; padding-left: 18px; overflow-y: auto; max-height: 50vh; line-height: 1.6; }
 .prompt-info-empty { color: #888; }
+
+/* AssetSearch */
+.asset-search-bar { display: flex; justify-content: flex-end; padding: 4px 8px; }
+.asset-search { position: relative; width: 280px; }
+.asset-search-input { display: flex; align-items: center; gap: 6px; border: 1px solid #d0d0d0; border-radius: 8px; padding: 4px 8px; background: #fff; }
+.asset-search-input input { border: none; outline: none; flex: 1; background: transparent; }
+.asset-search-results { position: absolute; right: 0; top: 110%; width: 360px; max-height: 60vh; overflow-y: auto; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 8px 28px #0003; z-index: 50; padding: 6px; }
+.asset-search-group-title { font-size: 12px; font-weight: 600; color: #547980; padding: 6px 8px 2px; }
+.asset-search-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 6px; }
+.asset-search-row:hover { background: #f3f3f3; }
+.asset-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-search-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.asset-search-empty { padding: 12px; color: #888; text-align: center; }

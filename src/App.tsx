@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
+import { AssetSearch } from "./components/AssetSearch";
 import { type AppMode } from "./components/ModeSwitch";
 import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
@@ -271,6 +272,7 @@ export function App() {
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
+  const [searchPreviewResults, setSearchPreviewResults] = useState<CanvasAsset[] | null>(null);
   const [promptInfoAsset, setPromptInfoAsset] = useState<CanvasAsset | null>(null);
   const [canvasUrl, setCanvasUrl] = useState("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x");
   const [canvasName, setCanvasName] = useState("未命名画布");
@@ -425,13 +427,14 @@ export function App() {
     );
   }, [assets, defaultAssetOrder, sortModes]);
 
-  const previewAssets = useMemo(
+  const defaultPreviewAssets = useMemo(
     () =>
       sectionDefinitions.flatMap((section) =>
         assetsByCategory[section.id].filter((asset) => asset.status !== "generating" && asset.status !== "failed")
       ),
     [assetsByCategory]
   );
+  const previewAssets = searchPreviewResults ?? defaultPreviewAssets;
   const previewIndex = previewAsset ? previewAssets.findIndex((asset) => asset.id === previewAsset.id) : -1;
 
   function toggleSection(category: AssetCategory) {
@@ -797,6 +800,7 @@ export function App() {
 
   function handleAssetAction(asset: CanvasAsset, action: AssetAction) {
     if (action === "preview") {
+      setSearchPreviewResults(null);
       setPreviewAsset(asset);
       return;
     }
@@ -1823,6 +1827,17 @@ export function App() {
         onRestoreSnapshot={(id) => void handleRestoreSnapshot(id)}
         onOpenQijing={() => void companyApiFacade.openCanvas("http://qijing.kjjhz.cn/", "plain")}
       />
+
+      <div className="asset-search-bar">
+        <AssetSearch
+          assets={assets}
+          onAction={handleAssetAction}
+          onPreview={(asset, results) => {
+            setSearchPreviewResults(results);
+            setPreviewAsset(asset);
+          }}
+        />
+      </div>
 
       <div className="asset-workspace">
         {sectionDefinitions.map((section) => (
