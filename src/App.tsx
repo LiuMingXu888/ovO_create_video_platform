@@ -5,6 +5,7 @@ import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
 import { PromptDock } from "./components/PromptDock";
+import { useToast } from "./components/ToastHost";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
 import {
   applyCanvasAssetLayout,
@@ -280,6 +281,7 @@ function readMediaDuration(kind: AssetKind, objectUrl: string): Promise<number |
 }
 
 export function App() {
+  const { showToast } = useToast();
   const [assets, setAssets] = useState<CanvasAsset[]>(sampleAssets);
   const [expandedSections, setExpandedSections] = useState<AssetCategory[]>(
     sectionDefinitions.map((section) => section.id)
@@ -829,7 +831,9 @@ export function App() {
     }
 
     if (action === "download") {
-      downloadAsset(asset);
+      void downloadAsset(asset)
+        .then(() => showToast("已下载"))
+        .catch((error) => setCanvasError(error instanceof Error ? error.message : "下载失败"));
       return;
     }
 
@@ -885,6 +889,7 @@ export function App() {
     try {
       await downloadAssets(selectedAssets);
       addActivityMessage(`已下载 ${selectedAssets.length} 个资源`);
+      showToast(`已下载 ${selectedAssets.length} 个`);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "批量下载失败");
     }
@@ -936,6 +941,7 @@ export function App() {
     try {
       await deleteAssetCore(asset, canvasSnapshot);
       addActivityMessage(`已删除「${asset.name}」`);
+      showToast("已删除");
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "删除同步失败");
     }
@@ -964,6 +970,7 @@ export function App() {
       }
     }
     addActivityMessage(failed === 0 ? `已删除 ${ok} 个资源` : `已删除 ${ok} 个，${failed} 个失败`);
+    showToast(`已删除 ${ok} 个`);
     cancelSelectionMode();
   }
 
@@ -1095,6 +1102,7 @@ export function App() {
           pendingTasksRef.current = pendingTasksRef.current.filter((item) => item.nodeId !== task.nodeId);
           persistLocalCanvasFull();
           updateActivityMessage(activityId, `已恢复并完成图片生成：${task.nodeId}`);
+          showToast("图片生成完成");
         })
         .catch((error) => {
           if (!mounted.current) {
@@ -1259,6 +1267,7 @@ export function App() {
 
     if (!project || !canvasSnapshot) {
       addActivityMessage(`已本地改名：${name}`);
+      showToast("已重命名");
       return;
     }
 
@@ -1271,6 +1280,7 @@ export function App() {
       });
       setCanvasSnapshot(result.snapshot);
       addActivityMessage(`已同步名称：${name}`);
+      showToast("已重命名");
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "名称同步失败");
     }
@@ -1654,6 +1664,7 @@ export function App() {
         setAssets(completedAssets);
         persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
         updateActivityMessage(generationActivityId, `已生成真实视频：${generatedAsset.name}（用时 ${formatElapsedTime(startTime, Date.now())}）`);
+        showToast("视频生成完成");
         await refreshAuthState();
       } catch (error) {
         // 清除超时和进度更新
@@ -1812,6 +1823,7 @@ export function App() {
       persistCanvasHistoryEntry(getCanvasUrlFromProject(project) || canvasUrl, canvasName, project, completedAssets);
       persistLocalCanvasFull(project, canvasName, getCanvasUrlFromProject(project) || canvasUrl, completedAssets);
       updateActivityMessage(generationActivityId, `已生成图片：${placeholder.name}（用时 ${formatElapsedTime(startTime, Date.now())}）`);
+      showToast("图片生成完成");
       await refreshAuthState();
     } catch (error) {
       clearTimeout(timeoutId);

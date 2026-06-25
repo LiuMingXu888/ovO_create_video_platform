@@ -1377,3 +1377,29 @@ button {
   padding: 4px 10px;
   cursor: pointer;
 }
+
+.toast-host {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+.toast {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #fff;
+  box-shadow: 0 4px 16px #0004;
+  animation: toast-in 0.18s ease-out;
+}
+.toast-success { background: #2f855a; }
+.toast-error { background: #c53030; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
