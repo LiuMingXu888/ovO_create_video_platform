@@ -1403,3 +1403,44 @@ button {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.settings-modal {
+  position: relative;
+  width: min(480px, calc(100vw - 32px));
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #202734;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #4a5568;
+}
+.settings-field-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.settings-field-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.settings-field small {
+  font-size: 11px;
+  color: #718096;
+}
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}

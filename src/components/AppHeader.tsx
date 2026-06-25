@@ -1,4 +1,4 @@
-import { Coins, Download, LogIn, LogOut, MousePointer2, RefreshCw, SquareCheck, Trash2, UserRound, X } from "lucide-react";
+import { Coins, Download, LogIn, LogOut, MousePointer2, RefreshCw, Settings, SquareCheck, Trash2, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
 import { getManualUpdateButtonLabel, isManualUpdateBusy, type ManualUpdateState } from "../update/manualUpdateState";
 import { ModeSwitch, type AppMode } from "./ModeSwitch";
@@ -21,6 +21,7 @@ interface AppHeaderProps {
   onUpdateClick?: () => void;
   onOpenLogin?: () => void;
   onLogout?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export function AppHeader({
@@ -40,7 +41,8 @@ export function AppHeader({
   onCancelSelectionMode,
   onUpdateClick,
   onOpenLogin,
-  onLogout
+  onLogout,
+  onOpenSettings
 }: AppHeaderProps) {
   const accountLabel =
     authState.status === "authenticated"
@@ -161,6 +163,10 @@ export function AppHeader({
             <span>登录账号</span>
           </button>
         )}
+        <button type="button" className="header-tool-button" aria-label="设置" title="设置" onClick={onOpenSettings}>
+          <Settings size={16} />
+          <span>设置</span>
+        </button>
       </div>
     </header>
   );

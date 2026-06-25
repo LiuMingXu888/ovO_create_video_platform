@@ -4,6 +4,8 @@ import { type AppMode } from "./components/ModeSwitch";
 import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
+import { SettingsModal } from "./components/SettingsModal";
+import { loadDownloadDir, saveDownloadDir, pickFolder } from "./lib/appSettings";
 import { PromptDock } from "./components/PromptDock";
 import { useToast } from "./components/ToastHost";
 import { sampleAssets, sectionDefinitions } from "./data/sampleAssets";
@@ -287,6 +289,8 @@ export function App() {
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
   const [appVersion, setAppVersion] = useState(() => window.ovoDesktop?.version ?? "0.1.1");
   const [appMode, setAppMode] = useState<AppMode>("free");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [downloadDir, setDownloadDir] = useState("");
   const [updateState, dispatchUpdate] = useReducer(
     manualUpdateReducer,
     { phase: "idle" } satisfies ManualUpdateState
@@ -304,6 +308,10 @@ export function App() {
   useEffect(() => {
     assetsRef.current = assets;
   }, [assets]);
+
+  useEffect(() => {
+    void loadDownloadDir().then(setDownloadDir);
+  }, []);
 
   // snapshotStateRef 始终镜像最新快照所需字段，供 takeSnapshot 读取（避免 stale closure）
   const snapshotStateRef = useRef<{
@@ -1776,6 +1784,7 @@ export function App() {
         onUpdateClick={handleManualUpdateClick}
         onOpenLogin={() => handleOpenLogin()}
         onLogout={handleLogout}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {updateState.phase === "error" && updateState.detail ? (
@@ -1879,6 +1888,21 @@ export function App() {
       ) : (
         <div className="workflow-placeholder">这是工作流页面</div>
       )}
+      <SettingsModal
+        open={settingsOpen}
+        downloadDir={downloadDir}
+        onChangeDownloadDir={setDownloadDir}
+        onPickFolder={async () => {
+          const dir = await pickFolder();
+          if (dir) setDownloadDir(dir);
+        }}
+        onSave={async () => {
+          await saveDownloadDir(downloadDir);
+          setSettingsOpen(false);
+          showToast("设置已保存");
+        }}
+        onClose={() => setSettingsOpen(false)}
+      />
     </main>
   );
 }
