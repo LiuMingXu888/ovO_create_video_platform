@@ -82,11 +82,36 @@ button {
   gap: 10px;
 }
 
+@font-face {
+  font-family: "Shrikhand";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Shrikhand-Regular.woff2") format("woff2");
+}
+
 .brand-mark {
-  color: #e24f57;
+  --stroke-width: 6px;
+  font-family: "Shrikhand", serif;
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 400;
   letter-spacing: 0;
+  color: #f7f7f7;
+  -webkit-text-stroke: var(--stroke-width) transparent;
+  background-image: linear-gradient(90deg, #c1deff 12%, #f2c9de 24%, #f1ccac 36%, #eae189 48%, #aae5b2 60%, #ffffffcc 72%, #decdff 84%, #c1deff);
+  background-size: 150% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  filter: drop-shadow(2px 2px 6px #0005);
+  transition: background-position 0.3s, scale 0.3s, filter 0.3s;
+  will-change: background-position, scale, filter;
+  cursor: crosshair;
+}
+
+.brand-mark:hover {
+  background-position: 100% 0;
+  scale: 1.05;
+  filter: drop-shadow(2px 2px 8px #0003);
 }
 
 .brand-version,
