@@ -23,9 +23,17 @@ UI 布局：
 
 ## 关键决策（已与用户确认）
 
-- **快照内容**：除本地镜像（assets 资源、布局、画布名、画布地址、进行中任务）外，**额外保存服务端画布原始 `canvasSnapshot` JSON**。
-- **恢复行为**：恢复时把该快照的 `canvasSnapshot` **回推到公司服务端画布**（PUT `endpoints.projectSnapshot`，复用已验证的 `saveProjectSnapshot`），随后从服务端重新拉取刷新视图，保证「所见 == 线上」。测试画布，允许真正改动线上画布。
+- **快照内容**：本地镜像（assets 资源、布局、画布名、画布地址）**+ 上次「获取画布资源」时服务端返回的 `canvasSnapshot` JSON**（随获取结果顺带存入内存，不单独重新拉取）。每次自动/手动保存时读内存中这两份数据，无需额外网络请求。
+- **恢复行为（四步）**：
+  1. 先把当前本地状态存一份（`reason: 'pre-restore'`）作为反悔保底；
+  2. 把选中快照写回本地视图（setAssets / setCanvasName / setCanvasUrl / setCanvasSnapshot）；
+  3. 把该快照的 `canvasSnapshot` 推回服务端（`saveProjectSnapshot`）；
+  4. `loadCanvasFromUrl` 重新从服务端拉取刷新，保证「所见 == 线上 == 刚推的那份」。
+  测试画布，允许真正改动线上画布。
+- **为什么要推服务端**：不推的话，下次点「获取画布资源」又会把服务端数据拉回来覆盖本地，恢复就白做了。
 - **首份时机**：点「获取画布资源」成功后**立即存第 1 份**，之后每 10 分钟一份。
+- **before-quit flush**：只向**主窗口**（App.tsx 所在渲染进程）发 `ovo:snapshot:flush`，只等它一个 `flush-done` 回执（或 1.5s 超时兜底），不向画布浏览窗口广播，避免白等超时。
+- **appendSnapshot 串行化**：主进程内用一个 `Promise` 链（`writeQueue`）串行执行 append，防止 auto/manual/quit 同时触发时读-改-写互相覆盖。
 - **打开奇境**：放在中间地址栏行右侧；用与登录窗口一致的「带地址栏内嵌浏览器」，plain 模式（不挂 CDP / 不开 DevTools）。
 - **地址栏**：plain/devtools/capture 三个窗口都加地址栏。capture 模式因 CDP 与 DevTools 互斥仍不开 DevTools，但地址栏照常工作。
 
@@ -70,25 +78,26 @@ UI 布局：
 ### D. 自动保存控制器（渲染端）
 
 在 `App.tsx` 内用 `useRef` + 一个小封装管理：
-- `snapshotStateRef`：始终持有最新的 `{ project, canvasName, canvasUrl, assets, canvasSnapshot }`（每次相关 setState 时同步，复用现有 `assetsRef` 模式）。
-- `takeSnapshot(reason)`：从 `snapshotStateRef` 读当前态 → `buildSnapshotEntry` → `ovoDesktop.snapshots.append`；无 `projectId` 时跳过。
-- `startAutoSave(projectId)`：清掉已有 `setInterval`/记录的 projectId → **立即 `takeSnapshot('load')`** → `setInterval(takeSnapshot, 10*60*1000)`。再次以不同画布调用即「停旧转新」。
+- `snapshotStateRef`：始终持有最新的 `{ project, canvasName, canvasUrl, assets, canvasSnapshot }`。
+  - `canvasSnapshot` 在 `loadCanvasFromUrl` 拿到服务端数据后写入，之后不再更新（不重复拉服务端）。
+  - assets/canvasName/canvasUrl 随各自 setState 同步（复用现有 `assetsRef` 模式）。
+- `takeSnapshot(reason)`：从 `snapshotStateRef` 读当前态 → `buildSnapshotEntry` → `ovoDesktop.snapshots.append`；无 `projectId` 时跳过，静默返回。
+- `startAutoSave(projectId)`：清掉已有 interval/projectId → **立即 `takeSnapshot('load')`** → `setInterval(takeSnapshot, 10*60*1000)`。再次以不同画布调用即「停旧转新」。
 - `stopAutoSave()`：清 interval。
 - 触发点：`loadCanvasFromUrl` 成功末尾调用 `startAutoSave(project.projectId)`。
 
 退出前保存：`main.ts` `before-quit`：
-- 首次进入时 `event.preventDefault()`，向所有窗口 `webContents.send('ovo:snapshot:flush')`，等待渲染端回 `ovo:snapshot:flush-done`（或 1.5s 超时兜底），置 `flushed=true` 后 `app.quit()`。
+- 首次进入时 `event.preventDefault()`，只向**主窗口**（mainWindow）`webContents.send('ovo:snapshot:flush')`，等待它回 `ovo:snapshot:flush-done`（或 1.5s 超时兜底），置 `flushed=true` 后 `app.quit()`。不向画布浏览窗口广播（它们没有快照 state，不会回执，避免白等超时）。
 - 渲染端收到 `flush` 即 `await takeSnapshot('quit')` 再回 `flush-done`。
-- 兜底超时确保不会卡住退出。
 
 ### E. 恢复流程（问题 4）
 
-`handleRestoreSnapshot(id)`：
-1. `ovoDesktop.snapshots.get(projectId, id)` 取完整 entry。
-2. 回写本地视图：`setAssets / setCanvasName / setCanvasUrl / setCanvasSnapshot`，并 `persistLocalCanvasFull`。
-3. 回推服务端：`saveProjectSnapshot(transport, projectId, entry.canvasSnapshot)`。
-4. 重新 `loadCanvasFromUrl(canvasUrl)` 从服务端刷新，保证视图与线上一致。
-5. `addActivityMessage` 反馈；失败走 `setCanvasError`。
+`handleRestoreSnapshot(id)` 四步：
+1. **先存保底**：`await takeSnapshot('pre-restore')`（防止恢复错了有反悔）。
+2. **取完整快照**：`ovoDesktop.snapshots.get(projectId, id)`。
+3. **回写本地视图**：`setAssets / setCanvasName / setCanvasUrl / setCanvasSnapshot` + `persistLocalCanvasFull`。
+4. **推回服务端**：`saveProjectSnapshot(transport, projectId, entry.canvasSnapshot)`；推完后 `loadCanvasFromUrl(canvasUrl)` 重新拉取刷新，保证「所见 == 线上 == 刚推的那份」。下次点「获取」拉回来的就是恢复的这份，不会再被覆盖。
+5. `addActivityMessage` 反馈；任一步失败走 `setCanvasError`（回推失败必须显式提示，因为改动线上）。
 
 ### F. UI 重构（`CanvasControls.tsx` + `styles.css`）
 
@@ -111,11 +120,11 @@ UI 布局：
 
 ## 数据流
 
-加载：`获取画布资源` → `loadCanvasFromUrl` → 设状态 + `persistLocalCanvasFull` → `startAutoSave(projectId)`（立即存 1 份）。
-自动：每 10min `takeSnapshot('auto')` → 主进程 append + 裁剪 6。
+加载：`获取画布资源` → `loadCanvasFromUrl` → 设状态（含 `canvasSnapshot`）+ `persistLocalCanvasFull` → `startAutoSave(projectId)`（立即存 1 份，读内存中已有 canvasSnapshot，不重新拉服务端）。
+自动：每 10min `takeSnapshot('auto')` → 主进程串行 append + 裁剪 6。
 手动：`保存记录` → `takeSnapshot('manual')`。
-退出：`before-quit` → flush → `takeSnapshot('quit')` → quit。
-恢复：`恢复历史记录` → 选项 → `get` → 本地回写 + `saveProjectSnapshot` 回推 + 重新加载刷新。
+退出：`before-quit` → 只向主窗口 flush → `takeSnapshot('quit')` → quit（1.5s 超时兜底）。
+恢复：`恢复历史记录` → 选项 → ① `takeSnapshot('pre-restore')` → ② `get` → ③ 本地回写 → ④ `saveProjectSnapshot` 回推 → ⑤ `loadCanvasFromUrl` 重新加载刷新。
 
 ## 错误处理
 
