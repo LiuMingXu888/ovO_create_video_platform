@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AppHeader } from "./components/AppHeader";
+import { type AppMode } from "./components/ModeSwitch";
 import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
@@ -317,6 +318,7 @@ export function App() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(() => new Set());
   const [appVersion, setAppVersion] = useState(() => window.ovoDesktop?.version ?? "0.1.1");
+  const [appMode, setAppMode] = useState<AppMode>("free");
   const [updateState, dispatchUpdate] = useReducer(
     manualUpdateReducer,
     { phase: "idle" } satisfies ManualUpdateState
@@ -1845,6 +1847,8 @@ export function App() {
         authState={authState}
         project={displayProject}
         appVersion={appVersion}
+        appMode={appMode}
+        onModeChange={setAppMode}
         updateState={updateState}
         selectionMode={selectionMode}
         selectedCount={selectedAssetIds.size}
@@ -1865,7 +1869,9 @@ export function App() {
         </pre>
       ) : null}
 
-      <CanvasControls
+      {appMode === "free" ? (
+        <>
+          <CanvasControls
         canvasUrl={canvasUrl}
         canvasName={canvasName}
         canvasHistory={canvasHistory}
@@ -1955,6 +1961,10 @@ export function App() {
           handleAssetAction(asset, action);
         }}
       />
+        </>
+      ) : (
+        <div className="workflow-placeholder">这是工作流页面</div>
+      )}
     </main>
   );
 }
