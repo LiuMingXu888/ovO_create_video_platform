@@ -1491,3 +1491,38 @@ button {
 .asset-search-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-search-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 .asset-search-empty { padding: 12px; color: #888; text-align: center; }
+
+/* 波浪时长滑竿（ui2）：等效原版 shape() 波浪，限 Chromium 128 可跑 */
+.wavy-range {
+  --c: #547980;
+  --bg: #ebe8d5;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+}
+/* 波浪轨道：用 SVG 背景画一条波浪线 */
+.wavy-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background-repeat: repeat-x;
+  background-position: center;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='28'><path d='M0 14 Q 10 4 20 14 T 40 14' fill='none' stroke='%23547980' stroke-width='3'/></svg>");
+}
+.wavy-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -7px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 3px solid var(--bg);
+  box-shadow: 0 0 0 6px var(--c) inset, 0 0 0 2px var(--bg);
+  transition: box-shadow 0.3s;
+}
+.wavy-range:active::-webkit-slider-thumb,
+.wavy-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 14px var(--c) inset, 0 0 0 2px var(--bg);
+}

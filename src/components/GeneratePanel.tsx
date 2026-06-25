@@ -66,6 +66,7 @@ export function GeneratePanel({ settings, onSettingsChange, onGenerate, disabled
           <span>{settings.durationSeconds}s</span>
           <input
             type="range"
+            className="wavy-range"
             aria-label="时长"
             min="4"
             max="15"
