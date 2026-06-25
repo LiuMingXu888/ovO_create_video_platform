@@ -107,6 +107,85 @@ button {
   font-weight: 700;
 }
 
+.mode-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-left: 12px;
+  padding: 0 12px;
+  border: 1px solid #d7d4cc;
+  border-radius: 999px;
+  background: #f6f7f4;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.35s ease, border-color 0.35s ease;
+}
+
+.mode-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 44px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transform: translate(0, -50%);
+  transition: transform 0.35s ease;
+  z-index: 1;
+}
+
+.mode-switch--workflow {
+  background: #16a34a;
+  border-color: #15803d;
+}
+
+.mode-switch--workflow .mode-switch-thumb {
+  transform: translate(48px, -50%);
+}
+
+.mode-switch-label {
+  position: relative;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  transition: color 0.35s ease;
+}
+
+.mode-switch-label--free {
+  width: 44px;
+  text-align: center;
+  color: #1e2329;
+}
+
+.mode-switch-label--workflow {
+  width: 44px;
+  text-align: center;
+  color: #9aa08f;
+}
+
+.mode-switch--workflow .mode-switch-label--free {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mode-switch--workflow .mode-switch-label--workflow {
+  color: #ffffff;
+}
+
+.workflow-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 48px 24px;
+  color: #68705f;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .project-title {
   display: flex;
   flex-direction: column;
