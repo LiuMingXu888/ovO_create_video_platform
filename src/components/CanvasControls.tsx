@@ -130,7 +130,7 @@ export function CanvasControls({
         </div>
 
         <div className="canvas-control-actions">
-          <button type="button" className="primary-button" onClick={() => { setSnapshotPopoverOpen(false); onLoadCanvas(); }} disabled={loading}>
+          <button type="button" className="primary-button" onClick={onLoadCanvas} disabled={loading}>
             {loading ? <Loader2 size={16} /> : <RefreshCw size={16} />}
             <span>获取画布资源</span>
           </button>
