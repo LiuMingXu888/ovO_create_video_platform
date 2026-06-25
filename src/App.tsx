@@ -1104,6 +1104,21 @@ export function App() {
           updateActivityMessage(activityId, errorMessage);
         });
     }
+
+    // 兜底：如果有 status=generating 的图片占位但对应 pendingTask 未落盘（极端情况：
+    // app 在首次 persistLocalCanvasFull IPC 回调前被强杀），这些占位永远停在生成中。
+    // 此处将其标记为失败，避免 UI 永久卡"生成中"且无任何轮询请求。
+    setAssets((current) => {
+      const pendingNodeIds = new Set(pendingTasksRef.current.map((t) => t.nodeId));
+      const orphans = current.filter((a) => a.kind === "image" && a.status === "generating" && !pendingNodeIds.has(a.id));
+      if (orphans.length === 0) {
+        return current;
+      }
+      const orphanIds = new Set(orphans.map((a) => a.id));
+      return current.map((a) =>
+        orphanIds.has(a.id) ? { ...a, status: "failed" as const, errorMessage: "生成已中断，请重新生成" } : a
+      );
+    });
   }
 
   // ── 快照：takeSnapshot / startAutoSave / stopAutoSave ──────────────────────
@@ -1703,6 +1718,14 @@ export function App() {
         prompt: promptText,
         settings: imageGenerationSettings,
         referenceImageUrls
+      }, {
+        onTaskIdKnown: (taskId) => {
+          // 异步模型：POST 返回 taskId 后立即回填写盘，这样退出重开也能续轮询
+          pendingTasksRef.current = pendingTasksRef.current.map((task) =>
+            task.nodeId === placeholder.id ? { ...task, taskId, status: "running" as const } : task
+          );
+          persistLocalCanvasFull();
+        }
       });
 
       clearTimeout(timeoutId);

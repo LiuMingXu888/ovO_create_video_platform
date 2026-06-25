@@ -2,7 +2,7 @@ import { checkAuth } from "../api/authClient";
 import { saveProjectSnapshot } from "../api/canvasClient";
 import { DesktopApiTransport } from "../api/desktopTransport";
 import { generateVideo as generateVideoWithTransport } from "../api/generationClient";
-import { generateImage as generateImageWithTransport, pollImageResult as pollImageResultWithTransport } from "../api/imageGenerationClient";
+import { generateImage as generateImageWithTransport, pollImageResult as pollImageResultWithTransport, DEFAULT_IMAGE_GENERATION_POLL_OPTIONS } from "../api/imageGenerationClient";
 import { createCompanyCanvas as createCompanyCanvasWithTransport } from "../api/projectClient";
 import { FetchApiTransport } from "../api/transport";
 import { uploadCanvasAsset as uploadCanvasAssetWithTransport } from "../api/uploadClient";
@@ -95,7 +95,8 @@ export const companyApiFacade = {
     prompt: string;
     settings: ImageGenerationSettings;
     referenceImageUrls?: string[];
-  }) => generateImageWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
+  }, options?: { onTaskIdKnown?: (taskId: string) => void }) =>
+    generateImageWithTransport(window.ovoDesktop ? desktopTransport : transport, input, options ? { ...DEFAULT_IMAGE_GENERATION_POLL_OPTIONS, ...options } : undefined),
   pollImageResult: (input: { projectId: string; nodeId: string; taskId?: string }) =>
     pollImageResultWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
   createCompanyCanvas: () => createCompanyCanvasWithTransport(window.ovoDesktop ? desktopTransport : transport),

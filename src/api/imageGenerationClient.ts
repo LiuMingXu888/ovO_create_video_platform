@@ -11,6 +11,8 @@ export interface PollOptions {
   intervalMs: number;
   maxAttempts: number;
   initialDelayMs?: number;
+  /** 异步模型专用：POST 返回 taskId 后立即调用，早于内部轮询完成，用于写盘以便重启续轮询 */
+  onTaskIdKnown?: (taskId: string) => void;
 }
 
 interface BuildGenerateImagePayloadInput {
@@ -127,6 +129,9 @@ export async function generateImage(
   if (!submitResult.taskId) {
     throw new Error("生成接口未返回任务 ID 或图片地址");
   }
+
+  // 立即通知调用方持久化 taskId，这样即便内部轮询过程中退出，重开也能续轮询。
+  options.onTaskIdKnown?.(submitResult.taskId);
 
   const pollResult = await pollImageTaskUntilComplete(
     transport,

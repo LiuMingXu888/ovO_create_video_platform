@@ -904,7 +904,8 @@ describe("App shell", () => {
         nodeId: expect.stringMatching(/^generated-image-/),
         prompt: "一个站立的女人",
         settings: expect.objectContaining({ model: "GPT-Image-2", category: "人物" })
-      })
+      }),
+      expect.anything()
     );
     await waitFor(() =>
       expect(companyApiFacade.saveCanvasAsset).toHaveBeenCalledWith(
@@ -963,7 +964,8 @@ describe("App shell", () => {
     await waitFor(() => expect(companyApiFacade.generateImage).toHaveBeenCalled());
     // Submitted reference urls must still reflect the pre-clear selection.
     expect(companyApiFacade.generateImage).toHaveBeenCalledWith(
-      expect.objectContaining({ referenceImageUrls: expect.arrayContaining([expect.stringMatching(/^https?:/)]) })
+      expect.objectContaining({ referenceImageUrls: expect.arrayContaining([expect.stringMatching(/^https?:/)]) }),
+      expect.anything()
     );
     expect(screen.getByPlaceholderText(promptPlaceholder)).toHaveValue("");
     expect(referenceChips()).toHaveLength(0);
@@ -1040,6 +1042,43 @@ describe("App shell", () => {
       })
     );
     expect(await screen.findByText(/已恢复并完成图片生成/)).toBeInTheDocument();
+  });
+
+  it("marks orphaned generating image placeholder as failed when no pendingTask exists on restart", async () => {
+    const projectId = "cmq6fwhft0bg5m2l5u78zby8x";
+    // Local store has generating placeholder but NO pendingTask (extreme case: app was killed before first write)
+    window.ovoDesktop = {
+      version: "test",
+      localStore: {
+        read: vi.fn().mockResolvedValue({
+          schemaVersion: 1,
+          projectId,
+          canvasName: "接口项目",
+          canvasUrl: `http://qijing.kjjhz.cn/canvas/${projectId}`,
+          assets: [
+            { id: "orphan-image-1", name: "孤立图片 1", kind: "image", category: "characters", url: "", status: "generating" }
+          ],
+          pendingTasks: [],
+          updatedAt: new Date().toISOString()
+        }),
+        write: vi.fn().mockResolvedValue({ ok: true })
+      }
+    } as unknown as Window["ovoDesktop"];
+
+    vi.mocked(companyApiFacade.checkAuth).mockResolvedValue({ status: "authenticated", user: { account: "test", creditBalance: 0 } });
+    vi.mocked(companyApiFacade.loadCanvasResources).mockResolvedValue({
+      project: { projectId, canvasUrl: `http://qijing.kjjhz.cn/canvas/${projectId}`, title: "接口项目", loadedAt: "2026-06-15T00:00:00.000Z" },
+      snapshot: { snapshot: { nodes: [] } },
+      assets: []
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
+    await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
+
+    // Orphan must NOT stay "generating" forever; it should be marked failed
+    await waitFor(() => expect(screen.queryByText("生成中")).not.toBeInTheDocument());
+    expect(screen.getByText(/生成已中断，请重新生成/)).toBeInTheDocument();
   });
 
   it("updates the real generation activity item with the final elapsed time", async () => {
