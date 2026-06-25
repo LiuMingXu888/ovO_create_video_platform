@@ -2193,7 +2193,8 @@ describe("App shell", () => {
       projectId: "cmq6fwhft0bg5m2l5u78zby8x",
       snapshot: originalSnapshot,
       assetId: "node-image",
-      name: "道具-苏晚晴"
+      name: "道具-苏晚晴",
+      category: "props"
     });
   });
 
@@ -2262,7 +2263,8 @@ describe("App shell", () => {
       projectId: "cmq6fwhft0bg5m2l5u78zby8x",
       snapshot: originalSnapshot,
       assetId: "node-image",
-      name: "场景-苏晚晴"
+      name: "场景-苏晚晴",
+      category: "scenes"
     });
   });
 

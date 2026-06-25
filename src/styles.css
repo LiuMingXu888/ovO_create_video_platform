@@ -340,7 +340,7 @@ button {
 }
 
 .canvas-url-row .canvas-url-field {
-  flex: 1;
+  flex: 0 0 360px;
   max-width: none;
 }
 

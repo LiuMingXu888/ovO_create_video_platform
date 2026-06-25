@@ -34,13 +34,18 @@ export function removeAssetFromSnapshot(snapshot: unknown, assetId: string): { s
   return { snapshot: cloned, updated };
 }
 
-export function renameAssetInSnapshot(snapshot: unknown, assetId: string, name: string): { snapshot: unknown; updated: boolean } {
+export function renameAssetInSnapshot(
+  snapshot: unknown,
+  assetId: string,
+  name: string,
+  category?: string
+): { snapshot: unknown; updated: boolean } {
   const cloned = structuredClone(snapshot);
-  const updated = renameInValue(cloned, assetId, name, new Set());
+  const updated = renameInValue(cloned, assetId, name, category, new Set());
   return { snapshot: cloned, updated };
 }
 
-function renameInValue(value: unknown, assetId: string, name: string, seen: Set<unknown>): boolean {
+function renameInValue(value: unknown, assetId: string, name: string, category: string | undefined, seen: Set<unknown>): boolean {
   if (!isRecord(value) || seen.has(value)) {
     return false;
   }
@@ -50,11 +55,14 @@ function renameInValue(value: unknown, assetId: string, name: string, seen: Set<
   let updated = false;
   if (matchesAsset(value, assetId)) {
     setNameFields(value, name);
+    if (category !== undefined && "category" in value) {
+      value.category = category;
+    }
     updated = true;
   }
 
   for (const child of Object.values(value)) {
-    if (renameInValue(child, assetId, name, seen)) {
+    if (renameInValue(child, assetId, name, category, seen)) {
       updated = true;
     }
   }

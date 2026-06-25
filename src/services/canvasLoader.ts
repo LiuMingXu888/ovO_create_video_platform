@@ -80,9 +80,9 @@ async function normalizeAndSyncAssetPrefixes(transport: ApiTransport, projectId:
 
 export async function renameCanvasAsset(
   transport: ApiTransport,
-  input: { projectId: string; snapshot: unknown; assetId: string; name: string }
+  input: { projectId: string; snapshot: unknown; assetId: string; name: string; category?: AssetCategory }
 ) {
-  const renamed = renameAssetInSnapshot(input.snapshot, input.assetId, input.name);
+  const renamed = renameAssetInSnapshot(input.snapshot, input.assetId, input.name, input.category);
   if (!renamed.updated) {
     throw new Error("未找到可同步的画布资源节点");
   }

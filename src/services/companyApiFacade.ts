@@ -47,7 +47,7 @@ export const companyApiFacade = {
     return authState;
   },
   loadCanvasResources: (canvasUrl: string) => loadCanvasResources(window.ovoDesktop ? desktopTransport : transport, canvasUrl),
-  renameCanvasAsset: (input: { projectId: string; snapshot: unknown; assetId: string; name: string }) =>
+  renameCanvasAsset: (input: { projectId: string; snapshot: unknown; assetId: string; name: string; category?: AssetCategory }) =>
     renameCanvasAsset(window.ovoDesktop ? desktopTransport : transport, input),
   deleteCanvasAsset: (input: { projectId: string; snapshot: unknown; assetId: string }) =>
     deleteCanvasAsset(window.ovoDesktop ? desktopTransport : transport, input),

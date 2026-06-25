@@ -1316,7 +1316,8 @@ export function App() {
         projectId: project.projectId,
         snapshot: canvasSnapshot,
         assetId,
-        name: nextName
+        name: nextName,
+        category
       });
       setCanvasSnapshot(result.snapshot);
       addActivityMessage(`已同步分类：${nextName}`);
