@@ -318,6 +318,52 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
+// 共享地址栏：为任意 BrowserWindow+BrowserView 对挂载工具栏（后退/前进/前往/复制/刷新）。
+// 调用方需先 setBrowserView，再 await attachBrowserToolbar；
+// 窗口关闭时调用返回的 dispose() 清理 IPC 监听。
+async function attachBrowserToolbar(
+  win: BrowserWindow,
+  view: BrowserView,
+  initialUrl: string
+): Promise<{ dispose(): void }> {
+  const actionChannel = `ovo:browser-toolbar:${win.id}:action`;
+  const urlChannel = `ovo:browser-toolbar:${win.id}:url`;
+
+  function resizeView() {
+    if (win.isDestroyed()) return;
+    const [width, height] = win.getContentSize();
+    view.setBounds({ x: 0, y: LOGIN_TOOLBAR_HEIGHT, width, height: Math.max(0, height - LOGIN_TOOLBAR_HEIGHT) });
+  }
+
+  function updateUrl() {
+    if (win.isDestroyed()) return;
+    win.webContents.send(urlChannel, view.webContents.getURL());
+  }
+
+  ipcMain.on(actionChannel, (_event, action: string) => {
+    if (action === "back" && view.webContents.canGoBack()) { view.webContents.goBack(); return; }
+    if (action === "forward" && view.webContents.canGoForward()) { view.webContents.goForward(); return; }
+    if (action === "reload") { view.webContents.reload(); return; }
+    if (action.startsWith("go:")) {
+      void view.webContents.loadURL(normalizeCompanyWindowUrl(action.slice(3))).catch(() => undefined);
+      return;
+    }
+    if (action === "copy") { clipboard.writeText(view.webContents.getURL()); }
+  });
+
+  win.on("resize", resizeView);
+  win.on("maximize", resizeView);
+  win.on("unmaximize", resizeView);
+  view.webContents.on("did-navigate", updateUrl);
+  view.webContents.on("did-navigate-in-page", updateUrl);
+  view.webContents.on("did-start-navigation", updateUrl);
+
+  resizeView();
+  await win.loadURL(createLoginToolbarUrl(initialUrl, actionChannel, urlChannel));
+
+  return { dispose() { ipcMain.removeAllListeners(actionChannel); } };
+}
+
 export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<CompanySessionResult> {
   const initialUrl = normalizeCompanyWindowUrl(targetUrl);
   const loginWindow = new BrowserWindow({
@@ -337,65 +383,9 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
       sandbox: true
     }
   });
-  const actionChannel = `ovo:login-window:${loginWindow.id}:action`;
-  const urlChannel = `ovo:login-window:${loginWindow.id}:url`;
-
-  function resizeLoginView() {
-    if (loginWindow.isDestroyed()) {
-      return;
-    }
-
-    const [width, height] = loginWindow.getContentSize();
-    loginView.setBounds({
-      x: 0,
-      y: LOGIN_TOOLBAR_HEIGHT,
-      width,
-      height: Math.max(0, height - LOGIN_TOOLBAR_HEIGHT)
-    });
-  }
-
-  function updateToolbarUrl() {
-    if (loginWindow.isDestroyed()) {
-      return;
-    }
-
-    loginWindow.webContents.send(urlChannel, loginView.webContents.getURL());
-  }
-
-  ipcMain.on(actionChannel, (_event, action: string) => {
-    if (action === "back" && loginView.webContents.canGoBack()) {
-      loginView.webContents.goBack();
-      return;
-    }
-
-    if (action === "forward" && loginView.webContents.canGoForward()) {
-      loginView.webContents.goForward();
-      return;
-    }
-
-    if (action === "reload") {
-      loginView.webContents.reload();
-      return;
-    }
-
-    if (action.startsWith("go:")) {
-      const target = normalizeCompanyWindowUrl(action.slice(3));
-      void loginView.webContents.loadURL(target).catch(() => undefined);
-      return;
-    }
-
-    if (action === "copy") {
-      clipboard.writeText(loginView.webContents.getURL());
-    }
-  });
 
   loginWindow.setBrowserView(loginView);
-  loginWindow.on("resize", resizeLoginView);
-  loginWindow.on("maximize", resizeLoginView);
-  loginWindow.on("unmaximize", resizeLoginView);
-  loginView.webContents.on("did-navigate", updateToolbarUrl);
-  loginView.webContents.on("did-navigate-in-page", updateToolbarUrl);
-  loginView.webContents.on("did-start-navigation", updateToolbarUrl);
+  const toolbar = await attachBrowserToolbar(loginWindow, loginView, initialUrl);
 
   // 接口诊断 is now folded into the login window: record every /api/* call —
   // including full request and response bodies — to the same on-disk storage
@@ -404,10 +394,7 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
   // capturing the response bodies is the whole point of this window.
   const apiCapture = await attachApiCapture(loginView.webContents);
 
-  resizeLoginView();
-  await loginWindow.loadURL(createLoginToolbarUrl(initialUrl, actionChannel, urlChannel));
   await loginView.webContents.loadURL(initialUrl);
-  updateToolbarUrl();
 
   return new Promise((resolve) => {
     let resolved = false;
@@ -447,7 +434,7 @@ export async function openLoginWindow(targetUrl = COMPANY_ORIGIN): Promise<Compa
     }, LOGIN_TIMEOUT_MS);
 
     loginWindow.on("closed", () => {
-      ipcMain.removeAllListeners(actionChannel);
+      toolbar.dispose();
       apiCapture.detach();
       finish({ ok: false, message: "登录窗口已关闭" });
     });
@@ -637,9 +624,8 @@ export async function openCanvasWindow(
     height: 950,
     title: windowTitle,
     webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
+      contextIsolation: false,
+      nodeIntegration: true
     }
   });
   const inspectView = new BrowserView({
@@ -650,15 +636,6 @@ export async function openCanvasWindow(
       sandbox: true
     }
   });
-
-  function resizeInspectView() {
-    if (inspectWindow.isDestroyed()) {
-      return;
-    }
-
-    const [width, height] = inspectWindow.getContentSize();
-    inspectView.setBounds({ x: 0, y: 0, width, height });
-  }
 
   // The embedded company SPA occasionally errors on its first paint (the same
   // "white screen until you refresh" the web app shows). Auto-reload once on a
@@ -690,15 +667,13 @@ export async function openCanvasWindow(
   });
 
   inspectWindow.setBrowserView(inspectView);
-  inspectWindow.on("resize", resizeInspectView);
-  inspectWindow.on("maximize", resizeInspectView);
-  inspectWindow.on("unmaximize", resizeInspectView);
-  resizeInspectView();
+  const toolbar = await attachBrowserToolbar(inspectWindow, inspectView, initialUrl);
 
   // capture 与 DevTools 在同一 webContents 上互斥:只有 capture 模式挂 CDP,
   // 只有 devtools 模式开 DevTools,plain 模式两者都不做。
   const apiCapture = mode === "capture" ? await attachApiCapture(inspectView.webContents) : null;
   inspectWindow.on("closed", () => {
+    toolbar.dispose();
     apiCapture?.detach();
   });
 

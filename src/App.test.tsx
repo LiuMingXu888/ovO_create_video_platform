@@ -307,7 +307,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     const videoSection = screen.getByRole("button", { name: "视频" }).closest("section") as HTMLElement;
@@ -366,7 +366,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     const scenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
@@ -428,7 +428,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     const audioSection = screen.getByRole("button", { name: "音频" }).closest("section") as HTMLElement;
@@ -510,7 +510,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText("粘贴画布地址，例如 http://qijing.kjjhz.cn/canvas/..."), {
       target: { value: "http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
 
     expect(await screen.findByText("接口图片")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "打开画布 接口项目" })).toBeInTheDocument();
@@ -550,7 +550,7 @@ describe("App shell", () => {
 
     const { unmount } = render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.change(screen.getByLabelText("当前画布名称"), { target: { value: "我的第一块画布" } });
     fireEvent.click(screen.getByRole("button", { name: "保存画布名称" }));
@@ -565,7 +565,7 @@ describe("App shell", () => {
 
     expect(screen.getByRole("button", { name: "打开画布 我的第一块画布" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "打开画布 我的第一块画布" }));
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
 
     await screen.findByText("接口图片 B");
     const reloadedScenesSection = screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement;
@@ -598,7 +598,7 @@ describe("App shell", () => {
 
     const { unmount } = render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.change(screen.getByLabelText("当前画布名称"), { target: { value: "要删除的画布" } });
     fireEvent.click(screen.getByRole("button", { name: "保存画布名称" }));
@@ -625,7 +625,7 @@ describe("App shell", () => {
     fireEvent.change(screen.getByPlaceholderText("粘贴画布地址，例如 http://qijing.kjjhz.cn/canvas/..."), {
       target: { value: "http://qijing.kjjhz.cn/share/3xYG8A11G2Z9BsNlQX2p97nafHVWrTFV" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
 
     await waitFor(() => expect(companyApiFacade.openLogin).toHaveBeenCalledWith("http://qijing.kjjhz.cn/share/3xYG8A11G2Z9BsNlQX2p97nafHVWrTFV"));
     expect(companyApiFacade.loadCanvasResources).not.toHaveBeenCalled();
@@ -678,7 +678,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("人物-接口图片");
     fireEvent.click(screen.getByRole("button", { name: "退出账户" }));
 
@@ -786,7 +786,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
@@ -889,7 +889,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     // 1) Start a video generation that stays pending → "生成中" placeholder appears.
@@ -947,7 +947,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     fireEvent.click(screen.getByRole("tab", { name: "图片生成" }));
@@ -1006,7 +1006,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     // Add an image reference, then type a prompt.
@@ -1088,7 +1088,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     await waitFor(() =>
@@ -1145,7 +1145,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
@@ -1211,7 +1211,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
@@ -1279,7 +1279,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
@@ -1338,7 +1338,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("人物-小区楼道");
     fireEvent.click(screen.getByRole("button", { name: "加入提示词 人物-小区楼道" }));
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
@@ -1379,7 +1379,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("生成视频 1");
     fireEvent.click(screen.getByRole("button", { name: "去除字幕 生成视频 1" }));
 
@@ -1481,7 +1481,7 @@ describe("App shell", () => {
     });
 
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("原片");
 
     // 1) Start subtitle removal on the existing video (placeholder S).
@@ -1552,7 +1552,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     fireEvent.click(screen.getByRole("tab", { name: "图片生成" }));
@@ -1598,7 +1598,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.click(screen.getAllByTitle("加入提示词")[0]);
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
@@ -1629,7 +1629,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
     fireEvent.change(screen.getByPlaceholderText(promptPlaceholder), {
       target: { value: "随机生成一个视频" }
@@ -1748,7 +1748,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("接口图片");
     fireEvent.click(screen.getByRole("button", { name: "删除 接口图片" }));
 
@@ -1801,7 +1801,7 @@ describe("App shell", () => {
       .mockResolvedValueOnce({ ok: true, snapshot: { snapshot: { nodes: [] } } });
 
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("图A");
 
     fireEvent.click(screen.getByRole("button", { name: "多选" }));
@@ -1868,7 +1868,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("接口图片");
     fireEvent.click(screen.getByRole("button", { name: "重命名 接口图片" }));
     fireEvent.change(screen.getByDisplayValue("接口图片"), { target: { value: "接口图片改名" } });
@@ -1982,7 +1982,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await waitFor(() => expect(screen.getByLabelText("当前画布名称")).toHaveValue("接口项目"));
 
     expect(screen.getByLabelText("人物排序")).toHaveValue("generated-desc");
@@ -2184,7 +2184,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("人物-苏晚晴");
     fireEvent.click(screen.getByRole("button", { name: "设为道具图片 人物-苏晚晴" }));
 
@@ -2252,7 +2252,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "加载画布资源" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取画布资源" }));
     await screen.findByText("人物-苏晚晴");
     fireEvent.dragStart(screen.getByText("人物-苏晚晴").closest("article") as HTMLElement);
     fireEvent.drop(screen.getByRole("button", { name: "场景" }).closest("section") as HTMLElement);

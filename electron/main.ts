@@ -14,6 +14,7 @@ import {
 } from "./companySession.js";
 import type { SaveAssetInput } from "./downloadPaths.js";
 import { readCanvasStore, writeCanvasStore } from "./canvasStore.js";
+import { appendSnapshot, getSnapshot, listSnapshots } from "./canvasSnapshotStore.js";
 import { createGiteeReleaseUpdater } from "./giteeReleaseUpdater.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,8 @@ const __dirname = path.dirname(__filename);
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 const appIconPath = path.join(__dirname, "../resources/ovO.png");
+
+let mainWindow: BrowserWindow | null = null;
 
 app.setName("ovO");
 
@@ -40,6 +43,9 @@ function createMainWindow() {
       sandbox: true
     }
   });
+
+  mainWindow = window;
+  window.on("closed", () => { if (mainWindow === window) mainWindow = null; });
 
   if (devServerUrl) {
     void window.loadURL(devServerUrl);
@@ -84,6 +90,10 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:updater:download-update", () => updater.downloadUpdate());
   ipcMain.handle("ovo:updater:install-update", () => updater.installUpdate());
 
+  ipcMain.handle("ovo:snapshot:list", (_e, projectId: string) => listSnapshots(projectId));
+  ipcMain.handle("ovo:snapshot:append", (_e, projectId: string, entry: unknown) => appendSnapshot(projectId, entry as Parameters<typeof appendSnapshot>[1]));
+  ipcMain.handle("ovo:snapshot:get", (_e, projectId: string, id: string) => getSnapshot(projectId, id));
+
   createMainWindow();
 
   app.on("activate", () => {
@@ -95,4 +105,20 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   app.quit();
+});
+
+// 退出前向主窗口发 flush，等渲染端存完快照再真正退出（1.5s 超时兜底）
+let quitFlushed = false;
+app.on("before-quit", (event) => {
+  if (quitFlushed) return;
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) { quitFlushed = true; return; }
+  event.preventDefault();
+  const timer = setTimeout(() => { quitFlushed = true; app.quit(); }, 1500);
+  ipcMain.once("ovo:snapshot:flush-done", () => {
+    clearTimeout(timer);
+    quitFlushed = true;
+    app.quit();
+  });
+  win.webContents.send("ovo:snapshot:flush");
 });

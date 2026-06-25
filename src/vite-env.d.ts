@@ -138,5 +138,12 @@ interface Window {
       read: (projectId: string) => Promise<unknown | null>;
       write: (projectId: string, data: unknown) => Promise<{ ok: boolean }>;
     };
+    snapshots?: {
+      list: (projectId: string) => Promise<Array<{ id: string; createdAt: string; canvasName: string; assetCount: number }>>;
+      append: (projectId: string, entry: unknown) => Promise<Array<{ id: string; createdAt: string; canvasName: string; assetCount: number }>>;
+      get: (projectId: string, id: string) => Promise<{ id: string; createdAt: string; projectId: string; canvasName: string; canvasUrl: string; assets: unknown[]; canvasSnapshot: unknown; assetCount: number } | null>;
+      onFlush: (listener: () => void) => () => void;
+      sendFlushDone: () => void;
+    };
   };
 }

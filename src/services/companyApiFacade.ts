@@ -1,4 +1,5 @@
 import { checkAuth } from "../api/authClient";
+import { saveProjectSnapshot } from "../api/canvasClient";
 import { DesktopApiTransport } from "../api/desktopTransport";
 import { generateVideo as generateVideoWithTransport } from "../api/generationClient";
 import { generateImage as generateImageWithTransport, pollImageResult as pollImageResultWithTransport } from "../api/imageGenerationClient";
@@ -98,6 +99,8 @@ export const companyApiFacade = {
   pollImageResult: (input: { projectId: string; nodeId: string; taskId?: string }) =>
     pollImageResultWithTransport(window.ovoDesktop ? desktopTransport : transport, input),
   createCompanyCanvas: () => createCompanyCanvasWithTransport(window.ovoDesktop ? desktopTransport : transport),
+  restoreCanvasSnapshot: (projectId: string, snapshot: unknown) =>
+    saveProjectSnapshot(window.ovoDesktop ? desktopTransport : transport, projectId, snapshot),
   logout: async () => {
     if (!window.ovoDesktop) {
       return { status: "unauthenticated", message: "已退出登录" } satisfies AuthState;

@@ -24,6 +24,7 @@ import {
   type PendingTask
 } from "./lib/localCanvasStore";
 import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
+import { buildSnapshotEntry, formatSnapshotTimestamp, type SnapshotMeta } from "./lib/canvasSnapshots";
 import { getCategoryForAssetName } from "./lib/assetCategory";
 import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
@@ -310,6 +311,7 @@ export function App() {
   );
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
+  const [snapshotHistory, setSnapshotHistory] = useState<SnapshotMeta[]>([]);
   const [activityMessages, setActivityMessages] = useState<ActivityMessage[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -333,9 +335,31 @@ export function App() {
     assetsRef.current = assets;
   }, [assets]);
 
+  // snapshotStateRef 始终镜像最新快照所需字段，供 takeSnapshot 读取（避免 stale closure）
+  const snapshotStateRef = useRef<{
+    projectId: string | null;
+    canvasName: string;
+    canvasUrl: string;
+    assets: typeof assets;
+    canvasSnapshot: unknown;
+  }>({ projectId: null, canvasName: "", canvasUrl: "", assets: [], canvasSnapshot: null });
+
+  const autoSaveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // In-progress generation tasks, mirrored to the Electron local file so they
   // can be resumed (polled to completion) after the app is reopened.
   const pendingTasksRef = useRef<PendingTask[]>([]);
+
+  // 保持 snapshotStateRef 与最新 state 同步（避免 takeSnapshot stale closure）
+  useEffect(() => {
+    snapshotStateRef.current = {
+      projectId: project?.projectId ?? null,
+      canvasName,
+      canvasUrl,
+      assets,
+      canvasSnapshot
+    };
+  }, [project, canvasName, canvasUrl, assets, canvasSnapshot]);
 
   // On startup: restore the persistent session without requiring a manual
   // "检查登录态" click. The company session uses a persist: partition so
@@ -1087,6 +1111,86 @@ export function App() {
     }
   }
 
+  // ── 快照：takeSnapshot / startAutoSave / stopAutoSave ──────────────────────
+  async function takeSnapshot(reason: string) {
+    const s = snapshotStateRef.current;
+    if (!s.projectId || !window.ovoDesktop?.snapshots) return;
+    const entry = buildSnapshotEntry(
+      { projectId: s.projectId, canvasName: s.canvasName, canvasUrl: s.canvasUrl, assets: s.assets, canvasSnapshot: s.canvasSnapshot },
+      new Date()
+    );
+    try {
+      await window.ovoDesktop.snapshots.append(s.projectId, entry);
+    } catch (e) {
+      console.warn("[snapshot] append failed:", reason, e);
+    }
+  }
+
+  function startAutoSave(projectId: string) {
+    if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current);
+    void takeSnapshot("load");
+    autoSaveIntervalRef.current = setInterval(() => void takeSnapshot("auto"), 10 * 60 * 1000);
+    void projectId; // consumed via snapshotStateRef
+  }
+
+  function stopAutoSave() {
+    if (autoSaveIntervalRef.current) {
+      clearInterval(autoSaveIntervalRef.current);
+      autoSaveIntervalRef.current = null;
+    }
+  }
+
+  // 退出前 flush：主进程发 ovo:snapshot:flush，存完后回执
+  useEffect(() => {
+    const unsub = window.ovoDesktop?.snapshots?.onFlush?.(() => {
+      void takeSnapshot("quit").finally(() => {
+        window.ovoDesktop?.snapshots?.sendFlushDone?.();
+      });
+    });
+    return () => { unsub?.(); stopAutoSave(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ── end 快照 ────────────────────────────────────────────────────────────────
+
+  async function refreshSnapshotHistory() {
+    const pid = snapshotStateRef.current.projectId;
+    if (!pid || !window.ovoDesktop?.snapshots) return;
+    const list = await window.ovoDesktop.snapshots.list(pid);
+    setSnapshotHistory(list);
+  }
+
+  async function handleManualSave() {
+    await takeSnapshot("manual");
+    await refreshSnapshotHistory();
+  }
+
+  async function handleRestoreSnapshot(id: string) {
+    const pid = snapshotStateRef.current.projectId;
+    if (!pid || !window.ovoDesktop?.snapshots) return;
+    try {
+      // ① 先存保底，防止恢复错了有反悔
+      await takeSnapshot("pre-restore");
+      // ② 取完整快照
+      const entry = await window.ovoDesktop.snapshots.get(pid, id);
+      if (!entry) throw new Error("快照不存在");
+      // ③ 回写本地视图
+      const typedAssets = entry.assets as typeof assets;
+      setAssets(typedAssets);
+      assetsRef.current = typedAssets;
+      setCanvasName(entry.canvasName);
+      setCanvasUrl(entry.canvasUrl);
+      setCanvasSnapshot(entry.canvasSnapshot);
+      persistLocalCanvasFull(project, entry.canvasName, entry.canvasUrl, typedAssets);
+      // ④ 推回服务端 + 重新加载
+      await companyApiFacade.restoreCanvasSnapshot(pid, entry.canvasSnapshot);
+      await loadCanvasFromUrl(entry.canvasUrl);
+      addActivityMessage(`已恢复快照：${formatSnapshotTimestamp(entry.createdAt)}`);
+      await refreshSnapshotHistory();
+    } catch (e) {
+      setCanvasError(`恢复失败：${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   async function loadCanvasFromUrl(targetCanvasUrl: string) {
     setCanvasLoading(true);
     setCanvasError(undefined);
@@ -1126,6 +1230,7 @@ export function App() {
       persistLocalCanvasFull(result.project, nextCanvasName, result.project.canvasUrl, nextAssets);
       addActivityMessage(`已加载 ${result.assets.length} 个资源`);
       void resumePendingImageTasks(result.project);
+      startAutoSave(result.project.projectId);
     } catch (error) {
       setCanvasError(error instanceof Error ? error.message : "画布资源加载失败");
     } finally {
@@ -1766,6 +1871,7 @@ export function App() {
         authState={authState}
         loading={canvasLoading}
         errorMessage={canvasError}
+        snapshotHistory={snapshotHistory}
         onCanvasUrlChange={handleCanvasUrlChange}
         onCanvasNameChange={setCanvasName}
         onSaveCanvasName={handleSaveCanvasName}
@@ -1774,6 +1880,10 @@ export function App() {
         onNewCanvas={createNewCanvasSession}
         onOpenCompanyCanvas={handleOpenCompanyCanvas}
         onLoadCanvas={handleLoadCanvas}
+        onSaveSnapshot={() => void handleManualSave()}
+        onOpenSnapshotHistory={() => void refreshSnapshotHistory()}
+        onRestoreSnapshot={(id) => void handleRestoreSnapshot(id)}
+        onOpenQijing={() => void companyApiFacade.openCanvas("http://qijing.kjjhz.cn/", "plain")}
       />
 
       <div className="asset-workspace">

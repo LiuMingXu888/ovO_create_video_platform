@@ -8,7 +8,7 @@ type SaveAssetInput = {
 };
 
 contextBridge.exposeInMainWorld("ovoDesktop", {
-  version: "0.1.1",
+  version: "0.1.12",
   updater: {
     getCurrentVersion: () => ipcRenderer.invoke("ovo:updater:get-current-version"),
     checkForUpdates: () => ipcRenderer.invoke("ovo:updater:check-for-updates"),
@@ -53,5 +53,16 @@ contextBridge.exposeInMainWorld("ovoDesktop", {
   localStore: {
     read: (projectId: string) => ipcRenderer.invoke("ovo:local-store:read", projectId),
     write: (projectId: string, data: unknown) => ipcRenderer.invoke("ovo:local-store:write", projectId, data)
+  },
+  snapshots: {
+    list: (projectId: string) => ipcRenderer.invoke("ovo:snapshot:list", projectId),
+    append: (projectId: string, entry: unknown) => ipcRenderer.invoke("ovo:snapshot:append", projectId, entry),
+    get: (projectId: string, id: string) => ipcRenderer.invoke("ovo:snapshot:get", projectId, id),
+    onFlush: (listener: () => void) => {
+      const handler = () => listener();
+      ipcRenderer.on("ovo:snapshot:flush", handler);
+      return () => ipcRenderer.removeListener("ovo:snapshot:flush", handler);
+    },
+    sendFlushDone: () => ipcRenderer.send("ovo:snapshot:flush-done")
   }
 });

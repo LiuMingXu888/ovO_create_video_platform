@@ -8,9 +8,11 @@ const baseProps = {
   canvasName: "测试画布",
   canvasHistory: [],
   loading: false,
+  snapshotHistory: [],
   onCanvasUrlChange: vi.fn(), onCanvasNameChange: vi.fn(), onSaveCanvasName: vi.fn(),
   onSelectCanvasHistory: vi.fn(), onDeleteCanvasHistory: vi.fn(), onNewCanvas: vi.fn(),
-  onOpenCompanyCanvas: vi.fn(), onLoadCanvas: vi.fn()
+  onOpenCompanyCanvas: vi.fn(), onLoadCanvas: vi.fn(),
+  onSaveSnapshot: vi.fn(), onOpenSnapshotHistory: vi.fn(), onRestoreSnapshot: vi.fn(), onOpenQijing: vi.fn()
 };
 
 describe("CanvasControls 画布按钮", () => {
