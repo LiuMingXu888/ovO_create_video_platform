@@ -1,6 +1,7 @@
 import { Coins, Download, LogIn, LogOut, MousePointer2, RefreshCw, SquareCheck, Trash2, UserRound, X } from "lucide-react";
 import type { AuthState, CanvasProject } from "../types";
 import { getManualUpdateButtonLabel, isManualUpdateBusy, type ManualUpdateState } from "../update/manualUpdateState";
+import { ModeSwitch, type AppMode } from "./ModeSwitch";
 
 interface AppHeaderProps {
   authState?: AuthState;
@@ -9,6 +10,8 @@ interface AppHeaderProps {
   selectedCount?: number;
   totalAssetCount?: number;
   appVersion?: string;
+  appMode?: AppMode;
+  onModeChange?: (mode: AppMode) => void;
   updateState?: ManualUpdateState;
   onToggleSelectionMode?: () => void;
   onSelectAllAssets?: () => void;
@@ -27,6 +30,8 @@ export function AppHeader({
   selectedCount = 0,
   totalAssetCount = 0,
   appVersion = "0.1.1",
+  appMode = "free",
+  onModeChange,
   updateState = { phase: "idle" },
   onToggleSelectionMode,
   onSelectAllAssets,
@@ -53,6 +58,7 @@ export function AppHeader({
       <div className="brand" aria-label="ovO">
         <span className="brand-mark">ovO</span>
         <span className="brand-version">v{appVersion}</span>
+        {onModeChange ? <ModeSwitch mode={appMode} onModeChange={onModeChange} /> : null}
       </div>
 
       <div className="project-title">
