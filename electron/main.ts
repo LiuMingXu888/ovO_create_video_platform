@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -16,6 +16,7 @@ import type { SaveAssetInput } from "./downloadPaths.js";
 import { readCanvasStore, writeCanvasStore } from "./canvasStore.js";
 import { appendSnapshot, getSnapshot, listSnapshots } from "./canvasSnapshotStore.js";
 import { createGiteeReleaseUpdater } from "./giteeReleaseUpdater.js";
+import { readAppSettings, writeAppSettings } from "./appSettingsStore.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +94,16 @@ app.whenReady().then(() => {
   ipcMain.handle("ovo:snapshot:list", (_e, projectId: string) => listSnapshots(projectId));
   ipcMain.handle("ovo:snapshot:append", (_e, projectId: string, entry: unknown) => appendSnapshot(projectId, entry as Parameters<typeof appendSnapshot>[1]));
   ipcMain.handle("ovo:snapshot:get", (_e, projectId: string, id: string) => getSnapshot(projectId, id));
+
+  ipcMain.handle("ovo:settings:get", () => readAppSettings());
+  ipcMain.handle("ovo:settings:set", (_e, input: { downloadDir: string }) => writeAppSettings({ downloadDir: typeof input?.downloadDir === "string" ? input.downloadDir : "" }));
+  ipcMain.handle("ovo:dialog:select-folder", async () => {
+    const result = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true };
+    }
+    return { canceled: false, path: result.filePaths[0] };
+  });
 
   createMainWindow();
 

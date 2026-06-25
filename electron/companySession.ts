@@ -13,6 +13,7 @@ import {
 } from "./companySessionClient.js";
 import { createCategorizedDownloadPlan, createDownloadFolderName, sanitizePathPart, type SaveAssetInput } from "./downloadPaths.js";
 import { createStoragePaths } from "./storagePaths.js";
+import { readAppSettings, resolveDownloadDir } from "./appSettingsStore.js";
 
 const LOGIN_POLL_INTERVAL_MS = 2000;
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
@@ -548,7 +549,8 @@ export async function uploadCompanyFile(pathname: string, input: CompanyUploadIn
 
 export async function saveAssetToDownloads(input: SaveAssetInput) {
   const fileName = sanitizePathPart(input.fileName);
-  const destinationPath = path.join(app.getPath("downloads"), fileName);
+  const baseDir = resolveDownloadDir(app.getPath("downloads"), readAppSettings().downloadDir);
+  const destinationPath = path.join(baseDir, fileName);
 
   try {
     const response = await fetchWithCompanySession(input.url);
@@ -577,7 +579,7 @@ export async function saveAssetToDownloads(input: SaveAssetInput) {
 export async function saveAssetsToDownloads(input: SaveAssetsInput) {
   const directoryName = createDownloadFolderName(new Date());
   const plan = createCategorizedDownloadPlan({
-    downloadsPath: app.getPath("downloads"),
+    downloadsPath: resolveDownloadDir(app.getPath("downloads"), readAppSettings().downloadDir),
     timestampFolderName: directoryName,
     assets: input.assets
   });

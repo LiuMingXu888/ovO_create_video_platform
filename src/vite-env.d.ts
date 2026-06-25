@@ -134,6 +134,13 @@ interface Window {
         message?: string;
       }>;
     };
+    settings?: {
+      get: () => Promise<{ downloadDir: string }>;
+      set: (input: { downloadDir: string }) => Promise<{ ok: boolean }>;
+    };
+    dialog?: {
+      selectFolder: () => Promise<{ canceled: boolean; path?: string }>;
+    };
     localStore?: {
       read: (projectId: string) => Promise<unknown | null>;
       write: (projectId: string, data: unknown) => Promise<{ ok: boolean }>;
