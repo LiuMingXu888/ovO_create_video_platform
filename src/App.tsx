@@ -246,40 +246,6 @@ function isSharedCanvasUrl(value: string) {
   }
 }
 
-function readMediaDuration(kind: AssetKind, objectUrl: string): Promise<number | undefined> {
-  if (kind === "image") {
-    return Promise.resolve(undefined);
-  }
-
-  return new Promise((resolve) => {
-    const media = document.createElement(kind === "audio" ? "audio" : "video");
-    let settled = false;
-    const timeoutId = window.setTimeout(() => settle(undefined), 5000);
-
-    function settle(duration: number | undefined) {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      window.clearTimeout(timeoutId);
-      media.onloadedmetadata = null;
-      media.onerror = null;
-      media.removeAttribute("src");
-      resolve(duration);
-    }
-
-    media.preload = "metadata";
-    media.onloadedmetadata = () => {
-      settle(Number.isFinite(media.duration) ? media.duration : undefined);
-    };
-    media.onerror = () => {
-      settle(undefined);
-    };
-    media.src = objectUrl;
-  });
-}
-
 export function App() {
   const { showToast } = useToast();
   const [assets, setAssets] = useState<CanvasAsset[]>(sampleAssets);
@@ -1477,69 +1443,6 @@ export function App() {
     });
   }
 
-  async function handleReferenceFilesSelected(files: FileList) {
-    const createdReferences = await Promise.all(
-      Array.from(files).map(async (file) => {
-        const id = createId("local-ref");
-        const name = getDisplayName(file);
-        const kind = kindFromFile(file, "image");
-        const objectUrl = URL.createObjectURL(file);
-        referenceObjectUrls.current.set(id, objectUrl);
-        const durationSeconds = await readMediaDuration(kind, objectUrl);
-        const issue =
-          kind !== "image" && durationSeconds === undefined
-            ? {
-                id,
-                message: `无法读取「${name}」的媒体时长`
-              }
-            : undefined;
-
-        return {
-          item: {
-            id,
-            name,
-            kind,
-            url: objectUrl,
-            sizeBytes: file.size,
-            durationSeconds,
-            mimeType: file.type,
-            fileName: file.name,
-            source: "local-file" as const
-          },
-          issue
-        };
-      })
-    );
-
-    if (!mounted.current) {
-      return;
-    }
-
-    const newItems = createdReferences.map(({ item }) => item);
-    const issues = createdReferences.flatMap(({ issue }) => (issue ? [issue] : []));
-
-    setReferences((current) => {
-      const candidateReferences = [...current, ...newItems];
-      const validation = validateReferenceItems(candidateReferences);
-
-      if (validation.valid && issues.length === 0) {
-        setReferenceIssues((currentIssues) => currentIssues.filter((issue) => !newItems.some((item) => item.id === issue.id)));
-        return candidateReferences;
-      }
-
-      newItems.forEach((item) => {
-        revokeObjectUrl(referenceObjectUrls.current.get(item.id));
-        referenceObjectUrls.current.delete(item.id);
-      });
-      setReferenceIssues((currentIssues) => [
-        ...currentIssues,
-        ...issues,
-        ...validation.errors.map((message) => ({ id: createId("reference-error"), message }))
-      ]);
-      return current;
-    });
-  }
-
   function removeReference(id: string) {
     revokeObjectUrl(referenceObjectUrls.current.get(id));
     referenceObjectUrls.current.delete(id);
@@ -1938,7 +1841,6 @@ export function App() {
         validationErrors={referenceIssues.map((issue) => issue.message)}
         onPromptChange={setPrompt}
         onRemoveReference={removeReference}
-        onLocalFilesSelected={handleReferenceFilesSelected}
         onGenerate={handleGeneratePreview}
         activityMessages={activityMessages.map((message) => message.text)}
         generateMode={generateMode}

@@ -1,6 +1,6 @@
-import { ImagePlus, X } from "lucide-react";
+import { ListPlus, X } from "lucide-react";
 import { useState } from "react";
-import { getReferenceLabel } from "../lib/referenceText";
+import { buildReferenceText, getReferenceLabel } from "../lib/referenceText";
 import { validateReferenceItems } from "../lib/referenceValidation";
 import type { GenerateMode, GenerationSettings, ImageGenerationSettings, ReferenceItem } from "../types";
 import { GeneratePanel } from "./GeneratePanel";
@@ -13,7 +13,7 @@ interface PromptDockProps {
   validationErrors?: string[];
   onPromptChange: (value: string) => void;
   onRemoveReference: (id: string) => void;
-  onLocalFilesSelected: (files: FileList) => void;
+  onLocalFilesSelected?: (files: FileList) => void;
   onGenerate: () => void;
   generateMode: GenerateMode;
   onGenerateModeChange: (mode: GenerateMode) => void;
@@ -32,7 +32,6 @@ export function PromptDock({
   validationErrors = [],
   onPromptChange,
   onRemoveReference,
-  onLocalFilesSelected,
   onGenerate,
   generateMode,
   onGenerateModeChange,
@@ -52,21 +51,21 @@ export function PromptDock({
   return (
     <div className="prompt-dock">
       <div className="reference-strip" aria-label="参考素材">
-        <label className="reference-add" title="添加参考素材">
-          <input
-            className="visually-hidden"
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,audio/mpeg,audio/wav"
-            onChange={(event) => {
-              if (event.currentTarget.files) {
-                onLocalFilesSelected(event.currentTarget.files);
-              }
-              event.currentTarget.value = "";
-            }}
-          />
-          <ImagePlus size={20} />
-        </label>
+        <button
+          type="button"
+          className="reference-add reference-textify"
+          title="文字化引用到提示词"
+          aria-label="文字化引用到提示词"
+          disabled={references.length === 0}
+          onClick={() => {
+            const text = buildReferenceText(references);
+            if (text) {
+              onPromptChange(`${text}\n${prompt}`);
+            }
+          }}
+        >
+          <ListPlus size={20} />
+        </button>
 
         {references.map((item) => (
           <button
