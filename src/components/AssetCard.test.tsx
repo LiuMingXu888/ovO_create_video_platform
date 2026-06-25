@@ -139,3 +139,71 @@ describe("AssetCard image reuse button", () => {
     expect(screen.getByLabelText("复用提示词和资源 人物B")).toBeDisabled();
   });
 });
+
+describe("AssetCard view-prompt button", () => {
+  it("人物卡片显示提示词按钮并触发 view-prompt", () => {
+    const onAction = vi.fn();
+    const asset = {
+      id: "img3",
+      name: "人物C",
+      kind: "image" as const,
+      category: "characters" as const,
+      url: "https://cdn.example.com/c.png",
+      status: "ready" as const,
+      generationPrompt: "一个角色提示词"
+    } as CanvasAsset;
+    render(
+      <AssetCard asset={asset} onAction={onAction} onRename={() => {}} onChangeCategory={() => {}} />
+    );
+    const btn = screen.getByLabelText("查看提示词 人物C");
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ category: "characters" }), "view-prompt");
+  });
+
+  it("没有 generationPrompt 时提示词按钮禁用", () => {
+    const asset = {
+      id: "img4",
+      name: "人物D",
+      kind: "image" as const,
+      category: "scenes" as const,
+      url: "https://cdn.example.com/d.png",
+      status: "ready" as const
+    } as CanvasAsset;
+    render(
+      <AssetCard asset={asset} onAction={vi.fn()} onRename={() => {}} onChangeCategory={() => {}} />
+    );
+    expect(screen.getByLabelText("查看提示词 人物D")).toBeDisabled();
+  });
+
+  it("音频卡片不显示提示词按钮", () => {
+    const asset = {
+      id: "aud1",
+      name: "背景音乐",
+      kind: "audio" as const,
+      category: "audio" as const,
+      url: "https://cdn.example.com/a.mp3",
+      status: "ready" as const
+    } as CanvasAsset;
+    render(
+      <AssetCard asset={asset} onAction={vi.fn()} onRename={() => {}} onChangeCategory={() => {}} />
+    );
+    expect(screen.queryByLabelText(/查看提示词/)).toBeNull();
+  });
+
+  it("视频卡片显示提示词按钮", () => {
+    const asset = {
+      id: "vid1",
+      name: "成片A",
+      kind: "video" as const,
+      category: "video" as const,
+      url: "https://cdn.example.com/v.mp4",
+      status: "ready" as const,
+      generationPrompt: "视频提示词"
+    } as CanvasAsset;
+    render(
+      <AssetCard asset={asset} onAction={vi.fn()} onRename={() => {}} onChangeCategory={() => {}} />
+    );
+    expect(screen.getByLabelText("查看提示词 成片A")).not.toBeDisabled();
+  });
+});

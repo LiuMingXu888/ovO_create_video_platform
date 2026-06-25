@@ -10,7 +10,8 @@ export type AssetAction =
   | "remove-subtitles"
   | "toggle-play"
   | "delete"
-  | "reuse-generation";
+  | "reuse-generation"
+  | "view-prompt";
 
 export type SortMode = "default" | "generated-asc" | "generated-desc" | "name-asc" | "name-desc";
 

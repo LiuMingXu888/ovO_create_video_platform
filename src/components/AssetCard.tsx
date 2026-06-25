@@ -1,4 +1,4 @@
-import { CaptionsOff, Check, Download, Film, Maximize2, Package, Pause, Pencil, Play, Plus, RefreshCcw, RotateCw, Trash2, UserRound, X } from "lucide-react";
+import { CaptionsOff, Check, Download, Film, Maximize2, MessageSquareText, Package, Pause, Pencil, Play, Plus, RefreshCcw, RotateCw, Trash2, UserRound, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { AssetAction, AssetCategory, CanvasAsset } from "../types";
 
@@ -280,6 +280,17 @@ export function AssetCard({
           <button type="button" title="删除" aria-label={`删除 ${asset.name}`} onClick={() => onAction(asset, "delete")}>
             <Trash2 size={15} />
           </button>
+          {asset.kind !== "audio" && (
+            <button
+              type="button"
+              title={asset.generationPrompt ? "查看提示词" : "暂无生成提示词"}
+              aria-label={`查看提示词 ${asset.name}`}
+              disabled={!asset.generationPrompt}
+              onClick={() => onAction(asset, "view-prompt")}
+            >
+              <MessageSquareText size={15} />
+            </button>
+          )}
         </div>
       </div>
 
