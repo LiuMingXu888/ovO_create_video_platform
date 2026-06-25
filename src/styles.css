@@ -1444,3 +1444,12 @@ button {
   display: flex;
   justify-content: flex-end;
 }
+
+/* PromptInfoModal */
+.prompt-info-modal { display: flex; flex-direction: column; gap: 12px; }
+.prompt-info-thumbs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.prompt-info-thumb { flex: 0 0 auto; width: 96px; height: 96px; border-radius: 8px; overflow: hidden; background: #00000010; display: grid; place-items: center; }
+.prompt-info-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.prompt-info-thumb span { font-size: 12px; padding: 4px; text-align: center; }
+.prompt-info-prompt { margin: 0; padding-left: 18px; overflow-y: auto; max-height: 50vh; line-height: 1.6; }
+.prompt-info-empty { color: #888; }

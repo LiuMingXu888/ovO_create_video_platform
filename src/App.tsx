@@ -4,6 +4,7 @@ import { type AppMode } from "./components/ModeSwitch";
 import { AssetSection } from "./components/AssetSection";
 import { CanvasControls } from "./components/CanvasControls";
 import { PreviewModal } from "./components/PreviewModal";
+import { PromptInfoModal } from "./components/PromptInfoModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { loadDownloadDir, saveDownloadDir, pickFolder } from "./lib/appSettings";
 import { PromptDock } from "./components/PromptDock";
@@ -270,6 +271,7 @@ export function App() {
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [referenceIssues, setReferenceIssues] = useState<ReferenceIssue[]>([]);
   const [previewAsset, setPreviewAsset] = useState<CanvasAsset | null>(null);
+  const [promptInfoAsset, setPromptInfoAsset] = useState<CanvasAsset | null>(null);
   const [canvasUrl, setCanvasUrl] = useState("http://qijing.kjjhz.cn/canvas/cmq6fwhft0bg5m2l5u78zby8x");
   const [canvasName, setCanvasName] = useState("未命名画布");
   const [canvasHistory, setCanvasHistory] = useState(() => loadCanvasHistory());
@@ -823,6 +825,11 @@ export function App() {
 
     if (action === "reuse-generation") {
       reuseGeneration(asset);
+      return;
+    }
+
+    if (action === "view-prompt") {
+      setPromptInfoAsset(asset);
       return;
     }
 
@@ -1861,6 +1868,7 @@ export function App() {
         onGenerateImage={handleGenerateImage}
       />
 
+      <PromptInfoModal asset={promptInfoAsset} onClose={() => setPromptInfoAsset(null)} />
       <PreviewModal
         asset={previewAsset}
         onClose={() => setPreviewAsset(null)}
