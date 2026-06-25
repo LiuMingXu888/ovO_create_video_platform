@@ -26,6 +26,7 @@ export function PreviewModal({
   const [videoSize, setVideoSize] = useState<{ width: number; height: number } | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [scale, setScale] = useState(1);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,10 @@ export function PreviewModal({
     setEditingName(false);
     setDraftName(asset?.name ?? "");
   }, [asset?.id, asset?.name]);
+
+  useEffect(() => {
+    setScale(1);
+  }, [asset?.id]);
 
   if (!asset) {
     return null;
@@ -54,7 +59,7 @@ export function PreviewModal({
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${asset.name} 预览`}>
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${asset.name} 预览`} onWheel={(e) => e.preventDefault()}>
       <div className="preview-modal">
         <button type="button" className="modal-close" onClick={onClose} title="关闭" aria-label="关闭">
           <X size={20} />
@@ -138,8 +143,26 @@ export function PreviewModal({
             </button>
           </div>
         </div>
-        <div className="preview-frame">
-          {asset.kind === "image" && <img className="preview-media" src={asset.url} alt={asset.name} />}
+        <div
+          className="preview-frame"
+          onWheel={(e) => {
+            e.preventDefault();
+            if (e.ctrlKey && asset.kind === "image") {
+              setScale((current) => {
+                const next = current + (e.deltaY < 0 ? 0.25 : -0.25);
+                return Math.min(4, Math.max(1, Number(next.toFixed(2))));
+              });
+            }
+          }}
+        >
+          {asset.kind === "image" && (
+            <img
+              className="preview-media"
+              src={asset.url}
+              alt={asset.name}
+              style={{ transform: `scale(${scale})`, transformOrigin: "center center", transition: "transform 0.08s ease-out" }}
+            />
+          )}
           {asset.kind === "video" && (
             <video
               className={videoClassName}
