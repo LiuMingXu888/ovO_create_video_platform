@@ -1,5 +1,6 @@
 import { ImagePlus, X } from "lucide-react";
 import { useState } from "react";
+import { getReferenceLabel } from "../lib/referenceText";
 import { validateReferenceItems } from "../lib/referenceValidation";
 import type { GenerateMode, GenerationSettings, ImageGenerationSettings, ReferenceItem } from "../types";
 import { GeneratePanel } from "./GeneratePanel";
@@ -23,20 +24,6 @@ interface PromptDockProps {
   onGenerateImage: () => void;
   generateDisabled?: boolean;
   activityMessages?: string[];
-}
-
-function getReferenceLabel(item: ReferenceItem, references: ReferenceItem[]) {
-  const sameKindIndex = references.filter((reference) => reference.kind === item.kind).findIndex((reference) => reference.id === item.id) + 1;
-
-  if (item.kind === "image") {
-    return `图片${sameKindIndex}`;
-  }
-
-  if (item.kind === "video") {
-    return `视频${sameKindIndex}`;
-  }
-
-  return `音频${sameKindIndex}`;
 }
 
 export function PromptDock({
