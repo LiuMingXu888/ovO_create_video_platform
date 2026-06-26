@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ensureDefaultAssetPrefix,
   parseAssetNamePrefix,
-  replaceAssetCategoryPrefix
+  replaceAssetCategoryPrefix,
+  stripPromptPrefixes
 } from "./assetNamePrefix";
 import type { CanvasAsset } from "../types";
 
@@ -79,5 +80,15 @@ describe("asset name prefixes", () => {
     expect(replaceAssetCategoryPrefix("人物-苏晚晴", "props")).toBe("道具-苏晚晴");
     expect(replaceAssetCategoryPrefix("场景-百家老宅", "characters")).toBe("人物-百家老宅");
     expect(replaceAssetCategoryPrefix("苏晚晴", "scenes")).toBe("场景-苏晚晴");
+  });
+
+  it("strips 人物- and 音频- prefixes from prompt text, keeping 场景- and 道具- intact", () => {
+    expect(stripPromptPrefixes("人物-苏晚晴在场景-百家老宅吃道具-桂花糕，音频-背景音乐")).toBe(
+      "苏晚晴在场景-百家老宅吃道具-桂花糕，背景音乐"
+    );
+    expect(stripPromptPrefixes("音频-旁白讲述故事")).toBe("旁白讲述故事");
+    expect(stripPromptPrefixes("场景-森林很美丽")).toBe("场景-森林很美丽");
+    expect(stripPromptPrefixes("道具-宝剑闪闪发光")).toBe("道具-宝剑闪闪发光");
+    expect(stripPromptPrefixes("普通文本没有前缀")).toBe("普通文本没有前缀");
   });
 });

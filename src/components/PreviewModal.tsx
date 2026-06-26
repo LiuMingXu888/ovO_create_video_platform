@@ -59,8 +59,8 @@ export function PreviewModal({
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${asset.name} 预览`} onWheel={(e) => e.preventDefault()}>
-      <div className="preview-modal">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${asset.name} 预览`} onClick={onClose} onWheel={(e) => e.preventDefault()}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="modal-close" onClick={onClose} title="关闭" aria-label="关闭">
           <X size={20} />
         </button>

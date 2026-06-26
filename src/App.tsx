@@ -32,7 +32,7 @@ import {
 import { normalizeSnapshotAssets } from "./lib/assetNormalizer";
 import { buildSnapshotEntry, formatSnapshotTimestamp, type SnapshotMeta } from "./lib/canvasSnapshots";
 import { getCategoryForAssetName } from "./lib/assetCategory";
-import { replaceAssetCategoryPrefix } from "./lib/assetNamePrefix";
+import { replaceAssetCategoryPrefix, stripPromptPrefixes } from "./lib/assetNamePrefix";
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { DEFAULT_IMAGE_GENERATION_SETTINGS } from "./lib/imageGenOptions";
 import { decodeNodeIdTime } from "./lib/nodeIdTime";
@@ -258,6 +258,7 @@ export function App() {
   );
   const [draggedAsset, setDraggedAsset] = useState<CanvasAsset | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [nodeName, setNodeName] = useState("");
   const [generationSettings, setGenerationSettings] = useState<GenerationSettings>({
     aspectRatio: "9:16",
     resolution: "720p",
@@ -649,7 +650,13 @@ export function App() {
       return;
     }
 
-    setPrompt(asset.generationPrompt);
+    // Strip "人物-" and "音频-" prefixes from prompt
+    const processedPrompt = stripPromptPrefixes(asset.generationPrompt);
+    setPrompt(processedPrompt);
+
+    // Copy asset name to nodeName input (strip prefix)
+    const processedName = stripPromptPrefixes(asset.name);
+    setNodeName(processedName);
 
     if (!asset.generationReferences?.length) {
       setReferences([]);
@@ -675,9 +682,10 @@ export function App() {
 
   function createGeneratedVideoPlaceholder() {
     const placeholderId = createId("generated-video");
+    const baseName = nodeName.trim() || `生成视频 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`;
     return {
       id: placeholderId,
-      name: `生成视频 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`,
+      name: baseName,
       kind: "video" as const,
       category: "video" as const,
       url: "",
@@ -694,9 +702,10 @@ export function App() {
 
   function createGeneratedImagePlaceholder(category: AssetCategory): CanvasAsset {
     const placeholderId = createId("generated-image");
+    const baseName = nodeName.trim() || `生成图片 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`;
     return {
       id: placeholderId,
-      name: `生成图片 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`,
+      name: baseName,
       kind: "image",
       category,
       url: "",
@@ -1526,6 +1535,7 @@ export function App() {
     setPrompt("");
     setReferences([]);
     setReferenceIssues([]);
+    setNodeName("");
 
     if (project) {
       const startTime = Date.now();
@@ -1669,6 +1679,7 @@ export function App() {
     setPrompt("");
     setReferences([]);
     setReferenceIssues([]);
+    setNodeName("");
 
     // 记录进行中任务并落盘, 这样生成途中退出 app 后重开仍能续轮询。
     pendingTasksRef.current = [
@@ -1891,9 +1902,11 @@ export function App() {
 
       <PromptDock
         prompt={prompt}
+        nodeName={nodeName}
         references={references}
         validationErrors={referenceIssues.map((issue) => issue.message)}
         onPromptChange={setPrompt}
+        onNodeNameChange={setNodeName}
         onRemoveReference={removeReference}
         onGenerate={handleGeneratePreview}
         activityMessages={activityMessages.map((message) => message.text)}

@@ -77,3 +77,13 @@ export function replaceAssetCategoryPrefix(name: string, category: AssetCategory
 export function categoryFromAssetNamePrefix(name: string): AssetCategory | null {
   return parseAssetNamePrefix(name)?.category ?? null;
 }
+
+/**
+ * Strip "人物-" and "音频-" prefixes from prompt text.
+ * Keeps "场景-" and "道具-" prefixes intact (user requirement).
+ * Examples: "人物-小红" → "小红", "音频-背景" → "背景", "场景-森林" stays unchanged.
+ */
+export function stripPromptPrefixes(text: string): string {
+  // Remove literal "人物-" and "音频-" prefixes wherever they appear
+  return text.replace(/人物-/g, '').replace(/音频-/g, '');
+}
