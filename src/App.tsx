@@ -1899,13 +1899,11 @@ export function App() {
 
       <PromptDock
         prompt={prompt}
-        nodeName={nodeName}
         references={references}
         validationErrors={referenceIssues.map((issue) => issue.message)}
         nodeName={nodeName}
         onNodeNameChange={setNodeName}
         onPromptChange={setPrompt}
-        onNodeNameChange={setNodeName}
         onRemoveReference={removeReference}
         onGenerate={handleGeneratePreview}
         activityMessages={activityMessages.map((message) => message.text)}

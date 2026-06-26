@@ -6,17 +6,14 @@ import type { GenerateMode, GenerationSettings, ImageGenerationSettings, Referen
 import { GeneratePanel } from "./GeneratePanel";
 import { ImageGeneratePanel } from "./ImageGeneratePanel";
 import { PromptTokenEditor } from "./PromptTokenEditor";
-import { ToolsPlaceholder } from "./ToolsPlaceholder";
 
 interface PromptDockProps {
   prompt: string;
-  nodeName: string;
   references: ReferenceItem[];
   validationErrors?: string[];
   nodeName: string;
   onNodeNameChange: (value: string) => void;
   onPromptChange: (value: string) => void;
-  onNodeNameChange: (value: string) => void;
   onRemoveReference: (id: string) => void;
   onLocalFilesSelected?: (files: FileList) => void;
   onGenerate: () => void;
@@ -33,13 +30,11 @@ interface PromptDockProps {
 
 export function PromptDock({
   prompt,
-  nodeName,
   references,
   validationErrors = [],
   nodeName,
   onNodeNameChange,
   onPromptChange,
-  onNodeNameChange,
   onRemoveReference,
   onGenerate,
   generateMode,
