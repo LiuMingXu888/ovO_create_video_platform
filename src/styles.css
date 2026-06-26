@@ -200,7 +200,42 @@ button {
   color: #15803d;
 }
 
-.workflow-placeholder {
+/* 新的模式切换按钮组 */
+.mode-switch-group {
+  display: inline-flex;
+  margin-left: 12px;
+  border: 1px solid #d7d4cc;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f6f7f4;
+}
+
+.mode-switch-button {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #68705f;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-right: 1px solid #d7d4cc;
+}
+
+.mode-switch-button:last-child {
+  border-right: none;
+}
+
+.mode-switch-button--active {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.mode-switch-button:hover:not(.mode-switch-button--active) {
+  background: #e8e9e5;
+}
+
+.workflow-placeholder, .tools-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -915,6 +950,39 @@ button {
   width: min(96vw, 1800px);
   color: #b4232d;
   font-size: 12px;
+}
+
+.node-name-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(96vw, 1800px);
+  padding: 8px 0;
+}
+
+.node-name-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #547980;
+  white-space: nowrap;
+}
+
+.node-name-field input {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.node-name-field input:focus {
+  border-color: #547980;
+}
+
+.node-name-field input::placeholder {
+  color: #999;
 }
 
 .prompt-row {

@@ -1,4 +1,4 @@
-export type AppMode = "free" | "workflow";
+export type AppMode = "free" | "workflow" | "tools";
 
 interface ModeSwitchProps {
   mode: AppMode;
@@ -6,19 +6,29 @@ interface ModeSwitchProps {
 }
 
 export function ModeSwitch({ mode, onModeChange }: ModeSwitchProps) {
-  const isWorkflow = mode === "workflow";
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={isWorkflow}
-      aria-label="模式切换"
-      className={`mode-switch${isWorkflow ? " mode-switch--workflow" : ""}`}
-      onClick={() => onModeChange(isWorkflow ? "free" : "workflow")}
-    >
-      <span className="mode-switch-thumb" aria-hidden="true" />
-      <span className="mode-switch-label mode-switch-label--free">自由</span>
-      <span className="mode-switch-label mode-switch-label--workflow">工作流</span>
-    </button>
+    <div className="mode-switch-group" role="group" aria-label="模式切换">
+      <button
+        type="button"
+        className={`mode-switch-button${mode === "free" ? " mode-switch-button--active" : ""}`}
+        onClick={() => onModeChange("free")}
+      >
+        自由
+      </button>
+      <button
+        type="button"
+        className={`mode-switch-button${mode === "workflow" ? " mode-switch-button--active" : ""}`}
+        onClick={() => onModeChange("workflow")}
+      >
+        工作流
+      </button>
+      <button
+        type="button"
+        className={`mode-switch-button${mode === "tools" ? " mode-switch-button--active" : ""}`}
+        onClick={() => onModeChange("tools")}
+      >
+        工具
+      </button>
+    </div>
   );
 }

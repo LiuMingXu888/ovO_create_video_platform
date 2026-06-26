@@ -650,13 +650,8 @@ export function App() {
       return;
     }
 
-    // Strip "人物-" and "音频-" prefixes from prompt
-    const processedPrompt = stripPromptPrefixes(asset.generationPrompt);
-    setPrompt(processedPrompt);
-
-    // Copy asset name to nodeName input (strip prefix)
-    const processedName = stripPromptPrefixes(asset.name);
-    setNodeName(processedName);
+    setPrompt(asset.generationPrompt);
+    setNodeName(asset.name);
 
     if (!asset.generationReferences?.length) {
       setReferences([]);
@@ -682,10 +677,10 @@ export function App() {
 
   function createGeneratedVideoPlaceholder() {
     const placeholderId = createId("generated-video");
-    const baseName = nodeName.trim() || `生成视频 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`;
+    const defaultName = `生成视频 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-video")).length + 1}`;
     return {
       id: placeholderId,
-      name: baseName,
+      name: nodeName.trim() || defaultName,
       kind: "video" as const,
       category: "video" as const,
       url: "",
@@ -702,10 +697,10 @@ export function App() {
 
   function createGeneratedImagePlaceholder(category: AssetCategory): CanvasAsset {
     const placeholderId = createId("generated-image");
-    const baseName = nodeName.trim() || `生成图片 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`;
+    const defaultName = `生成图片 ${assetsRef.current.filter((asset) => asset.id.startsWith("generated-image")).length + 1}`;
     return {
       id: placeholderId,
-      name: baseName,
+      name: nodeName.trim() || defaultName,
       kind: "image",
       category,
       url: "",
@@ -1533,6 +1528,7 @@ export function App() {
       video: [...current.video, generatedAsset.id]
     }));
     setPrompt("");
+    setNodeName("");
     setReferences([]);
     setReferenceIssues([]);
     setNodeName("");
@@ -1677,6 +1673,7 @@ export function App() {
       [assetCategory]: [...current[assetCategory], placeholder.id]
     }));
     setPrompt("");
+    setNodeName("");
     setReferences([]);
     setReferenceIssues([]);
     setNodeName("");
@@ -1905,6 +1902,8 @@ export function App() {
         nodeName={nodeName}
         references={references}
         validationErrors={referenceIssues.map((issue) => issue.message)}
+        nodeName={nodeName}
+        onNodeNameChange={setNodeName}
         onPromptChange={setPrompt}
         onNodeNameChange={setNodeName}
         onRemoveReference={removeReference}
@@ -1944,8 +1943,10 @@ export function App() {
         }}
       />
         </>
-      ) : (
+      ) : appMode === "workflow" ? (
         <div className="workflow-placeholder">这是工作流页面</div>
+      ) : (
+        <div className="tools-placeholder">这是工具</div>
       )}
       <SettingsModal
         open={settingsOpen}

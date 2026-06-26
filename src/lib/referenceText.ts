@@ -8,15 +8,25 @@ export function getReferenceLabel(item: ReferenceItem, references: ReferenceItem
   return `音频${sameKindIndex}`;
 }
 
+function stripAssetPrefix(name: string): string {
+  // 去除"人物-"或"人物 -"等变体（模糊匹配）
+  let stripped = name.replace(/^人物[\s\-]*/, '');
+  // 去除"音频-"或"音频 -"等变体（模糊匹配）
+  stripped = stripped.replace(/^音频[\s\-]*/, '');
+  // 如果替换后为空，返回原名
+  return stripped || name;
+}
+
 export function buildReferenceText(references: ReferenceItem[]): string {
   const groups: { name: string; labels: string[] }[] = [];
   for (const item of references) {
     const label = getReferenceLabel(item, references);
-    const existing = groups.find((group) => group.name === item.name);
+    const processedName = stripAssetPrefix(item.name);
+    const existing = groups.find((group) => group.name === processedName);
     if (existing) {
       existing.labels.push(label);
     } else {
-      groups.push({ name: item.name, labels: [label] });
+      groups.push({ name: processedName, labels: [label] });
     }
   }
   return groups.map((group) => `${group.labels.join("")}是${group.name}`).join("、");

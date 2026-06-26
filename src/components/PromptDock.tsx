@@ -13,6 +13,8 @@ interface PromptDockProps {
   nodeName: string;
   references: ReferenceItem[];
   validationErrors?: string[];
+  nodeName: string;
+  onNodeNameChange: (value: string) => void;
   onPromptChange: (value: string) => void;
   onNodeNameChange: (value: string) => void;
   onRemoveReference: (id: string) => void;
@@ -34,6 +36,8 @@ export function PromptDock({
   nodeName,
   references,
   validationErrors = [],
+  nodeName,
+  onNodeNameChange,
   onPromptChange,
   onNodeNameChange,
   onRemoveReference,
@@ -109,6 +113,17 @@ export function PromptDock({
       </div>
 
       {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
+
+      <div className="node-name-field">
+        <label htmlFor="node-name-input">节点名称</label>
+        <input
+          id="node-name-input"
+          type="text"
+          value={nodeName}
+          placeholder="自动命名"
+          onChange={(e) => onNodeNameChange(e.currentTarget.value)}
+        />
+      </div>
 
       <div className="prompt-row prompt-row-three-column">
         <PromptTokenEditor

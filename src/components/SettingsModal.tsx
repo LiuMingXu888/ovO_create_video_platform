@@ -31,7 +31,7 @@ export function SettingsModal({ open, downloadDir, onChangeDownloadDir, onPickFo
               <FolderOpen size={16} />
             </button>
           </div>
-          <small>留空则下载到系统下载文件夹。不要加后面的斜杠。</small>
+          <small>留空则下载到系统下载文件夹。路径末尾不要加斜杠。</small>
         </label>
         <div className="settings-actions">
           <button type="button" className="primary-button" onClick={onSave}>保存</button>
