@@ -527,13 +527,56 @@ export function App() {
   }
 
   function selectCanvasHistory(entry: CanvasHistoryEntry) {
+    void openCanvasFromHistory(entry);
+  }
+
+  // 点击历史画布即打开: 本地命中则秒显本地资源 + 后台静默补 snapshot; 未命中则服务端全量加载。
+  async function openCanvasFromHistory(entry: CanvasHistoryEntry) {
     setCanvasUrl(entry.url);
     setCanvasName(entry.name);
-    setProject((current) =>
-      current && (current.canvasUrl === entry.url || current.projectId === entry.projectId)
-        ? { ...current, title: entry.name }
-        : current
-    );
+
+    if (entry.projectId) {
+      const local = await readLocalCanvas(entry.projectId);
+      if (local && local.assets.length > 0) {
+        const localAssets = applyCanvasAssetLayout(local.assets, entry.layout);
+        // 先用最小 project 占位, 让顶部信息有内容; 后台拉到完整 project 后会被替换。
+        setProject({
+          projectId: entry.projectId,
+          canvasUrl: entry.url,
+          title: entry.name,
+          loadedAt: new Date().toISOString()
+        });
+        setCanvasSnapshot(null);
+        setAssets(localAssets);
+        assetsRef.current = localAssets;
+        pendingTasksRef.current = local.pendingTasks;
+        setSortModes(defaultSortModes);
+        setDefaultAssetOrder(createAssetOrder(localAssets));
+        setCanvasError(undefined);
+        addActivityMessage(`已从本地加载 ${localAssets.length} 个资源`);
+        void syncCanvasMetaFromServer(entry.url);
+        return;
+      }
+    }
+
+    // 本地无缓存: 走服务端全量加载(带 loading)。
+    await loadCanvasFromUrl(entry.url);
+  }
+
+  // 后台静默拉取 project + snapshot(不替换已显示的本地资源), 让生成/改名等需要 snapshot 的功能可用。
+  async function syncCanvasMetaFromServer(targetCanvasUrl: string) {
+    if (isSharedCanvasUrl(targetCanvasUrl)) {
+      return;
+    }
+    try {
+      const result = await companyApiFacade.loadCanvasResources(targetCanvasUrl);
+      setProject(result.project);
+      setCanvasSnapshot(result.snapshot);
+      startAutoSave(result.project.projectId);
+      void resumePendingImageTasks(result.project);
+    } catch (error) {
+      console.warn("[openCanvasFromHistory] 后台同步 snapshot 失败", error);
+    }
   }
 
   function deleteCanvasHistory(entry: CanvasHistoryEntry) {

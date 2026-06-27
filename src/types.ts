@@ -15,7 +15,7 @@ export type AssetAction =
 
 export type SortMode = "default" | "generated-asc" | "generated-desc" | "name-asc" | "name-desc";
 
-export type GenerateMode = "video" | "image" | "tools";
+export type GenerateMode = "video" | "image";
 
 export type VideoResolution = "480p" | "720p" | "1080p";
 

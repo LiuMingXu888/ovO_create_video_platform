@@ -13,6 +13,10 @@ function stripAssetPrefix(name: string): string {
   let stripped = name.replace(/^人物[\s\-]*/, '');
   // 去除"音频-"或"音频 -"等变体（模糊匹配）
   stripped = stripped.replace(/^音频[\s\-]*/, '');
+  // 去除"场景-"或"场景 -"等变体（模糊匹配）
+  stripped = stripped.replace(/^场景[\s\-]*/, '');
+  // 去除"道具-"或"道具 -"等变体（模糊匹配）
+  stripped = stripped.replace(/^道具[\s\-]*/, '');
   // 如果替换后为空，返回原名
   return stripped || name;
 }

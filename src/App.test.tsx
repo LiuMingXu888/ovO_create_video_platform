@@ -2612,6 +2612,8 @@ describe("PromptDock", () => {
       <PromptDock
         prompt=""
         references={references}
+        nodeName=""
+        onNodeNameChange={() => undefined}
         onPromptChange={() => undefined}
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
@@ -2645,6 +2647,8 @@ describe("PromptDock", () => {
       <PromptDock
         prompt=""
         references={references}
+        nodeName=""
+        onNodeNameChange={() => undefined}
         onPromptChange={() => undefined}
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
@@ -2670,6 +2674,8 @@ describe("PromptDock", () => {
       <PromptDock
         prompt=""
         references={[]}
+        nodeName=""
+        onNodeNameChange={() => undefined}
         onPromptChange={() => undefined}
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
@@ -2727,6 +2733,8 @@ describe("PromptDock", () => {
       <PromptDock
         prompt=""
         references={[]}
+        nodeName=""
+        onNodeNameChange={() => undefined}
         onPromptChange={() => undefined}
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}
@@ -2764,6 +2772,8 @@ describe("PromptDock", () => {
     const props: React.ComponentProps<typeof PromptDock> = {
       prompt: "",
       references: [],
+      nodeName: "",
+      onNodeNameChange: () => undefined,
       onPromptChange: () => undefined,
       onRemoveReference: () => undefined,
       onLocalFilesSelected: () => undefined,
@@ -2800,6 +2810,8 @@ describe("PromptDock", () => {
       <PromptDock
         prompt=""
         references={[]}
+        nodeName=""
+        onNodeNameChange={() => undefined}
         onPromptChange={() => undefined}
         onRemoveReference={() => undefined}
         onLocalFilesSelected={() => undefined}

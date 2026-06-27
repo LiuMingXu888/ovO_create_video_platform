@@ -95,18 +95,6 @@ export function PromptDock({
         </div>
       )}
 
-      <div className="node-name-row">
-        <label className="node-name-label">
-          <span>:节点名称</span>
-          <input
-            type="text"
-            value={nodeName}
-            placeholder="为生成的节点命名"
-            onChange={(e) => onNodeNameChange(e.currentTarget.value)}
-          />
-        </label>
-      </div>
-
       {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
 
       <div className="node-name-field">
@@ -145,15 +133,6 @@ export function PromptDock({
             >
               图片生成
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={generateMode === "tools"}
-              className={`generate-mode-tab${generateMode === "tools" ? " generate-mode-tab-active" : ""}`}
-              onClick={() => onGenerateModeChange("tools")}
-            >
-              工具
-            </button>
           </div>
           {generateMode === "video" ? (
             <GeneratePanel
@@ -162,15 +141,13 @@ export function PromptDock({
               onGenerate={onGenerate}
               disabled={generateDisabled}
             />
-          ) : generateMode === "image" ? (
+          ) : (
             <ImageGeneratePanel
               settings={imageGenerationSettings}
               onSettingsChange={onImageGenerationSettingsChange}
               onGenerate={onGenerateImage}
               disabled={generateDisabled}
             />
-          ) : (
-            <ToolsPlaceholder />
           )}
         </div>
         <section className="prompt-note-panel" aria-label="提示记录">

@@ -24,6 +24,8 @@ const baseProps = {
   prompt: "",
   references: [] as ReferenceItem[],
   validationErrors: [],
+  nodeName: "",
+  onNodeNameChange: vi.fn(),
   onPromptChange: vi.fn(),
   onRemoveReference: vi.fn(),
   onGenerate: vi.fn(),
