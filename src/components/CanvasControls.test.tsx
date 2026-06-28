@@ -12,7 +12,8 @@ const baseProps = {
   onCanvasUrlChange: vi.fn(), onCanvasNameChange: vi.fn(), onSaveCanvasName: vi.fn(),
   onSelectCanvasHistory: vi.fn(), onDeleteCanvasHistory: vi.fn(), onNewCanvas: vi.fn(),
   onOpenCompanyCanvas: vi.fn(), onLoadCanvas: vi.fn(),
-  onSaveSnapshot: vi.fn(), onOpenSnapshotHistory: vi.fn(), onRestoreSnapshot: vi.fn(), onOpenQijing: vi.fn()
+  onSaveSnapshot: vi.fn(), onOpenSnapshotHistory: vi.fn(), onRestoreSnapshot: vi.fn(), onOpenQijing: vi.fn(),
+  canUndo: false, canRedo: false, onUndo: vi.fn(), onRedo: vi.fn()
 };
 
 describe("CanvasControls 画布按钮", () => {

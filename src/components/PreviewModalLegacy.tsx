@@ -1,10 +1,13 @@
+/**
+ * @deprecated 旧版预览模态框（自研缩放/旋转逻辑）。
+ * 已被基于 ViewerJS 的 PreviewModal.tsx 取代，保留此文件仅作存档参考，
+ * 不在项目中引用。如需回退，可重新导出此组件。
+ */
 import { useEffect, useRef, useState } from "react";
-import Viewer from "viewerjs";
-import "viewerjs/dist/viewer.css";
 import { ChevronLeft, ChevronRight, Download, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
 import type { AssetAction, CanvasAsset } from "../types";
 
-interface PreviewModalProps {
+interface PreviewModalLegacyProps {
   asset: CanvasAsset | null;
   onClose: () => void;
   onPrevious?: () => void;
@@ -15,7 +18,7 @@ interface PreviewModalProps {
   onRename?: (assetId: string, name: string) => void;
 }
 
-export function PreviewModal({
+export function PreviewModalLegacy({
   asset,
   onClose,
   onPrevious,
@@ -24,13 +27,12 @@ export function PreviewModal({
   hasNext = false,
   onAction,
   onRename
-}: PreviewModalProps) {
+}: PreviewModalLegacyProps) {
   const [videoSize, setVideoSize] = useState<{ width: number; height: number } | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [scale, setScale] = useState(1);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
-  const viewerRef = useRef<Viewer | null>(null);
 
   useEffect(() => {
     setVideoSize(null);
@@ -41,59 +43,9 @@ export function PreviewModal({
     setDraftName(asset?.name ?? "");
   }, [asset?.id, asset?.name]);
 
-  // 模态框打开时锁定 body 滚动，关闭后还原（修复下方列表可滚动的问题）。
   useEffect(() => {
-    if (!asset) {
-      return;
-    }
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [asset]);
-
-  // 图片使用 ViewerJS（仅 Modal 模式）：点击图片进入带工具栏的全屏查看器
-  // （放大/缩小/1:1/重置/旋转/翻转/全屏）。视频与音频保留原生播放器。
-  useEffect(() => {
-    if (asset?.kind !== "image" || !imageRef.current) {
-      return;
-    }
-
-    let viewer: Viewer | null = null;
-    try {
-      viewer = new Viewer(imageRef.current, {
-        inline: false,
-        navbar: false,
-        title: true,
-        toolbar: {
-          zoomIn: 1,
-          zoomOut: 1,
-          oneToOne: 1,
-          reset: 1,
-          rotateLeft: 1,
-          rotateRight: 1,
-          flipHorizontal: 1,
-          flipVertical: 1
-        },
-        movable: true,
-        zoomable: true,
-        rotatable: true,
-        scalable: true,
-        keyboard: true,
-        backdrop: true
-      });
-      viewerRef.current = viewer;
-    } catch {
-      // 测试或无 DOM 环境下 ViewerJS 初始化失败时忽略，图片仍正常显示。
-      viewer = null;
-    }
-
-    return () => {
-      viewer?.destroy();
-      viewerRef.current = null;
-    };
-  }, [asset?.id, asset?.kind, asset?.url]);
+    setScale(1);
+  }, [asset?.id]);
 
   if (!asset) {
     return null;
@@ -196,14 +148,24 @@ export function PreviewModal({
             </button>
           </div>
         </div>
-        <div className="preview-frame">
+        <div
+          className="preview-frame"
+          onWheel={(e) => {
+            e.preventDefault();
+            if (e.ctrlKey && asset.kind === "image") {
+              setScale((current) => {
+                const next = current + (e.deltaY < 0 ? 0.25 : -0.25);
+                return Math.min(4, Math.max(1, Number(next.toFixed(2))));
+              });
+            }
+          }}
+        >
           {asset.kind === "image" && (
             <img
-              ref={imageRef}
-              className="preview-media preview-media-viewer"
+              className="preview-media"
               src={asset.url}
               alt={asset.name}
-              title="点击放大查看（支持缩放/旋转/翻转/全屏）"
+              style={{ transform: `scale(${scale})`, transformOrigin: "center center", transition: "transform 0.08s ease-out" }}
             />
           )}
           {asset.kind === "video" && (

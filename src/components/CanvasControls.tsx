@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ExternalLink, History, Link, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Check, ExternalLink, History, Link, Loader2, Plus, RefreshCw, Redo2, Save, Trash2, Undo2 } from "lucide-react";
 import type { CanvasHistoryEntry } from "../lib/canvasHistory";
 import type { SnapshotMeta } from "../lib/canvasSnapshots";
 import { formatSnapshotTimestamp } from "../lib/canvasSnapshots";
@@ -24,6 +24,10 @@ interface CanvasControlsProps {
   onSaveSnapshot: () => void;
   onOpenSnapshotHistory: () => void;
   onRestoreSnapshot: (id: string) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   onOpenQijing: () => void;
 }
 
@@ -46,6 +50,10 @@ export function CanvasControls({
   onSaveSnapshot,
   onOpenSnapshotHistory,
   onRestoreSnapshot,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onOpenQijing
 }: CanvasControlsProps) {
   const [snapshotPopoverOpen, setSnapshotPopoverOpen] = useState(false);
@@ -165,10 +173,29 @@ export function CanvasControls({
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className="secondary-button icon-only-button"
+            onClick={onUndo}
+            disabled={loading || !canUndo}
+            title="撤销上一步"
+            aria-label="撤销上一步"
+          >
+            <Undo2 size={16} />
+          </button>
+          <button
+            type="button"
+            className="secondary-button icon-only-button"
+            onClick={onRedo}
+            disabled={loading || !canRedo}
+            title="重做下一步"
+            aria-label="重做下一步"
+          >
+            <Redo2 size={16} />
+          </button>
         </div>
 
         <div className="canvas-status-line">{loading ? "正在连接公司接口" : authLabel}</div>
-        <div className="canvas-status-line">当前网址：{canvasUrl}</div>
         {errorMessage && <div className="canvas-error-line">{errorMessage}</div>}
       </div>
 

@@ -55,7 +55,7 @@ describe("PromptDock 文字化引用按钮", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "文字化引用到提示词" }));
-    expect(onPromptChange).toHaveBeenCalledWith("图片1音频1是小李\n原有提示词");
+    expect(onPromptChange).toHaveBeenCalledWith("图片1音频1是小李；\n原有提示词");
   });
 
   it("无引用时按钮禁用", () => {

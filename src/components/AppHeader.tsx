@@ -63,11 +63,6 @@ export function AppHeader({
         {onModeChange ? <ModeSwitch mode={appMode} onModeChange={onModeChange} /> : null}
       </div>
 
-      <div className="project-title">
-        <span>{project?.title ?? "未命名项目"}</span>
-        <small>{project ? project.projectId : "本地壳子 · 公司 API 待接入"}</small>
-      </div>
-
       <div className="header-actions">
         {selectionMode ? (
           <>

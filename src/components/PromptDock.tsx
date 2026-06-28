@@ -64,7 +64,7 @@ export function PromptDock({
           onClick={() => {
             const text = buildReferenceText(references);
             if (text) {
-              onPromptChange(`${text}\n${prompt}`);
+              onPromptChange(`${text}；\n${prompt}`);
             }
           }}
         >

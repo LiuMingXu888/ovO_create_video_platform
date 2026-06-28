@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useDropzone } from "react-dropzone";
 import { AppHeader } from "./components/AppHeader";
 import { AssetSearch } from "./components/AssetSearch";
 import { type AppMode } from "./components/ModeSwitch";
@@ -36,6 +37,16 @@ import { replaceAssetCategoryPrefix, stripPromptPrefixes } from "./lib/assetName
 import { validateReferenceItems } from "./lib/referenceValidation";
 import { DEFAULT_IMAGE_GENERATION_SETTINGS } from "./lib/imageGenOptions";
 import { decodeNodeIdTime } from "./lib/nodeIdTime";
+import {
+  canRedo,
+  canUndo,
+  createUndoRedoHistory,
+  pushCheckpoint,
+  redo,
+  undo,
+  type CanvasStateSnapshot,
+  type UndoRedoState
+} from "./lib/undoRedoHistory";
 import { companyApiFacade } from "./services/companyApiFacade";
 import { SEEDANCE_MODEL_NAME } from "./api/generationClient";
 import { chooseSubtitleRemovalRoute } from "./api/subtitleClient";
@@ -288,6 +299,7 @@ export function App() {
   const [canvasLoading, setCanvasLoading] = useState(false);
   const [canvasError, setCanvasError] = useState<string | undefined>();
   const [snapshotHistory, setSnapshotHistory] = useState<SnapshotMeta[]>([]);
+  const [undoRedo, setUndoRedo] = useState<UndoRedoState>(() => createUndoRedoHistory());
   const [activityMessages, setActivityMessages] = useState<ActivityMessage[]>([]);
   const [playingAssetId, setPlayingAssetId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -304,6 +316,19 @@ export function App() {
   const referenceObjectUrls = useRef<Map<string, string>>(new Map());
   const mediaElements = useRef<Map<string, HTMLMediaElement>>(new Map());
   const mounted = useRef(true);
+
+  // 本地文件拖入（react-dropzone）：noClick/noKeyboard，仅响应拖放，不打开文件选择框。
+  // onDrop 引用的 handleDroppedFiles 是提升的函数声明，闭包读取时已存在。
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: (acceptedFiles) => void handleDroppedFiles(acceptedFiles),
+    noClick: true,
+    noKeyboard: true,
+    accept: {
+      "image/*": [],
+      "audio/*": [],
+      "video/*": []
+    }
+  });
 
   // Live mirror of `assets` so async completion handlers (generation /
   // subtitle removal) merge into the *current* list instead of a stale
@@ -970,6 +995,7 @@ export function App() {
       return;
     }
 
+    captureCheckpoint();
     try {
       await deleteAssetCore(asset, canvasSnapshot);
       addActivityMessage(`已删除「${asset.name}」`);
@@ -988,6 +1014,7 @@ export function App() {
     if (!confirmed) {
       return;
     }
+    captureCheckpoint();
     let ok = 0;
     let failed = 0;
     let workingSnapshot = canvasSnapshot;
@@ -1221,12 +1248,83 @@ export function App() {
     await refreshSnapshotHistory();
   }
 
+  // ── 撤销/重做 ───────────────────────────────────────────────────────────────
+  // 复用"恢复历史记录"的整份快照机制：每次破坏性操作（重命名、删除、批量删除、
+  // 切换分类、恢复快照）发生前，调用 captureCheckpoint() 把"操作前"状态压入 undo 栈。
+
+  /** 读取当前整份画布状态（从 ref 取，避免 stale closure）。 */
+  function currentCanvasStateSnapshot(): CanvasStateSnapshot {
+    const s = snapshotStateRef.current;
+    return {
+      assets: s.assets,
+      canvasSnapshot: s.canvasSnapshot,
+      canvasName: s.canvasName,
+      canvasUrl: s.canvasUrl
+    };
+  }
+
+  /** 破坏性操作前调用：把"操作前"状态压入 undo 栈，清空 redo 栈。 */
+  function captureCheckpoint() {
+    setUndoRedo((history) => pushCheckpoint(history, currentCanvasStateSnapshot()));
+  }
+
+  /** 把一份画布状态应用到本地视图，并在在线项目下推回服务端。 */
+  async function applyCanvasStateSnapshot(snapshot: CanvasStateSnapshot) {
+    const typedAssets = snapshot.assets as typeof assets;
+    setAssets(typedAssets);
+    assetsRef.current = typedAssets;
+    setCanvasName(snapshot.canvasName);
+    setCanvasUrl(snapshot.canvasUrl);
+    setCanvasSnapshot(snapshot.canvasSnapshot);
+    persistLocalCanvasFull(project, snapshot.canvasName, snapshot.canvasUrl, typedAssets);
+    setDefaultAssetOrder(createAssetOrder(typedAssets));
+
+    // 在线项目：把这份快照推回服务端，与"恢复历史记录"保持一致。
+    const pid = snapshotStateRef.current.projectId;
+    if (pid && snapshot.canvasSnapshot) {
+      await companyApiFacade.restoreCanvasSnapshot(pid, snapshot.canvasSnapshot);
+    }
+  }
+
+  async function handleUndo() {
+    const result = undo(undoRedo, currentCanvasStateSnapshot());
+    if (!result) {
+      return;
+    }
+    setUndoRedo(result.history);
+    try {
+      await applyCanvasStateSnapshot(result.restored);
+      addActivityMessage("已撤销上一步");
+      showToast("已撤销");
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "撤销同步失败");
+    }
+  }
+
+  async function handleRedo() {
+    const result = redo(undoRedo, currentCanvasStateSnapshot());
+    if (!result) {
+      return;
+    }
+    setUndoRedo(result.history);
+    try {
+      await applyCanvasStateSnapshot(result.restored);
+      addActivityMessage("已重做下一步");
+      showToast("已重做");
+    } catch (error) {
+      setCanvasError(error instanceof Error ? error.message : "重做同步失败");
+    }
+  }
+  // ── end 撤销/重做 ────────────────────────────────────────────────────────────
+
   async function handleRestoreSnapshot(id: string) {
     const pid = snapshotStateRef.current.projectId;
     if (!pid || !window.ovoDesktop?.snapshots) return;
     try {
       // ① 先存保底，防止恢复错了有反悔
       await takeSnapshot("pre-restore");
+      // 记入撤销栈，使"恢复历史记录"本身也可被撤销/重做。
+      captureCheckpoint();
       // ② 取完整快照
       const entry = await window.ovoDesktop.snapshots.get(pid, id);
       if (!entry) throw new Error("快照不存在");
@@ -1307,6 +1405,11 @@ export function App() {
   }
 
   async function renameAsset(assetId: string, name: string) {
+    const previous = assetsRef.current.find((asset) => asset.id === assetId);
+    // 名称未变化时不记录撤销点，避免无效撤销步骤。
+    if (previous && previous.name !== name) {
+      captureCheckpoint();
+    }
     const renamedAssets = assetsRef.current.map((asset) => (asset.id === assetId ? { ...asset, name } : asset));
     setAssets(renamedAssets);
     setReferences((current) => current.map((item) => (item.id.includes(assetId) ? { ...item, name } : item)));
@@ -1339,6 +1442,7 @@ export function App() {
       return;
     }
 
+    captureCheckpoint();
     const nextName = replaceAssetCategoryPrefix(targetAsset.name, category);
     const nextAsset = { ...targetAsset, name: nextName, category };
     const nextAssets = assets.map((asset) => (asset.id === assetId ? nextAsset : asset));
@@ -1432,7 +1536,7 @@ export function App() {
     setDraggedAsset(null);
   }
 
-  async function handleFilesSelected(category: AssetCategory, files: FileList) {
+  async function handleFilesSelected(category: AssetCategory, files: FileList | File[]) {
     const fallbackKind = kindFromCategory(category);
     const uploadInputs = Array.from(files).map((file) => ({
       file,
@@ -1522,6 +1626,31 @@ export function App() {
       }
       return nextOrder;
     });
+  }
+
+  // 本地文件拖入：按 kind 分组路由。图片走前缀解析（无前缀默认人物），
+  // 音频进音频、视频进视频。复用 handleFilesSelected 的上传管线。
+  async function handleDroppedFiles(files: File[]) {
+    if (files.length === 0) {
+      return;
+    }
+
+    const byKind: Record<AssetKind, File[]> = { image: [], audio: [], video: [] };
+    for (const file of files) {
+      byKind[kindFromFile(file, "image")].push(file);
+    }
+
+    // 每个 kind 用对应的 fallback 分类调用一次。图片 fallback=characters，
+    // 图片若带「场景-/道具-」前缀，handleFilesSelected 内的 getCategoryForAssetName 会改写。
+    if (byKind.image.length > 0) {
+      await handleFilesSelected("characters", byKind.image);
+    }
+    if (byKind.audio.length > 0) {
+      await handleFilesSelected("audio", byKind.audio);
+    }
+    if (byKind.video.length > 0) {
+      await handleFilesSelected("video", byKind.video);
+    }
   }
 
   function removeReference(id: string) {
@@ -1850,7 +1979,15 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main {...getRootProps({ className: "app-shell" })}>
+      <input {...getInputProps()} />
+      {isDragActive && (
+        <div className="drop-overlay" aria-hidden="true">
+          <div className="drop-overlay-message">
+            松开即可导入：图片归人物（按前缀分类）、音频归音频、视频归视频
+          </div>
+        </div>
+      )}
       <AppHeader
         authState={authState}
         project={displayProject}
@@ -1899,6 +2036,10 @@ export function App() {
         onSaveSnapshot={() => void handleManualSave()}
         onOpenSnapshotHistory={() => void refreshSnapshotHistory()}
         onRestoreSnapshot={(id) => void handleRestoreSnapshot(id)}
+        canUndo={canUndo(undoRedo)}
+        canRedo={canRedo(undoRedo)}
+        onUndo={() => void handleUndo()}
+        onRedo={() => void handleRedo()}
         onOpenQijing={() => void companyApiFacade.openCanvas("http://qijing.kjjhz.cn/", "plain")}
       />
 

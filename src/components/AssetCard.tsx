@@ -1,5 +1,5 @@
 import { CaptionsOff, Check, Download, Film, Maximize2, MessageSquareText, Package, Pause, Pencil, Play, Plus, RefreshCcw, RotateCw, Trash2, UserRound, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AssetAction, AssetCategory, CanvasAsset } from "../types";
 
 interface AssetCardProps {
@@ -50,10 +50,19 @@ export function AssetCard({
   const [mediaError, setMediaError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const mediaElementRef = useRef<HTMLMediaElement | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const isPlaying = playingAssetId === asset.id;
   const canDragCard = draggable && !editingName;
   const isGenerating = asset.status === "generating";
   const isFailed = asset.status === "failed";
+
+  // 双击编辑时自动全选文本
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [editingName]);
 
   function saveName() {
     const nextName = draftName.trim();
@@ -323,6 +332,7 @@ export function AssetCard({
             </button>
           </div>
           <input
+            ref={nameInputRef}
             aria-label={`编辑名称 ${asset.name}`}
             value={draftName}
             onChange={(event) => setDraftName(event.currentTarget.value)}
