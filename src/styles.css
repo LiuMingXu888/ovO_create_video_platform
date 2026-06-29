@@ -991,6 +991,13 @@ button {
   margin-bottom: 8px;
 }
 
+.prompt-token-editor .node-name-field {
+  width: 100%;
+  padding: 8px 14px 6px;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(217, 76, 84, 0.15);
+}
+
 .node-name-field label {
   font-size: 14px;
   font-weight: 600;
@@ -1042,6 +1049,7 @@ button {
 .prompt-token-editor {
   position: relative;
   display: grid;
+  grid-template-rows: auto 1fr;
   align-self: end;
   min-width: 0;
   min-height: 154px;

@@ -97,21 +97,22 @@ export function PromptDock({
 
       {errors.length > 0 && <div className="validation-errors">{errors.join(" / ")}</div>}
 
-      <div className="node-name-field">
-        <label htmlFor="node-name-input">节点名称</label>
-        <input
-          id="node-name-input"
-          type="text"
-          value={nodeName}
-          placeholder="自动命名"
-          onChange={(e) => onNodeNameChange(e.currentTarget.value)}
-        />
-      </div>
-
       <div className="prompt-row prompt-row-three-column">
         <PromptTokenEditor
           prompt={prompt}
           onPromptChange={onPromptChange}
+          headerSlot={
+            <div className="node-name-field">
+              <label htmlFor="node-name-input">节点名称</label>
+              <input
+                id="node-name-input"
+                type="text"
+                value={nodeName}
+                placeholder="自动命名"
+                onChange={(e) => onNodeNameChange(e.currentTarget.value)}
+              />
+            </div>
+          }
         />
         <div className="generate-column">
           <div className="generate-mode-tabs" role="tablist" aria-label="生成类型">

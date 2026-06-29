@@ -1,14 +1,15 @@
 import { GripVertical } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 interface PromptTokenEditorProps {
   prompt: string;
   onPromptChange: (value: string) => void;
+  headerSlot?: ReactNode;
 }
 
 const MIN_PROMPT_HEIGHT = 154;
 
-export function PromptTokenEditor({ prompt, onPromptChange }: PromptTokenEditorProps) {
+export function PromptTokenEditor({ prompt, onPromptChange, headerSlot }: PromptTokenEditorProps) {
   const [height, setHeight] = useState(MIN_PROMPT_HEIGHT);
   const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
@@ -55,6 +56,7 @@ export function PromptTokenEditor({ prompt, onPromptChange }: PromptTokenEditorP
 
   return (
     <div className="prompt-token-editor" style={{ height }}>
+      {headerSlot}
       {/* Full-width top strip: hovering anywhere along the top edge shows the
           ns-resize cursor and lets the user drag to change height (UI问题1). */}
       <div
