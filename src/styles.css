@@ -1052,7 +1052,7 @@ button {
   grid-template-rows: auto 1fr;
   align-self: end;
   min-width: 0;
-  min-height: 154px;
+  min-height: 190px;
   max-height: 90vh;
   overflow: hidden;
   border: 1px solid #d94c54;

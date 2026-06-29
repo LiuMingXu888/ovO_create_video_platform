@@ -2696,7 +2696,7 @@ describe("PromptDock", () => {
     expect(document.querySelector(".prompt-token-editor textarea")).toHaveClass("prompt-resizable-textarea");
     expect(document.querySelector(".prompt-token-editor textarea")).toHaveStyle({ resize: "none" });
     expect(document.querySelector(".generate-panel")).toHaveClass("generate-panel-fixed");
-    expect(editor).toHaveStyle({ height: "154px" });
+    expect(editor).toHaveStyle({ height: "190px" });
 
     fireEvent(
       handle,
@@ -2713,7 +2713,7 @@ describe("PromptDock", () => {
       })
     );
 
-    expect(editor).toHaveStyle({ height: "254px" });
+    expect(editor).toHaveStyle({ height: "290px" });
 
     fireEvent(
       window,
@@ -2724,7 +2724,7 @@ describe("PromptDock", () => {
     );
     fireEvent(window, new MouseEvent("pointerup", { bubbles: true }));
 
-    expect(editor).toHaveStyle({ height: "154px" });
+    expect(editor).toHaveStyle({ height: "190px" });
   });
 
   it("places prompt, generation settings, and prompt notes in a three-column row", () => {

@@ -7,7 +7,7 @@ interface PromptTokenEditorProps {
   headerSlot?: ReactNode;
 }
 
-const MIN_PROMPT_HEIGHT = 154;
+const MIN_PROMPT_HEIGHT = 190;
 
 export function PromptTokenEditor({ prompt, onPromptChange, headerSlot }: PromptTokenEditorProps) {
   const [height, setHeight] = useState(MIN_PROMPT_HEIGHT);
