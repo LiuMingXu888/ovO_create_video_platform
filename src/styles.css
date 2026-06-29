@@ -1044,7 +1044,7 @@ button {
   display: grid;
   align-self: end;
   min-width: 0;
-  min-height: 192px;
+  min-height: 154px;
   max-height: 90vh;
   overflow: hidden;
   border: 1px solid #d94c54;
@@ -1114,7 +1114,7 @@ button {
 .generate-panel {
   position: relative;
   display: grid;
-  height: 192px;
+  height: 154px;
   grid-template-rows: 20px 28px 28px 32px;
   gap: 6px;
   border: 1px solid #d7d4cc;
@@ -1163,7 +1163,7 @@ button {
 }
 
 .generate-panel-fixed {
-  height: 192px;
+  height: 154px;
 }
 
 .prompt-row:focus-within .generate-panel {
@@ -1604,6 +1604,8 @@ button {
 /* AssetSearch */
 .canvas-controls-search { grid-column: 1 / -1; }
 .canvas-controls-search .asset-search { width: 100%; }
+.canvas-open-buttons-search { margin-top: 50px; width: 100%; }
+.canvas-open-buttons-search .asset-search { width: 100%; }
 .asset-search-bar { display: flex; justify-content: flex-end; padding: 4px 8px; }
 .asset-search { position: relative; width: 280px; }
 .asset-search-input { display: flex; align-items: center; gap: 6px; border: 1px solid #d0d0d0; border-radius: 8px; padding: 4px 8px; background: #fff; }

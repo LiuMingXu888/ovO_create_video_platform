@@ -201,8 +201,6 @@ export function CanvasControls({
         {errorMessage && <div className="canvas-error-line">{errorMessage}</div>}
       </div>
 
-      {searchSlot && <div className="canvas-controls-search">{searchSlot}</div>}
-
       {/* 右列：三个公司画布按钮，顶部与名称行对齐 */}
       <div className="canvas-open-buttons">
         <button type="button" className="secondary-button" onClick={() => onOpenCompanyCanvas("plain")} disabled={!canOpen}>
@@ -217,6 +215,7 @@ export function CanvasControls({
           <ExternalLink size={16} />
           <span>Open公司画布(API Fetch)</span>
         </button>
+        {searchSlot && <div className="canvas-open-buttons-search">{searchSlot}</div>}
       </div>
     </section>
   );
