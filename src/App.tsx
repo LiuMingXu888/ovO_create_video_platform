@@ -2041,18 +2041,17 @@ export function App() {
         onUndo={() => void handleUndo()}
         onRedo={() => void handleRedo()}
         onOpenQijing={() => void companyApiFacade.openCanvas("http://qijing.kjjhz.cn/", "plain")}
+        searchSlot={
+          <AssetSearch
+            assets={assets}
+            onAction={handleAssetAction}
+            onPreview={(asset, results) => {
+              setSearchPreviewResults(results);
+              setPreviewAsset(asset);
+            }}
+          />
+        }
       />
-
-      <div className="asset-search-bar">
-        <AssetSearch
-          assets={assets}
-          onAction={handleAssetAction}
-          onPreview={(asset, results) => {
-            setSearchPreviewResults(results);
-            setPreviewAsset(asset);
-          }}
-        />
-      </div>
 
       <div className="asset-workspace">
         {sectionDefinitions.map((section) => (

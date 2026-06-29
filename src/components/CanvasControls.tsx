@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, ExternalLink, History, Link, Loader2, Plus, RefreshCw, Redo2, Save, Trash2, Undo2 } from "lucide-react";
 import type { CanvasHistoryEntry } from "../lib/canvasHistory";
 import type { SnapshotMeta } from "../lib/canvasSnapshots";
@@ -29,6 +29,7 @@ interface CanvasControlsProps {
   onUndo: () => void;
   onRedo: () => void;
   onOpenQijing: () => void;
+  searchSlot?: ReactNode;
 }
 
 export function CanvasControls({
@@ -54,7 +55,8 @@ export function CanvasControls({
   canRedo,
   onUndo,
   onRedo,
-  onOpenQijing
+  onOpenQijing,
+  searchSlot
 }: CanvasControlsProps) {
   const [snapshotPopoverOpen, setSnapshotPopoverOpen] = useState(false);
 
@@ -198,6 +200,8 @@ export function CanvasControls({
         <div className="canvas-status-line">{loading ? "正在连接公司接口" : authLabel}</div>
         {errorMessage && <div className="canvas-error-line">{errorMessage}</div>}
       </div>
+
+      {searchSlot && <div className="canvas-controls-search">{searchSlot}</div>}
 
       {/* 右列：三个公司画布按钮，顶部与名称行对齐 */}
       <div className="canvas-open-buttons">
