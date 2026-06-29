@@ -18,7 +18,10 @@ export function PromptInfoModal({ asset, onClose }: PromptInfoModalProps) {
         <button type="button" className="modal-close" onClick={onClose} title="关闭" aria-label="关闭">
           <X size={20} />
         </button>
-        <h2 className="preview-title">{asset.name} · 提示词</h2>
+        <h2 className="preview-title">
+          <span className="preview-title-name">{asset.name} · 提示词</span>
+          <span className="preview-model-badge">{asset.model ?? "本地上传"}</span>
+        </h2>
         <div className="prompt-info-thumbs-container">
           <div className="prompt-info-thumbs" aria-label="生成引用素材">
             {references.length === 0 ? (

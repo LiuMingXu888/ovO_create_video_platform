@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Viewer from "viewerjs";
 import "viewerjs/dist/viewer.css";
 import { ChevronLeft, ChevronRight, Download, Pencil, Plus, RefreshCcw, Trash2, X } from "lucide-react";
@@ -31,6 +31,18 @@ export function PreviewModal({
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
+
+  // 键盘左右箭头切换节点
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "ArrowLeft") { e.preventDefault(); onPrevious?.(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); onNext?.(); }
+  }, [onPrevious, onNext]);
+
+  useEffect(() => {
+    if (!asset) return;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [asset, handleKeyDown]);
 
   useEffect(() => {
     setVideoSize(null);
@@ -141,7 +153,8 @@ export function PreviewModal({
             </form>
           ) : (
             <h2 className="preview-title" title={asset.name} onDoubleClick={startRename}>
-              {asset.name}
+              <span className="preview-title-name">{asset.name}</span>
+              <span className="preview-model-badge">{asset.model ?? "本地上传"}</span>
             </h2>
           )}
           <div className="preview-actions" aria-label="预览操作">
